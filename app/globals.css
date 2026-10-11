@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
@@ -20,7 +21,7 @@ button { font:inherit; cursor:pointer; }
 .menu-button { display:none; border:0; background:none; }
 .hero { background:var(--blue); padding:54px 0 64px; }
 .hero-grid { display:grid; grid-template-columns:1fr 1fr; gap:70px; align-items:center; }
-.kicker,.eyebrow { display:block; text-transform:uppercase; letter-spacing:.14em; font-size:8px; color:#52625f; margin:0 0 12px; }
+.kicker,.eyebrow { display:block; text-transform:uppercase; letter-spacing:.12em; font:9px 'DM Mono',monospace; color:#52625f; margin:0 0 12px; }
 .kicker { display:inline-block; background:#e8f1f6; padding:5px 8px; color:#42575a; }
 h1,h2,h3,p { margin-top:0; }
 h1,h2 { font-family:Georgia, 'Times New Roman', serif; font-weight:400; letter-spacing:-.035em; }

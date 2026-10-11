@@ -1,49 +1,66 @@
 'use client'
 
-import './dashboard.css'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useState } from 'react'
-import { Bell, Camera, ChevronDown, CircleHelp, Grid2X2, Heart, LayoutDashboard, LogOut, Menu, MoreHorizontal, Search, Settings, SlidersHorizontal, WalletCards, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Camera } from 'lucide-react'
+import './dashboard.css'
+import { OwnerShell } from '@/components/owner-shell'
+import { fetchOwnerBookings, fetchOwnerListings } from '@/lib/data'
+import { useProfile } from '@/lib/use-profile'
+import { pesos, type BookingWithRelations, type Listing } from '@/lib/types'
 
-const rentals = [
-  ['Sony ZV-E10 & 16–50mm Kit', 'ACTIVE RENTAL', 'Oct 24 - 27 (4 Days)', '₱1,800.00', 'Renter: Paolo R. · Campus Journalist / Vlog Shoot', 'camera'],
-  ['Fujifilm X-T30 II Silver Body', 'AWAITING HAND-OFF', 'Oct 28 - 30 (3 Days)', '₱1,800.00', 'Renter: Alyssa C. · Student Film Documentary', 'body'],
-  ['Sigma 16mm f/1.4 Lens (Sony E)', 'COMPLETED', 'Oct 20 - 23 · Mint Ret.', '₱1,050.00', 'Renter: Marcus B. · Night Architecture Set', 'lens'],
-  ['Godox SL60W Video Light Kit', 'RESERVED', 'Nov 01 - 03 (Weekend)', '₱900.00', 'Renter: Bicol Indie Lab · Studio Pack', 'light'],
-]
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'AWAITING APPROVAL',
+  approved: 'AWAITING HAND-OFF',
+  active: 'ACTIVE RENTAL',
+  returned: 'RETURNED · INSPECTING',
+  completed: 'COMPLETED',
+  declined: 'DECLINED',
+}
 
-const vault = [
-  ['Sony ZV-E10 & 16–...', '₱450', 'VLOGGING · APS-C', 'camera'],
-  ['Fujifilm X-T30 II Body', '₱600', 'HYBRID FILM · APS-C', 'body'],
-  ['Sigma 16mm f/1.4 DC', '₱350', 'FAST PRIME · SONY E', 'lens'],
-  ['Godox SL60W Light...', '₱300', '5600K DAYLIGHT · BOWENS', 'light'],
-]
+function thumbKind(listing: Listing | null) {
+  if (!listing) return 'body'
+  if (listing.category === 'Cameras') return 'camera'
+  if (listing.category === 'Lenses') return 'lens'
+  if (listing.category === 'Lighting') return 'light'
+  return 'body'
+}
 
 function GearThumb({ kind }: { kind: string }) { return <div className={`gear-thumb thumb-${kind}`}><Camera size={34} /></div> }
 
-export default function DashboardPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  return <main className="dashboard-page">
-    <aside className={`dashboard-sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
-      <div className="studio-logo"><span className="brand-mark"><Camera size={13} /></span><div><b>LensShare</b><small>STUDIO<br />COLLECTIVE</small></div></div>
-      <button className="add-gear-button"><span>+</span> Add gear</button>
-      <nav className="dashboard-nav"><Link className="active" href="/dashboard"><LayoutDashboard size={16} /> Dashboard</Link><Link href="/dashboard/rentals"><Grid2X2 size={16} /> Manage Rentals</Link><Link href="/dashboard/listings"><Camera size={16} /> My Listings</Link><Link href="/dashboard/finance"><WalletCards size={16} /> Revenue & Payouts</Link><Link href="/dashboard/settings"><Settings size={16} /> Settings</Link></nav>
-      <div className="profile-chip"><span className="profile-icon">●</span><div><b>Mateo Rossi</b><small>Verified Creator</small></div><ChevronDown size={15} /></div>
-    </aside>
-    <section className="dashboard-main">
-      <header className="dashboard-header"><button className="dashboard-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle dashboard sidebar">{sidebarOpen ? <X /> : <Menu />}</button><div className="search-box"><Search size={16} /><input placeholder="Search rentals, gear serials, or creators..." /></div><span className="guarantee">◉ LensCare™ Guarantee ₱100,000 Insured</span><Bell size={17} /><CircleHelp size={17} /><span className="header-avatar">●</span></header>
-      <div className="dashboard-content"><div className="dashboard-title-row"><div><h1>Studio Dashboard <span className="status-pill">● Hub Naga · Active</span></h1><p>Overview of vault inventory, active peer escrow, and courier dispatch handoffs.</p></div><div className="title-actions"><button><SlidersHorizontal size={14} /> Filter period</button><button className="dark-action">⊕ Add listing</button></div></div>
-      <div className="dashboard-top-grid"><article className="hub-card"><span className="eyebrow">◉ ₱100,000 LensCare™ reserve active</span><h2>Explore your gear vault & rental co-op hub.</h2><p>Respond to verified student creators, schedule instant hub courier dispatches via Maxim or Lalamove, and review automated 24h bank escrow payouts.</p><div className="hub-actions"><button className="dark-action">How escrow works →</button><button>▣ View hub guidelines</button></div></article><article className="net-card"><span className="eyebrow">Monthly owner net take-home</span><strong>₱3,400 <small>↗ +18.4% MoM</small></strong><p>8 Days Rented · 85% Net Share</p><div className="mini-chart"><span /><span /><span /><span /><i /></div><div className="chart-labels"><small>WK 01</small><small>WK 02</small><small>WK 03</small><small>WK 04 (CURR)</small></div></article></div>
-      <div className="metric-grid"><Metric title="Active rentals" value="3 Active Units" detail="● 1 Dispatch Scheduled" kind="wave" /><Metric title="Vault gear online" value="4 Listed Kits" detail="◉ 100% Insured Verified" kind="wave short" /><Metric title="Pending in escrow" value="₱2,850.00" detail="ϟ Auto 24h Bank/GCash Release" kind="wave" /></div>
-      <div className="dashboard-columns"><div id="rentals"><SectionHeading title="Manage Active Bookings" sub="Real-time custody state and digital checklist verifications" link="See all rentals →" /> <div className="rental-list">{rentals.map((item) => <article className="rental-row" key={item[0]}><GearThumb kind={item[5]} /><div className="rental-copy"><div><span className="rental-status">{item[1]}</span><small>{item[2]}</small></div><h3>{item[0]}</h3><p>{item[4]}</p></div><div className="rental-price"><strong>{item[3]}</strong><button>{item[1] === 'ACTIVE RENTAL' ? 'Checklist' : item[1] === 'AWAITING HAND-OFF' ? 'Confirm hand-off' : item[1] === 'COMPLETED' ? '◉ Paid out' : 'Pre-pack kit'}</button></div></article>)}</div></div><div className="side-widgets"><Widget title="Rental Demographics"><div className="donut"><span>100%<small>Verified</small></span></div><div className="legend"><span>■ Student Filmmakers <b>60%</b></span><span>■ Campus Journalists <b>25%</b></span><span>■ Freelance DPs <b>15%</b></span></div></Widget><Widget title="Recent Community Reviews"><Review initials="AM" name="Alan Marti" time="Yesterday" text="Outstanding camera kit. Sony ZV-E10 was cleanly packed, sensor spotless, battery at 100%. Great pickup at Ateneo Ave hub." /><Review initials="OL" name="Onyama Limba" time="3d ago" text="Fujifilm X-T30 II colors were amazing for our short doc. Smooth handoff via Maxim courier and digital gear checklist." /></Widget></div></div>
-      <div className="vault-section" id="vault"><SectionHeading title="My Gear Vault & Public Listings" sub="Active equipment in the LensShare local marketplace" link="4 Kits Online · ⋯" /><div className="vault-grid">{vault.map(item => <article className="vault-card" key={item[0]}><div className="vault-image"><span>AVAILABLE TODAY</span><GearThumb kind={item[3]} /></div><small>{item[2]}</small><h3>{item[0]}</h3><p>⌖ Ateneo Ave Hub · 1.5 km</p><div className="vault-price"><strong>{item[1]}<small>/day</small></strong><button>Edit</button><button>Dates</button></div></article>)}</div></div>
-      <section className="settlement" id="settlement"><div className="section-heading"><div><span className="eyebrow">Settlement protocol</span><h2>Transparent Earnings & Escrow Splits</h2></div><span className="auto-pill">Auto-Payout Trigger: ACTIVE (24H)</span></div><div className="settlement-grid"><div><span>Owner net take-home (85%)</span><strong>₱3,400.00</strong><p>No hidden deductions or platform markups.</p></div><div><span>LensCare co-op pool (15%)</span><strong className="muted-price">₱600.00</strong><p>Funds ₱100k gear replacement insurance & ID vetting.</p></div><div><span>Connected payout ledger</span><p>GCash (••921) <b>₱1,050.00 · Settled</b></p><p>BPI Savings (••3042) <b>₱1,400.00 · Settled</b></p><a href="#settlement">View detailed statement →</a></div></div></section>
-      </div>
-    </section>
-  </main>
-}
-
-function Metric({ title, value, detail, kind }: { title: string; value: string; detail: string; kind: string }) { return <article className="metric-card"><span className="eyebrow">{title}</span><strong>{value}</strong><p>{detail}</p><div className={`metric-wave ${kind}`} /></article> }
-function SectionHeading({ title, sub, link }: { title: string; sub: string; link: string }) { return <div className="section-heading dashboard-section-heading"><div><h2>{title}</h2><p>{sub}</p></div><a href="#rentals">{link}</a></div> }
+function SectionHeading({ title, sub, link }: { title: string; sub: string; link: string }) { return <div className="section-heading dashboard-section-heading"><div><h2>{title}</h2><p>{sub}</p></div><Link href="/dashboard/rentals">{link}</Link></div> }
 function Widget({ title, children }: { title: string; children: React.ReactNode }) { return <article className="widget"><h2>{title}</h2>{children}</article> }
 function Review({ initials, name, time, text }: { initials: string; name: string; time: string; text: string }) { return <div className="review"><span>{initials}</span><div><b>{name}</b><small>{time}</small><p>“{text}”</p></div></div> }
+
+export default function DashboardPage() {
+  const router = useRouter()
+  const { user } = useProfile()
+  const [bookings, setBookings] = useState<BookingWithRelations[]>([])
+  const [listings, setListings] = useState<Listing[]>([])
+
+  useEffect(() => {
+    if (!user) return
+    fetchOwnerBookings(user.id).then(setBookings).catch(() => {})
+    fetchOwnerListings(user.id).then(setListings).catch(() => {})
+  }, [user])
+
+  const activeCount = bookings.filter((b) => b.status === 'active').length
+  const pendingEscrow = bookings.filter((b) => b.status === 'pending' || b.status === 'approved').reduce((sum, b) => sum + Number(b.total), 0)
+  const completedGross = bookings.filter((b) => b.status === 'completed').reduce((sum, b) => sum + Number(b.total), 0)
+  const ownerNet = Math.round(completedGross * 0.85)
+  const coopPool = completedGross - ownerNet
+  const recentBookings = useMemo(() => [...bookings].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 4), [bookings])
+
+  return <OwnerShell title="Studio Dashboard" subtitle="Overview of vault inventory, active peer escrow, and courier dispatch handoffs.">
+    <div className="dashboard-top-grid"><article className="hub-card"><span className="eyebrow">◉ ₱100,000 LensCare™ reserve active</span><h2>Explore your gear vault & rental co-op hub.</h2><p>Respond to verified student creators, schedule instant hub courier dispatches via Maxim or Lalamove, and review automated 24h bank escrow payouts.</p><div className="hub-actions"><button className="dark-action" onClick={() => router.push('/dashboard/rentals')}>Review bookings →</button><button onClick={() => router.push('/dashboard/listings')}>▣ View hub guidelines</button></div></article><article className="net-card"><span className="eyebrow">Owner net from completed rentals (85%)</span><strong>{pesos(ownerNet)}</strong><p>{bookings.filter((b) => b.status === 'completed').length} completed {bookings.filter((b) => b.status === 'completed').length === 1 ? 'rental' : 'rentals'} · 15% co-op pool</p><div className="mini-chart"><span /><span /><span /><i /></div><div className="chart-labels"><small>WK 01</small><small>WK 02</small><small>WK 03</small><small>WK 04 (CURR)</small></div></article></div>
+    <div className="metric-grid">
+      <article className="metric-card"><span className="eyebrow">Active rentals</span><strong>{activeCount} Active {activeCount === 1 ? 'Unit' : 'Units'}</strong><p>● From live bookings</p><div className="metric-wave" /></article>
+      <article className="metric-card"><span className="eyebrow">Vault gear online</span><strong>{listings.filter((l) => l.status === 'available').length} of {listings.length} Listed</strong><p>◉ Available on the marketplace</p><div className="metric-wave short" /></article>
+      <article className="metric-card"><span className="eyebrow">Pending in escrow</span><strong>{pesos(pendingEscrow)}</strong><p>ϟ Pending + approved bookings</p><div className="metric-wave" /></article>
+    </div>
+    <div className="dashboard-columns"><div id="rentals"><SectionHeading title="Manage Active Bookings" sub="Real-time custody state and digital checklist verifications" link="See all rentals →" /> <div className="rental-list">{recentBookings.map((booking) => <article className="rental-row" key={booking.id}><GearThumb kind={thumbKind(booking.listing)} /><div className="rental-copy"><div><span className="rental-status">{STATUS_LABEL[booking.status]}</span><small>{booking.start_date} → {booking.end_date} ({booking.days} {booking.days === 1 ? 'day' : 'days'})</small></div><h3>{booking.listing?.name || 'Removed listing'}</h3><p>Renter: {booking.renter?.full_name || 'Renter'} · {booking.shoot_description || 'No shoot description.'}</p></div><div className="rental-price"><strong>{pesos(Number(booking.total))}</strong><Link href="/dashboard/rentals">{booking.status === 'active' ? 'Checklist' : booking.status === 'approved' ? 'Confirm hand-off' : booking.status === 'pending' ? 'Review request' : booking.status === 'completed' ? '◉ Paid out' : 'View'}</Link></div></article>)}{!recentBookings.length && <div className="owner-empty"><h3>No bookings yet</h3><p>When renters request your gear, the requests appear here instantly.</p></div>}</div></div><div className="side-widgets"><Widget title="Rental Demographics"><div className="donut"><span>100%<small>Verified</small></span></div><div className="legend"><span>■ Student Filmmakers <b>60%</b></span><span>■ Campus Journalists <b>25%</b></span><span>■ Freelance DPs <b>15%</b></span></div></Widget><Widget title="Recent Community Reviews"><Review initials="AM" name="Alan Marti" time="Yesterday" text="Outstanding camera kit. Sony ZV-E10 was cleanly packed, sensor spotless, battery at 100%. Great pickup at Ateneo Ave hub." /><Review initials="OL" name="Onyama Limba" time="3d ago" text="Fujifilm X-T30 II colors were amazing for our short doc. Smooth handoff via Maxim courier and digital gear checklist." /></Widget></div></div>
+    <div className="vault-section" id="vault"><SectionHeading title="My Gear Vault & Public Listings" sub="Active equipment in the LensShare local marketplace" link={`${listings.length} Kits Online · ⋯`} /><div className="vault-grid">{listings.map((listing) => <article className="vault-card" key={listing.id}><div className="vault-image"><span>{listing.status === 'available' ? 'AVAILABLE TODAY' : 'PAUSED'}</span><GearThumb kind={thumbKind(listing)} /></div><small>{listing.meta || `${listing.brand} · ${listing.category}`}</small><h3>{listing.name}</h3><p>⌖ Naga City Hub</p><div className="vault-price"><strong>{pesos(Number(listing.daily_rate))}<small>/day</small></strong><Link href="/dashboard/listings">Edit</Link></div></article>)}</div></div>
+    <section className="settlement" id="settlement"><div className="section-heading"><div><span className="eyebrow">Settlement protocol</span><h2>Transparent Earnings & Escrow Splits</h2></div><span className="auto-pill">Auto-Payout Trigger: ACTIVE (24H)</span></div><div className="settlement-grid"><div><span>Owner net take-home (85%)</span><strong>{pesos(ownerNet)}</strong><p>From completed rentals. No hidden deductions or platform markups.</p></div><div><span>LensCare co-op pool (15%)</span><strong className="muted-price">{pesos(coopPool)}</strong><p>Funds ₱100k gear replacement insurance & ID vetting.</p></div><div><span>Connected payout ledger</span><p>Payment provider not connected yet — earnings shown are computed from completed bookings.</p><Link href="/dashboard/finance">View detailed statement →</Link></div></div></section>
+  </OwnerShell>
+}

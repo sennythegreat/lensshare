@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BadgeCheck, BookOpen, Camera, CircleHelp, Menu, UserRound, X } from 'lucide-react'
 import { useState } from 'react'
+import { useProfile } from '@/lib/use-profile'
+import { initialsOf } from '@/lib/types'
 import '../app/dashboard/owner-pages.css'
 
 const links = [
@@ -16,12 +18,10 @@ const links = [
 
 export function RenterShell({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle: string }) {
   const pathname = usePathname(); const [open, setOpen] = useState(false)
-  return <div className="owner-page renter-page"><aside className={`owner-sidebar ${open ? 'open' : ''}`}><div className="owner-logo"><span className="logo-mark"><img src="/lensshare-camera.png" alt="" /></span><strong>LensShare</strong><small>RENTER WORKSPACE</small></div><button className="owner-add"><Camera size={14} /> BROWSE GEAR</button><nav className="owner-nav">{links.map(([href, label, Icon]) => <Link key={href} href={href} className={pathname === href ? 'active' : ''} onClick={() => setOpen(false)}><Icon size={16} /> {label}</Link>)}</nav><div className="owner-user"><span>JV</span><div><b>Julian V.</b><small>Verified renter</small></div></div></aside><main className="owner-main"><header className="owner-header"><button className="owner-menu" onClick={() => setOpen(!open)} aria-label="Toggle menu">{open ? <X size={18} /> : <Menu size={18} />}</button><div className="owner-search">⌕ <input placeholder="Search cameras, lenses, and gear..." /></div><span className="owner-demo">DEMO RENTER · NAGA CITY HUB</span><Link href="/login" className="owner-avatar">JV</Link></header><div className="owner-content"><div className="owner-heading"><div><p className="eyebrow">RENTER WORKSPACE · NAGA CITY HUB</p><h1>{title}</h1><p>{subtitle}</p></div></div>{children}</div></main></div>
-} 
+  const { profile } = useProfile()
+  const name = profile?.full_name || 'Renter'
+  const initials = profile ? initialsOf(name) : '…'
+  return <div className="owner-page renter-page"><aside className={`owner-sidebar ${open ? 'open' : ''}`}><div className="owner-logo"><span className="logo-mark"><img src="/lensshare-camera.png" alt="" /></span><strong>LensShare</strong><small>RENTER WORKSPACE</small></div><button className="owner-add"><Camera size={14} /> BROWSE GEAR</button><nav className="owner-nav">{links.map(([href, label, Icon]) => <Link key={href} href={href} className={pathname === href ? 'active' : ''} onClick={() => setOpen(false)}><Icon size={16} /> {label}</Link>)}</nav><div className="owner-user"><span>{initials}</span><div><b>{name}</b><small>Verified renter</small></div></div></aside><main className="owner-main"><header className="owner-header"><button className="owner-menu" onClick={() => setOpen(!open)} aria-label="Toggle menu">{open ? <X size={18} /> : <Menu size={18} />}</button><div className="owner-search">⌕ <input placeholder="Search cameras, lenses, and gear..." /></div><span className="owner-demo">RENTER · NAGA CITY HUB</span><Link href="/renter/profile" className="owner-avatar">{initials}</Link></header><div className="owner-content"><div className="owner-heading"><div><p className="eyebrow">RENTER WORKSPACE · NAGA CITY HUB</p><h1>{title}</h1><p>{subtitle}</p></div></div>{children}</div></main></div>
+}
 
 export function Status({ children, tone = 'teal' }: { children: React.ReactNode; tone?: string }) { return <span className={`status ${tone}`}>{children}</span> }
-export const renterBookings = [
-  { id: 'LS-RNT-1048', name: 'Sony ZV-E10 & 16–50mm Kit', owner: 'Mara Santos', dates: 'Oct 25 – Oct 28, 2024', days: 3, total: 1350, status: 'Pending', image: '/lensshare-camera.png' },
-  { id: 'LS-RNT-0982', name: 'Fujifilm X-T30 II Silver Body', owner: 'Paolo R.', dates: 'Oct 12 – Oct 14, 2024', days: 2, total: 1200, status: 'Completed', image: '/camera-fujifilm.png' },
-]
-export const renterGear = { name: 'Sony ZV-E10 & 16–50mm Kit', owner: 'Mara Santos', price: 450, image: '/lensshare-camera.png' }
