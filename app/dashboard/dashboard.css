@@ -2,3 +2,52 @@
 @media(max-width:1000px){.dashboard-sidebar{width:220px}.dashboard-content{padding:24px}.dashboard-header{padding:0 24px}.guarantee{display:none}.dashboard-top-grid,.dashboard-columns{grid-template-columns:1fr}.side-widgets{display:grid;grid-template-columns:1fr 1fr}.vault-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:700px){.dashboard-sidebar{position:fixed;z-index:10;left:-240px;top:0;bottom:0;transition:left .2s;width:240px;box-shadow:10px 0 20px #0002}.dashboard-sidebar.sidebar-open{left:0}.dashboard-menu{display:block}.dashboard-header{gap:10px;padding:0 16px}.dashboard-content{padding:20px 16px}.dashboard-title-row{align-items:start;flex-direction:column}.title-actions{width:100%}.title-actions button{flex:1;justify-content:center}.dashboard-title-row h1{font-size:29px}.status-pill{display:inline-block;margin-top:8px}.metric-grid{grid-template-columns:1fr;margin-bottom:30px}.rental-row{align-items:flex-start}.rental-price strong{font-size:17px}.rental-price button{font-size:7px}.side-widgets{grid-template-columns:1fr}.vault-grid,.settlement-grid{grid-template-columns:1fr 1fr}.settlement .section-heading{flex-direction:column;gap:14px}.auth-page{grid-template-columns:1fr}.auth-brand-panel{min-height:330px;padding:30px 26px}.auth-brand-copy{margin:45px 0 25px}.auth-brand-copy h1{font-size:46px}.auth-form-panel{padding:30px 26px;min-height:600px}.auth-form-wrap{margin:70px auto 0}}
 @media(max-width:480px){.vault-grid,.settlement-grid{grid-template-columns:1fr}.hub-card h2{font-size:24px}.hub-actions{flex-direction:column}.rental-copy h3{font-size:14px}.rental-copy p{font-size:9px}.rental-price{display:none}.search-box{max-width:none}.dashboard-header>svg{display:none}}
+
+/* Fixed studio shell: only the workspace scrolls on desktop. */
+.dashboard-page{height:100dvh;min-height:100dvh;overflow:hidden;display:block}
+.dashboard-sidebar{position:fixed;inset:0 auto 0 0;width:262px;height:100dvh;min-height:0;z-index:20;overflow:hidden}
+.dashboard-main{height:100dvh;margin-left:262px;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth}
+.dashboard-header{position:sticky;top:0;z-index:15}
+.dashboard-content{width:min(100% - 64px, 1680px);margin:0 auto;padding-top:34px;padding-bottom:64px}
+.dashboard-top-grid{grid-template-columns:minmax(0,1.45fr) minmax(300px,.85fr)}
+.dashboard-columns{grid-template-columns:minmax(0,1.55fr) minmax(300px,.85fr)}
+.metric-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.vault-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.settlement-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+
+@media (min-width:1440px){
+  .dashboard-content{width:min(calc(100% - 80px),1920px);padding-left:18px;padding-right:18px}
+  .dashboard-header{padding-left:40px;padding-right:40px}
+  .dashboard-top-grid{grid-template-columns:minmax(0,1.55fr) minmax(360px,.85fr)}
+  .dashboard-columns{grid-template-columns:minmax(0,1.7fr) minmax(340px,.8fr);gap:28px}
+  .vault-grid{gap:18px}
+}
+@media (min-width:1920px){
+  .dashboard-sidebar{width:280px}
+  .dashboard-main{margin-left:280px}
+  .dashboard-content{width:min(calc(100% - 96px),2200px)}
+}
+@media (min-width:701px) and (max-width:1100px){
+  .dashboard-sidebar{width:220px;padding-left:16px;padding-right:16px}
+  .dashboard-main{margin-left:220px}
+  .dashboard-content{width:min(100% - 40px,1200px);padding-top:24px}
+  .dashboard-header{padding-left:22px;padding-right:22px}
+  .dashboard-top-grid,.dashboard-columns{grid-template-columns:minmax(0,1fr)}
+  .metric-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+}
+@media (max-width:700px){
+  .dashboard-page{height:auto;min-height:100vh;overflow:visible}
+  .dashboard-sidebar{height:100dvh;left:-240px;right:auto;width:240px;z-index:40;overflow:hidden}
+  .dashboard-sidebar.sidebar-open{left:0}
+  .dashboard-main{height:auto;min-height:100vh;margin-left:0;overflow:visible}
+  .dashboard-header{position:sticky;top:0;z-index:30}
+  .dashboard-content{width:100%;padding-top:20px}
+  .dashboard-top-grid,.dashboard-columns{grid-template-columns:minmax(0,1fr);gap:18px}
+  .metric-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+  .vault-grid,.settlement-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dashboard-title-row{flex-direction:column;align-items:flex-start}
+  .side-widgets{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:480px){
+  .vault-grid,.settlement-grid{grid-template-columns:minmax(0,1fr)}
+}
