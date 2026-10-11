@@ -8,13 +8,14 @@ import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const router = useRouter()
+  const [email, setEmail] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSubmitted(true)
-    router.push('/dashboard')
+    router.push(email.includes('renter') || email.includes('customer') ? '/browse' : '/dashboard')
   }
 
   return (
@@ -34,8 +35,9 @@ export default function LoginPage() {
           <span className="eyebrow">Welcome back</span>
           <h2>Log in to your studio</h2>
           <p className="auth-subtitle">Access your gear vault, rentals, and community payouts.</p>
+          <div className="demo-accounts"><span>Demo accounts</span><button type="button" onClick={() => setEmail('renter@lensshare.demo')}>Renter / customer</button><button type="button" onClick={() => setEmail('owner@lensshare.demo')}>Owner dashboard</button></div>
           <form onSubmit={handleSubmit} className="auth-form">
-            <label htmlFor="email">Email address<input id="email" type="email" placeholder="you@example.com" required /></label>
+            <label htmlFor="email">Email address<input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required /></label>
             <label htmlFor="password">Password<div className="password-field"><input id="password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" required /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>
             <div className="auth-options"><label className="checkbox-label"><input type="checkbox" /> Remember me</label><button type="button" className="forgot-button">Forgot password?</button></div>
             <button className="auth-submit" type="submit">Log in <ArrowLeft size={14} className="rotate-arrow" /></button>
