@@ -1,26 +1,27 @@
-"use client"
+'use client'
 
 import Link from 'next/link'
-import { Camera, ClipboardList, CircleHelp, IdCard, Menu, Settings, UserRound, X } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { BadgeCheck, BookOpen, Camera, CircleHelp, Menu, UserRound, X } from 'lucide-react'
 import { useState } from 'react'
-import './renter-shell.css'
+import '../app/dashboard/owner-pages.css'
 
-export function RenterShell({ children, active = 'browse' }: { children: React.ReactNode; active?: string }) {
-  const [open, setOpen] = useState(false)
-  const links = [['browse','Browse Equipment','/browse',Camera],['bookings','My Bookings','/bookings',ClipboardList],['profile','My Profile','/profile',UserRound],['verification','Verification','/verification',IdCard],['help','How It Works','#how',CircleHelp]] as const
-  return <div className="renter-shell"><aside className={open ? 'renter-sidebar open' : 'renter-sidebar'}><div className="renter-logo"><span><Camera /></span><div><b>LensShare</b><small>/ ARCHIVE<br/>P2P OPTICAL CO-OP</small></div></div><nav>{links.map(([key,label,href,Icon]) => <Link key={key} className={active === key ? 'active' : ''} href={href} onClick={() => setOpen(false)}><Icon />{label}</Link>)}</nav><div className="renter-account"><span>JV</span><div><b>Julian V.</b><small>VERIFIED RENTER</small></div><Settings /></div></aside><main className="renter-main"><header className="renter-header"><button className="renter-menu" onClick={() => setOpen(!open)} aria-label="Toggle renter menu">{open ? <X /> : <Menu />}</button><div className="renter-search"><Camera /><input placeholder="Search cameras, lenses, and gear..." /></div><span className="coverage">◉ LensCare™ ₱100,000 insured</span><Link href="/login" className="renter-avatar">JV</Link></header>{children}</main></div>
-}
+const links = [
+  ['/browse', 'Browse Equipment', Camera],
+  ['/renter/bookings', 'My Bookings', BookOpen],
+  ['/renter/profile', 'My Profile', UserRound],
+  ['/renter/verification', 'Verification', BadgeCheck],
+  ['/renter/how-it-works', 'How It Works', CircleHelp],
+] as const
 
-export function RenterPage({ title, subtitle, active, children }: { title: string; subtitle: string; active: string; children: React.ReactNode }) { return <RenterShell active={active}><section className="renter-content"><div className="renter-heading"><div><p className="renter-eyebrow">NAGA CITY HUB · RENTER WORKSPACE</p><h1>{title}</h1><p>{subtitle}</p></div><span className="hub-badge">● NAGA HUB · ACTIVE</span></div>{children}</section></RenterShell> }
+export function RenterShell({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle: string }) {
+  const pathname = usePathname(); const [open, setOpen] = useState(false)
+  return <div className="owner-page renter-page"><aside className={`owner-sidebar ${open ? 'open' : ''}`}><div className="owner-logo"><span className="logo-mark"><img src="/lensshare-camera.png" alt="" /></span><strong>LensShare</strong><small>RENTER WORKSPACE</small></div><button className="owner-add"><Camera size={14} /> BROWSE GEAR</button><nav className="owner-nav">{links.map(([href, label, Icon]) => <Link key={href} href={href} className={pathname === href ? 'active' : ''} onClick={() => setOpen(false)}><Icon size={16} /> {label}</Link>)}</nav><div className="owner-user"><span>JV</span><div><b>Julian V.</b><small>Verified renter</small></div></div></aside><main className="owner-main"><header className="owner-header"><button className="owner-menu" onClick={() => setOpen(!open)} aria-label="Toggle menu">{open ? <X size={18} /> : <Menu size={18} />}</button><div className="owner-search">⌕ <input placeholder="Search cameras, lenses, and gear..." /></div><span className="owner-demo">DEMO RENTER · NAGA CITY HUB</span><Link href="/login" className="owner-avatar">JV</Link></header><div className="owner-content"><div className="owner-heading"><div><p className="eyebrow">RENTER WORKSPACE · NAGA CITY HUB</p><h1>{title}</h1><p>{subtitle}</p></div></div>{children}</div></main></div>
+} 
 
-export function Status({ children, tone = 'teal' }: { children: React.ReactNode; tone?: string }) { return <span className={`renter-status ${tone}`}>{children}</span> }
-
-export function RenterCard({ children, className = '' }: { children: React.ReactNode; className?: string }) { return <section className={`renter-card ${className}`}>{children}</section> }
-
-export function RenterButtons() { return null }
-
-export function DemoNote() { return <p className="demo-note">DEMO WORKSPACE · Connect a backend to persist renter data and bookings.</p> }
-
-export function RenterFooter() { return null }
-
-export function RenterLink({ href, children }: { href: string; children: React.ReactNode }) { return <Link href={href} className="renter-button">{children}</Link> }
+export function Status({ children, tone = 'teal' }: { children: React.ReactNode; tone?: string }) { return <span className={`status ${tone}`}>{children}</span> }
+export const renterBookings = [
+  { id: 'LS-RNT-1048', name: 'Sony ZV-E10 & 16–50mm Kit', owner: 'Mara Santos', dates: 'Oct 25 – Oct 28, 2024', days: 3, total: 1350, status: 'Pending', image: '/lensshare-camera.png' },
+  { id: 'LS-RNT-0982', name: 'Fujifilm X-T30 II Silver Body', owner: 'Paolo R.', dates: 'Oct 12 – Oct 14, 2024', days: 2, total: 1200, status: 'Completed', image: '/camera-fujifilm.png' },
+]
+export const renterGear = { name: 'Sony ZV-E10 & 16–50mm Kit', owner: 'Mara Santos', price: 450, image: '/lensshare-camera.png' }
