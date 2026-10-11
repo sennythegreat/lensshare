@@ -25,7 +25,7 @@ export default function Page() {
         <div className={`nav-links ${menuOpen ? 'open' : ''}`}>
           <a href="#how">How it works</a><a href="#gear">Browse gear</a><a href="#owners">Rent your gear</a><a href="#community">Monetization</a>
         </div>
-        <div className="nav-actions"><button className="text-button">Sign up</button><button className="pill-button">Log in</button></div>
+        <div className="nav-actions"><a className="text-button" href="/login">Sign up</a><a className="pill-button" href="/login">Log in</a></div>
         <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">{menuOpen ? <X /> : <Menu />}</button>
       </nav>
 
