@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowUpRight, Camera, Check, ChevronRight, CircleHelp, Heart, LockKeyhole, Menu, Repeat2, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, Tag, X } from 'lucide-react'
+import { ArrowUpRight, Check, ChevronRight, CircleHelp, Heart, LockKeyhole, Menu, Repeat2, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, Tag, X } from 'lucide-react'
 
 const gear = [
   { tag: 'MIRRORLESS / SONY', name: 'Sony ZV-E10', detail: '4K vlog-ready camera with lens', price: '₱450', image: '/lensshare-camera.png' },
@@ -21,7 +21,7 @@ export default function Page() {
   return (
     <main>
       <nav className="nav shell">
-        <a href="#top" className="brand"><span className="brand-mark"><Camera size={14} /></span> LensShare</a>
+        <a href="#top" className="brand"><span className="brand-mark"><img src="/lensshare-logo.png" alt="" /></span> LensShare</a>
         <div className={`nav-links ${menuOpen ? 'open' : ''}`}>
           <a href="#how">How it works</a><a href="#gear">Browse gear</a><a href="#owners">Rent your gear</a><a href="#community">Monetization</a>
         </div>
@@ -45,7 +45,7 @@ export default function Page() {
 
       <section className="final-cta"><div className="shell center-heading"><SectionLabel>Local creatives marketplace</SectionLabel><h2>Bring Your Ideas to Life.<br/>Join LensShare Today.</h2><p>Whether you are shooting a campus documentary, filming a weekend vlog, or earning passive income on your camera — you belong in our community.</p><div className="hero-actions"><a className="button light" href="#gear">Find gear near you <ArrowUpRight size={14}/></a><a className="button outline-light" href="#owners">List your gear</a></div></div></section>
 
-      <footer className="footer"><div className="shell footer-grid"><div><a className="brand" href="#top"><span className="brand-mark"><Camera size={14}/></span> LensShare</a><p>Protection-powered peer-to-peer access for creators, students, and essential gear.</p><small>© 2026 LensShare · Local creator peer network</small></div>{[['Marketplace','Browse Gear','Vlogging Kits','Lenses','Portable Lighting'],['For owners','List Equipment','Earnings Calculator','Coverage & Theft Policy','How it works'],['Community','Find Filmmakers','Student Journalists','Student Filmmakers','Create Blog'],['Security & care','LensShare','Every transaction is secured by payment screening and verified identity.']].map(([title,...items])=><div key={title}><b>{title}</b>{items.map(item=><a href="#top" key={item}>{item}</a>)}</div>)}</div></footer>
+      <footer className="footer"><div className="shell footer-grid"><div><a className="brand" href="#top"><span className="brand-mark"><img src="/lensshare-logo.png" alt="" /></span> LensShare</a><p>Protection-powered peer-to-peer access for creators, students, and essential gear.</p><small>© 2026 LensShare · Local creator peer network</small></div>{[['Marketplace','Browse Gear','Vlogging Kits','Lenses','Portable Lighting'],['For owners','List Equipment','Earnings Calculator','Coverage & Theft Policy','How it works'],['Community','Find Filmmakers','Student Journalists','Student Filmmakers','Create Blog'],['Security & care','LensShare','Every transaction is secured by payment screening and verified identity.']].map(([title,...items])=><div key={title}><b>{title}</b>{items.map(item=><a href="#top" key={item}>{item}</a>)}</div>)}</div></footer>
     </main>
   )
 }

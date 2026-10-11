@@ -4,7 +4,7 @@ import '../dashboard/dashboard.css'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FormEvent, useState } from 'react'
-import { ArrowLeft, Camera, Eye, EyeOff, LockKeyhole } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, LockKeyhole } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Role } from '@/lib/types'
 
@@ -46,7 +46,7 @@ export default function SignupPage() {
   return (
     <main className="auth-page">
       <div className="auth-panel auth-brand-panel">
-        <Link href="/" className="brand auth-brand"><span className="brand-mark"><Camera size={14} /></span> LensShare</Link>
+        <Link href="/" className="brand auth-brand"><span className="brand-mark"><img src="/lensshare-logo.png" alt="" /></span> LensShare</Link>
         <div className="auth-brand-copy">
           <span className="kicker">Local creatives marketplace</span>
           <h1>Join the co-op.</h1>

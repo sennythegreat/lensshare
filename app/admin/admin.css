@@ -5,7 +5,7 @@
 .admin-page{min-height:100vh;background:#f3f3f0;color:#17201d;display:flex;font:13px Arial,sans-serif}
 .admin-sidebar{width:236px;flex:none;background:#07100e;padding:26px 18px 20px;display:flex;flex-direction:column;min-height:100vh}
 .admin-logo{display:flex;gap:9px;align-items:center;margin:0 3px 28px}
-.admin-logo-mark{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#dcebe7;color:#07100e;flex:none}
+.admin-logo-mark{display:grid;place-items:center;width:28px;height:30px;flex:none}
 .admin-logo b{font:700 16px Georgia,serif;display:block;color:#fff}
 .admin-logo small{font:8px 'DM Mono',monospace;letter-spacing:.18em;color:#7d8a84;line-height:1.55;display:block}
 .admin-sidebar nav{display:flex;flex-direction:column;gap:3px}
@@ -68,3 +68,11 @@
 .user-menu-panel a,.user-menu-panel button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:9px 12px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#3c4744;cursor:pointer;text-decoration:none;text-align:left}
 .user-menu-panel a:hover,.user-menu-panel button:hover{background:#f2f4f1;color:#17201d}
 .admin-topbar .user-menu{margin-left:auto}
+/* Identity beside the avatar */
+.user-menu-trigger{display:flex;align-items:center;gap:9px;background:none}
+.user-menu-name{display:flex;flex-direction:column;align-items:flex-end;line-height:1.3;white-space:nowrap}
+.user-menu-name b{font-size:12px;color:#fff}
+.user-menu-name small{font-size:9px;color:#7d8a84;text-transform:uppercase;letter-spacing:.06em}
+.admin-topbar .user-menu{margin-left:14px}
+@media(max-width:800px){.user-menu-name{display:none}}
+.admin-logo-mark img{width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { Camera, LayoutDashboard, Menu, Package, ShieldCheck, Users, X } from 'lucide-react'
+import { LayoutDashboard, Menu, Package, ShieldCheck, Users, X } from 'lucide-react'
 import { useProfile } from '@/lib/use-profile'
 import { initialsOf } from '@/lib/types'
 import { UserMenu } from '@/components/user-menu'
@@ -29,7 +29,7 @@ export function AdminShell({ children, title, subtitle }: { children: React.Reac
 
   return <main className="admin-page">
     <aside className={`admin-sidebar ${open ? 'open' : ''}`}>
-      <div className="admin-logo"><span className="admin-logo-mark"><Camera size={14} /></span><div><b>LensShare</b><small>ADMIN<br />CONSOLE</small></div></div>
+      <div className="admin-logo"><span className="admin-logo-mark"><img src="/lensshare-logo.png" alt="" /></span><div><b>LensShare</b><small>ADMIN<br />CONSOLE</small></div></div>
       <nav>{navLinks.map(([href, Icon, label]) => <Link key={href} href={href} className={pathname === href ? 'active' : ''} onClick={() => setOpen(false)}><Icon size={15} /> {label}</Link>)}</nav>
       <div className="admin-profile"><span className="admin-initials">{initials}</span><div><b>{name}</b><small>Platform admin</small></div></div>
     </aside>

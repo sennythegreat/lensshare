@@ -31,7 +31,10 @@ export function UserMenu({ initials, name, subtitle, settingsHref, triggerClassN
   }
 
   return <div className="user-menu" ref={ref}>
-    <button type="button" className={triggerClassName} aria-label="Account menu" aria-expanded={open} onClick={() => setOpen(!open)}>{initials}</button>
+    <button type="button" className="user-menu-trigger" aria-label="Account menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <span className="user-menu-name"><b>{name}</b><small>{subtitle}</small></span>
+      <span className={triggerClassName}>{initials}</span>
+    </button>
     {open && <div className="user-menu-panel">
       <div className="user-menu-head"><b>{name}</b><small>{subtitle}</small></div>
       {settingsHref && <Link href={settingsHref} onClick={() => setOpen(false)}><UserRound size={14} /> Account settings</Link>}

@@ -53,9 +53,10 @@ finishing any change.
   `postgres_changes` on `bookings`, filtered by their own id.
 - Gear photos upload to the public `gear-photos` storage bucket under
   `{user_id}/…`.
-- Demo accounts (password `demo1234`): `lensshare.owner@example.com` (Mateo Rossi)
-  and `lensshare.renter@example.com` (Julian Valdez). Sign them up through the app,
-  then run `seed.sql` to attach their listings and bookings.
+- Seed/demo accounts (password `demo1234`): `lensshare.owner@example.com` (Mateo Rossi)
+  and `lensshare.renter@example.com` (Julian Valdez). The login page has no
+  demo prefills — these accounts exist for `seed.sql` and manual testing; sign
+  them up through the app (or the dashboard), then run `seed.sql`.
 
 ## Routes
 

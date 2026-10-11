@@ -47,3 +47,24 @@
 .user-menu-panel a,.user-menu-panel button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:9px 12px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#3c4744;cursor:pointer;text-decoration:none;text-align:left}
 .user-menu-panel a:hover,.user-menu-panel button:hover{background:#f2f4f1;color:#17201d}
 .owner-header .user-menu{margin-left:auto}
+/* Identity beside the avatar + legibility pass */
+.user-menu-trigger{display:flex;align-items:center;gap:9px;background:none}
+.user-menu-name{display:flex;flex-direction:column;align-items:flex-end;line-height:1.3;white-space:nowrap}
+.user-menu-name b{font-size:12px;color:#17201d}
+.user-menu-name small{font-size:9px;color:#69716c;text-transform:uppercase;letter-spacing:.06em}
+.owner-header .user-menu{margin-left:14px}
+@media(max-width:700px){.user-menu-name{display:none}}
+/* Auth pages: legibility pass */
+.auth-form label{font-size:12px}
+.auth-form input{font-size:14px}
+.auth-subtitle{font-size:15px}
+.auth-switch{font-size:13px}
+.back-link{font-size:12px}
+.auth-note{font-size:12px}
+.auth-options .checkbox-label{font-size:12px}
+.forgot-button{font-size:12px}
+.auth-submit{font-size:12px}
+.demo-accounts span{font-size:11px}
+.demo-accounts button{font-size:12px}
+.auth-error,.auth-success{font-size:13px}
+.owner-logo > img{width:32px;height:34px;object-fit:contain;mix-blend-mode:multiply;flex:none}
