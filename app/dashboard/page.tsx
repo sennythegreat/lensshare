@@ -27,7 +27,7 @@ export default function DashboardPage() {
     <aside className={`dashboard-sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
       <div className="studio-logo"><span className="brand-mark"><Camera size={13} /></span><div><b>LensShare</b><small>STUDIO<br />COLLECTIVE</small></div></div>
       <button className="add-gear-button"><span>+</span> Add gear</button>
-      <nav className="dashboard-nav"><Link className="active" href="/dashboard"><LayoutDashboard size={16} /> Dashboard</Link><Link href="#rentals"><Grid2X2 size={16} /> Manage Rentals</Link><Link href="#vault"><Camera size={16} /> My Listings</Link><Link href="#settlement"><WalletCards size={16} /> Revenue & Payouts</Link><Link href="#settings"><Settings size={16} /> Settings</Link></nav>
+      <nav className="dashboard-nav"><Link className="active" href="/dashboard"><LayoutDashboard size={16} /> Dashboard</Link><Link href="/dashboard/rentals"><Grid2X2 size={16} /> Manage Rentals</Link><Link href="/dashboard/listings"><Camera size={16} /> My Listings</Link><Link href="/dashboard/finance"><WalletCards size={16} /> Revenue & Payouts</Link><Link href="/dashboard/settings"><Settings size={16} /> Settings</Link></nav>
       <div className="profile-chip"><span className="profile-icon">●</span><div><b>Mateo Rossi</b><small>Verified Creator</small></div><ChevronDown size={15} /></div>
     </aside>
     <section className="dashboard-main">
