@@ -27,3 +27,23 @@
 }
 .owner-sidebar nav a.active{background:#dcebe7;color:#244b43}
 .owner-toolbar-note{font-size:11px;color:#69716e}
+/* Admin console: no sidebar, full-width content */
+.admin-page .owner-main{width:100%;margin-left:0}
+.admin-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 22px}
+.admin-tabs a{border:1px solid #dfe3e0;background:#fff;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#53605b}
+.admin-tabs a.current{background:#dcebe7;border-color:#bcd6cf;color:#244b43}
+.admin-user-card{margin-bottom:16px}
+.admin-doc-row{display:flex;align-items:center;justify-content:space-between;gap:14px;border-top:1px solid #eef0ed;padding:12px 0}
+.admin-doc-row:first-of-type{border-top:0}
+.admin-doc-row small{color:#69716e}
+.admin-doc-actions{display:flex;gap:8px;align-items:center}
+/* Shared account dropdown (owner + renter headers) */
+.user-menu{position:relative;display:flex}
+.user-menu > button{border:0;padding:0;cursor:pointer}
+.user-menu-panel{position:absolute;right:0;top:calc(100% + 10px);background:#fff;border:1px solid #e7e8e5;box-shadow:0 8px 24px rgba(23,32,29,.12);border-radius:6px;min-width:190px;padding:6px;z-index:60;text-align:left}
+.user-menu-head{padding:10px 12px;border-bottom:1px solid #eef0ed;margin-bottom:6px}
+.user-menu-head b{display:block;font:14px Georgia,serif;color:#17201d}
+.user-menu-head small{font-size:10px;color:#69716e}
+.user-menu-panel a,.user-menu-panel button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:9px 12px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#3c4744;cursor:pointer;text-decoration:none;text-align:left}
+.user-menu-panel a:hover,.user-menu-panel button:hover{background:#f2f4f1;color:#17201d}
+.owner-header .user-menu{margin-left:auto}

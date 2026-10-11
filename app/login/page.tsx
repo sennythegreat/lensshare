@@ -21,7 +21,7 @@ function LoginForm() {
 
   async function routeAfterLogin(userId: string, fallback?: string) {
     const role = await fetchRole(userId)
-    router.push(fallback || (role === 'owner' ? '/dashboard' : '/browse'))
+    router.push(fallback || (role === 'admin' ? '/admin' : role === 'owner' ? '/dashboard' : '/browse'))
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

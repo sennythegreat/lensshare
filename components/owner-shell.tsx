@@ -3,9 +3,10 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { Camera, ChevronDown, LayoutDashboard, Menu, Settings, WalletCards, X } from 'lucide-react'
+import { Camera, ChevronDown, LayoutDashboard, Menu, Settings, ShieldCheck, WalletCards, X } from 'lucide-react'
 import { useProfile } from '@/lib/use-profile'
 import { initialsOf } from '@/lib/types'
+import { UserMenu } from '@/components/user-menu'
 import '../app/dashboard/owner-pages.css'
 
 export type GearCardItem = { name: string; category: string; price: string; status: string; image: string }
@@ -24,7 +25,7 @@ export function OwnerShell({ children, title, subtitle, onAddGear }: { children:
   const { profile } = useProfile()
   const name = profile?.full_name || 'Owner'
   const initials = profile ? initialsOf(name) : '…'
-  return <main className="owner-page"><aside className={`owner-sidebar ${open ? 'open' : ''}`}><div className="owner-logo"><span>◉</span><div><b>LensShare</b><small>STUDIO<br/>COLLECTIVE</small></div></div><button className="owner-add" type="button" onClick={onAddGear}>+ Add gear</button><nav>{navLinks.map(([href, Icon, label]) => <Link key={href} href={href} className={pathname === href ? 'active' : ''} onClick={() => setOpen(false)}><Icon/> {label}</Link>)}</nav><div className="owner-profile"><span>●</span><div><b>{name}</b><small>Verified owner</small></div><ChevronDown/></div></aside><section className="owner-main"><header className="owner-header"><button className="owner-menu" onClick={() => setOpen(!open)} aria-label="Toggle navigation">{open ? <X/> : <Menu/>}</button><div className="owner-search">⌕ <input placeholder="Search rentals, gear serials, or creators..."/></div><span className="owner-demo">OWNER WORKSPACE</span><span>◌</span><span>?</span><b className="owner-avatar">{initials}</b></header><div className="owner-content"><div className="owner-heading"><div><span className="owner-eyebrow">LENS SHARE · OWNER WORKSPACE</span><h1>{title}</h1><p>{subtitle}</p></div></div>{children}</div></section></main>
+  return <main className="owner-page"><aside className={`owner-sidebar ${open ? 'open' : ''}`}><div className="owner-logo"><span>◉</span><div><b>LensShare</b><small>STUDIO<br/>COLLECTIVE</small></div></div><button className="owner-add" type="button" onClick={onAddGear}>+ Add gear</button><nav>{navLinks.map(([href, Icon, label]) => <Link key={href} href={href} className={pathname === href ? 'active' : ''} onClick={() => setOpen(false)}><Icon/> {label}</Link>)}{profile?.role === 'admin' && <Link href="/admin" className={pathname.startsWith('/admin') ? 'active' : ''} onClick={() => setOpen(false)}><ShieldCheck/> Admin</Link>}</nav><div className="owner-profile"><span>●</span><div><b>{name}</b><small>Verified owner</small></div><ChevronDown/></div></aside><section className="owner-main"><header className="owner-header"><button className="owner-menu" onClick={() => setOpen(!open)} aria-label="Toggle navigation">{open ? <X/> : <Menu/>}</button><div className="owner-search">⌕ <input placeholder="Search rentals, gear serials, or creators..."/></div><span className="owner-demo">OWNER WORKSPACE</span><UserMenu initials={initials} name={name} subtitle="Owner workspace" settingsHref="/dashboard/settings" triggerClassName="owner-avatar" /></header><div className="owner-content"><div className="owner-heading"><div><span className="owner-eyebrow">LENS SHARE · OWNER WORKSPACE</span><h1>{title}</h1><p>{subtitle}</p></div></div>{children}</div></section></main>
 }
 
 export function GearCard({ item, onStatusToggle }: { item: GearCardItem; onStatusToggle?: () => void }) { return <article className="owner-gear-card"><div className="owner-gear-image"><img src={item.image} alt={item.name}/><span>{item.status}</span></div><small>{item.category}</small><h3>{item.name}</h3><p>● Naga City Hub · Listed gear</p><div className="owner-card-footer"><strong>{item.price}<small>/day</small></strong><button>EDIT</button><button onClick={onStatusToggle}>{onStatusToggle ? (item.status === 'AVAILABLE' ? 'PAUSE' : 'ACTIVATE') : 'DATES'}</button></div></article> }

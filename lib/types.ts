@@ -1,14 +1,39 @@
-export type Role = 'owner' | 'renter'
+export type Role = 'owner' | 'renter' | 'admin'
 
 export type Profile = {
   id: string
   full_name: string
+  email: string | null
   phone: string | null
   role: Role
   is_student: boolean
   verification_status: 'unverified' | 'pending' | 'verified'
   created_at: string
   updated_at: string
+}
+
+export type VerificationDocType = 'government_id' | 'selfie' | 'student_id' | 'proof_of_enrollment'
+export type VerificationReviewStatus = 'pending' | 'approved' | 'rejected'
+
+export type VerificationSubmission = {
+  id: string
+  user_id: string
+  doc_type: VerificationDocType
+  file_path: string
+  status: VerificationReviewStatus
+  review_note: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+}
+
+export type VerificationSubmissionWithUser = VerificationSubmission & {
+  user: Pick<Profile, 'id' | 'full_name' | 'email' | 'verification_status' | 'is_student'> | null
+}
+
+export type AdminUserRow = Profile & {
+  gear_listings: { count: number }[]
+  bookings: { count: number }[]
 }
 
 export type ListingStatus = 'available' | 'paused'

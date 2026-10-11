@@ -44,9 +44,16 @@ export async function proxy(request: NextRequest) {
     role = null // schema not applied yet — let requests through rather than brick the app
   }
 
-  const home = role === 'owner' ? '/dashboard' : '/browse'
+  const home = role === 'admin' ? '/admin' : role === 'owner' ? '/dashboard' : '/browse'
 
   if (pathname === '/login' || pathname === '/signup') {
+    const url = request.nextUrl.clone()
+    url.pathname = home
+    url.search = ''
+    return NextResponse.redirect(url)
+  }
+
+  if (pathname.startsWith('/admin') && role !== 'admin') {
     const url = request.nextUrl.clone()
     url.pathname = home
     url.search = ''
@@ -56,13 +63,13 @@ export async function proxy(request: NextRequest) {
   if (role) {
     if (pathname.startsWith('/dashboard') && role !== 'owner') {
       const url = request.nextUrl.clone()
-      url.pathname = '/renter/bookings'
+      url.pathname = role === 'admin' ? '/admin' : '/renter/bookings'
       url.search = ''
       return NextResponse.redirect(url)
     }
     if (pathname.startsWith('/renter') && role !== 'renter') {
       const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
+      url.pathname = role === 'admin' ? '/admin' : '/dashboard'
       url.search = ''
       return NextResponse.redirect(url)
     }
@@ -72,5 +79,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/renter/:path*', '/login', '/signup'],
+  matcher: ['/dashboard/:path*', '/renter/:path*', '/admin/:path*', '/login', '/signup'],
 }

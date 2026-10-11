@@ -25,14 +25,27 @@ finishing any change.
 
 - Env vars live in `.env`: `NEXT_PUBLIC_SUPABASE_URL` and
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-- `supabase/schema.sql` creates the schema (tables, RLS, signup trigger,
-  realtime, storage bucket); `supabase/seed.sql` seeds demo data. Both are
+- `supabase/schema.sql` creates the base schema (tables, RLS, signup trigger,
+  realtime, gear storage); `supabase/verification.sql` adds the verification
+  layer (`verification_submissions` table, private `verification-docs` bucket,
+  `profiles.email`); `supabase/enums.sql` converts every constrained text
+  column to native Postgres enums (Table Editor dropdowns) and makes the
+  role a three-value enum: `owner | renter | admin` (admin replaces the old
+  is_admin flag); `supabase/admin.sql` grants admins the
+  console's extra policies (read all bookings, moderate any listing);
+  `supabase/seed.sql` seeds demo data. All are
   idempotent and applied by pasting them into the Supabase dashboard SQL
   Editor. There is no local supabase CLI or migrations folder.
-- Tables: `profiles` (extends `auth.users`; holds the `role`:
-  `owner` | `renter`), `gear_listings` (publicly readable, owner-writable),
-  `bookings` (lifecycle `pending → approved → active → returned → completed`,
-  plus `declined`; visible only to the booking's renter and owner).
+- Tables: `profiles` (extends `auth.users`; `role` is an enum:
+  `owner` | `renter` | `admin` — exclusive, drives routing; plus
+  `verification_status`, `is_student`), `gear_listings` (publicly readable,
+  owner-writable; category and status are enums), `bookings` (status enum
+  lifecycle `pending → approved → active → returned → completed`, plus
+  `declined`; visible only to the booking's renter and owner), and
+  `verification_submissions` (identity/student documents; users see their
+  own, admins see all and review them). Identity documents live in the
+  PRIVATE `verification-docs` bucket (accessed via signed URLs) — never move
+  them to the public `gear-photos` bucket.
 - Row Level Security is the security core — the browser queries Supabase
   directly with the publishable key. Never replace RLS with client-side
   checks.
@@ -53,9 +66,16 @@ finishing any change.
 - `/dashboard/*` — owner workspace: overview, `listings`, `rentals`,
   `finance`, `settings`
 - `/renter/*` — renter workspace: `bookings`, `how-it-works`, `profile`,
-  `verification` (verification is still a demo screen)
+  `verification` (real upload flow: government ID + selfie, student docs)
+- `/admin` — admin console with its own dark-sidebar chrome
+  (`components/admin-shell.tsx`, styles in `app/admin/admin.css`):
+  dashboard (platform stats), `verifications` (queue; approving a government
+  ID verifies the account, approving student documents sets `is_student`),
+  `users` (owners & renters directory), `equipment` (all listings + moderation
+  pause/activate)
 - `proxy.ts` (Next 16's middleware) refreshes sessions and guards routes by
-  role: owners only reach `/dashboard/*`, renters only `/renter/*`.
+  role: owners only reach `/dashboard/*`, renters only `/renter/*`, and
+  `/admin/*` requires `profiles.is_admin`.
 
 ## Conventions
 
@@ -91,7 +111,8 @@ finishing any change.
 
 ## Scope
 
-The database, auth, and booking lifecycle are real; verification document
-uploads, payments/payouts, and reviews are not — those screens stay demo.
-Don't add new tables, auth providers, or state libraries without being asked.
+The database, auth, booking lifecycle, and the verification queue are real;
+payments/payouts, escrow, reviews, and the other admin screens (bookings/
+hand-offs, disputes, payouts) are not yet built. Don't add new tables, auth
+providers, or state libraries without being asked.
 Dev machine is Windows (Git Bash); write commands accordingly.

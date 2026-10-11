@@ -1,0 +1,70 @@
+/* ============================================================
+   Admin console — its own chrome, distinct from the owner pages.
+   Dark ink sidebar, same editorial type system.
+   ============================================================ */
+.admin-page{min-height:100vh;background:#f3f3f0;color:#17201d;display:flex;font:13px Arial,sans-serif}
+.admin-sidebar{width:236px;flex:none;background:#07100e;padding:26px 18px 20px;display:flex;flex-direction:column;min-height:100vh}
+.admin-logo{display:flex;gap:9px;align-items:center;margin:0 3px 28px}
+.admin-logo-mark{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#dcebe7;color:#07100e;flex:none}
+.admin-logo b{font:700 16px Georgia,serif;display:block;color:#fff}
+.admin-logo small{font:8px 'DM Mono',monospace;letter-spacing:.18em;color:#7d8a84;line-height:1.55;display:block}
+.admin-sidebar nav{display:flex;flex-direction:column;gap:3px}
+.admin-sidebar nav a{display:flex;align-items:center;gap:11px;padding:11px 10px;color:#aebbb4;text-decoration:none;border-radius:4px;font-size:12px}
+.admin-sidebar nav a:hover{background:#13231e;color:#fff}
+.admin-sidebar nav a.active{background:#dcebe7;color:#0b241f;font-weight:bold}
+.admin-profile{margin-top:auto;display:flex;align-items:center;gap:9px;border-top:1px solid #1c2b26;padding-top:16px}
+.admin-profile .admin-initials{background:#dcebe7;color:#0b241f;border-radius:50%;display:grid;place-items:center;width:27px;height:27px;font-size:9px;flex:none}
+.admin-profile div{display:flex;flex-direction:column}
+.admin-profile b{font-size:11px;color:#fff}
+.admin-profile small{font-size:9px;color:#7d8a84}
+.admin-main{flex:1;min-width:0}
+.admin-topbar{height:60px;border-bottom:1px solid #e3e6e2;display:flex;align-items:center;gap:16px;padding:0 28px;background:#fff}
+.admin-tag{font:9px 'DM Mono',monospace;letter-spacing:.14em;color:#53605b;background:#e9efe9;border-radius:14px;padding:7px 10px;margin-left:auto}
+.admin-avatar{background:#07100e;color:#fff;border-radius:50%;display:grid;place-items:center;width:27px;height:27px;font-size:9px}
+.admin-menu{display:none;border:0;background:transparent}
+.admin-content{padding:30px 30px 70px;max-width:1240px;margin:auto}
+.admin-eyebrow{font:9px 'DM Mono',monospace;letter-spacing:.12em;color:#67736e;text-transform:uppercase;display:block}
+.admin-heading h1{font:40px Georgia,serif;margin:9px 0 4px}
+.admin-heading p{margin:0;color:#69716e}
+.admin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:26px 0}
+.admin-grid.four{grid-template-columns:repeat(4,1fr)}
+.admin-card{background:#fff;border:1px solid #e7e8e5;padding:20px}
+.admin-card strong{display:block;font:22px Georgia,serif;margin:9px 0 5px}
+.admin-card p{margin:0;font-size:11px;color:#69716e}
+.admin-table{background:#fff;border:1px solid #e7e8e5}
+.admin-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 16px;border-top:1px solid #eef0ed}
+.admin-row:first-child{border-top:0}
+.admin-row h3{font:15px Georgia,serif;margin:0 0 2px}
+.admin-row small,.admin-row p{font-size:11px;color:#69716e;margin:0}
+.admin-row .admin-row-main{min-width:0}
+.admin-chips{display:flex;gap:5px;align-items:center;flex:none}
+.admin-pill{display:inline-block;border-radius:20px;padding:5px 9px;font:9px 'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase;background:#eef1ee;color:#53605b}
+.admin-pill.owner{background:#e9e2f2;color:#4c3a66}
+.admin-pill.renter{background:#dcebe7;color:#244b43}
+.admin-pill.verified{background:#dcebe7;color:#244b43}
+.admin-pill.pending{background:#f0e8cc;color:#75612d}
+.admin-pill.unverified{background:#eeeeeb;color:#68706c}
+.admin-pill.student{background:#dde9f3;color:#33566e}
+.admin-pill.available{background:#dcebe7;color:#244b43}
+.admin-pill.paused{background:#f0e8cc;color:#75612d}
+.admin-thumb{width:44px;height:36px;object-fit:cover;border:1px solid #e7e8e5;flex:none;background:#eef1ee}
+.admin-empty{border:1px dashed #dfe3e0;background:#fbfbf9;padding:44px 24px;text-align:center;color:#64706b}
+.admin-empty h3{font:20px Georgia,serif;margin:0 0 6px;color:#17201d}
+@media(max-width:800px){
+  .admin-sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);transition:transform .2s;z-index:30}
+  .admin-sidebar.open{transform:none}
+  .admin-menu{display:block}
+  .admin-main{width:100%}
+  .admin-grid,.admin-grid.four{grid-template-columns:1fr 1fr}
+}
+.admin-pill.admin{background:#f7e3e0;color:#8c3d31}
+/* Account dropdown (admin topbar) */
+.user-menu{position:relative;display:flex}
+.user-menu > button{border:0;padding:0;cursor:pointer}
+.user-menu-panel{position:absolute;right:0;top:calc(100% + 10px);background:#fff;border:1px solid #e7e8e5;box-shadow:0 8px 24px rgba(23,32,29,.12);border-radius:6px;min-width:190px;padding:6px;z-index:60;text-align:left}
+.user-menu-head{padding:10px 12px;border-bottom:1px solid #eef0ed;margin-bottom:6px}
+.user-menu-head b{display:block;font:14px Georgia,serif;color:#17201d}
+.user-menu-head small{font-size:10px;color:#69716e}
+.user-menu-panel a,.user-menu-panel button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:9px 12px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#3c4744;cursor:pointer;text-decoration:none;text-align:left}
+.user-menu-panel a:hover,.user-menu-panel button:hover{background:#f2f4f1;color:#17201d}
+.admin-topbar .user-menu{margin-left:auto}
