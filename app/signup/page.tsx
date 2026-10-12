@@ -16,13 +16,11 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState<Role>('renter')
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
-    setNotice('')
     setBusy(true)
     const supabase = createClient()
     const { data, error } = await supabase.auth.signUp({
@@ -39,8 +37,7 @@ export default function SignupPage() {
       router.push(role === 'owner' ? '/dashboard' : '/browse')
       return
     }
-    setNotice('Account created. Check your email to confirm your address, then log in.')
-    setBusy(false)
+    router.push(`/signup/verify?email=${encodeURIComponent(email)}`)
   }
 
   return (
@@ -79,7 +76,6 @@ export default function SignupPage() {
             </fieldset>
             <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Creating account…' : 'Create account'} <ArrowLeft size={14} className="rotate-arrow" /></button>
             {error && <p className="auth-error">{error}</p>}
-            {notice && <p className="auth-success">{notice}</p>}
           </form>
           <p className="auth-switch">Already have an account? <Link href="/login">Log in</Link></p>
         </div>

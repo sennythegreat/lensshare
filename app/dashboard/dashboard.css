@@ -71,3 +71,25 @@
   .auth-form input { font-size: 15px; padding: 14px; }
   .auth-panel { padding: 64px 9vw; }
 }
+
+/* ── Signup OTP verification screen (appended) ─────────────────────────── */
+.auth-form .auth-otp-row { display: flex; gap: 9px; }
+.auth-form .auth-otp-box {
+  width: auto;
+  flex: 1;
+  margin-top: 0;
+  padding: 14px 0;
+  text-align: center;
+  font: 20px 'DM Mono', monospace;
+  letter-spacing: .05em;
+  caret-color: #07100e;
+}
+.auth-form .auth-otp-box:focus { border-color: #78969a; box-shadow: 0 0 0 3px #dceff0; }
+.auth-form .auth-otp-box:disabled { opacity: .55; }
+.auth-resend { display: flex; gap: 8px; align-items: center; justify-content: center; color: #69716e; font-size: 11px; }
+.auth-resend button { border: 0; background: none; color: #597476; font-size: 11px; text-decoration: underline; cursor: pointer; }
+.auth-resend button:disabled { opacity: .5; }
+.auth-subtitle a { color: #263f41; text-decoration: underline; }
+@media (max-width: 700px) {
+  .auth-form .auth-otp-box { padding: 12px 0; font-size: 17px; }
+}

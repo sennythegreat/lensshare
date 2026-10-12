@@ -29,6 +29,11 @@ function LoginForm() {
     const supabase = createClient()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
+      if (error.message.toLowerCase().includes('email not confirmed')) {
+        setBusy(false)
+        router.push(`/signup/verify?email=${encodeURIComponent(email)}`)
+        return
+      }
       setError(error.message)
       setBusy(false)
       return
