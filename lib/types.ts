@@ -80,7 +80,7 @@ export type ListingWithOwner = Listing & {
 
 export type BookingWithRelations = Booking & {
   listing: Listing | null
-  renter: Pick<Profile, 'id' | 'full_name'> | null
+  renter: Pick<Profile, 'id' | 'full_name' | 'verification_status' | 'is_student' | 'phone'> | null
   owner: Pick<Profile, 'id' | 'full_name'> | null
 }
 
@@ -88,6 +88,13 @@ export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return 'LS'
   return parts.slice(0, 2).map((part) => part[0]!.toUpperCase()).join('')
+}
+
+// Shown to owners on bookings so they can gauge the renter's trust standing.
+export function renterVerificationLabel(renter: Pick<Profile, 'verification_status' | 'is_student'> | null | undefined): string {
+  if (!renter) return ''
+  const label = renter.verification_status === 'verified' ? '✓ Verified renter' : renter.verification_status === 'pending' ? 'Verification pending' : 'Unverified renter'
+  return renter.is_student ? `${label} · Student` : label
 }
 
 export function pesos(amount: number): string {

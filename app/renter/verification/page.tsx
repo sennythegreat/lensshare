@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BadgeCheck, Camera, FileUp, GraduationCap, IdCard } from 'lucide-react'
-import { RenterShell, Status } from '@/components/renter-shell'
+import { RenterHeadbar, Status } from '@/components/renter-headbar'
 import { fetchMySubmissions, insertVerificationSubmission, uploadVerificationDoc } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import type { VerificationDocType, VerificationSubmission } from '@/lib/types'
@@ -90,7 +90,7 @@ export default function VerificationPage() {
     }
   }
 
-  return <RenterShell title="Verification" subtitle="Complete your renter profile to unlock eligible deposit waivers.">
+  return <RenterHeadbar title="Verification" subtitle="Complete your renter profile to unlock eligible deposit waivers.">
     <div className="verification-grid">
       <section className="renter-card">
         <p className="eyebrow"><IdCard size={13} /> IDENTITY REVIEW</p>
@@ -116,5 +116,5 @@ export default function VerificationPage() {
     <p className="demo-note"><Camera size={12} /> Documents are stored privately and reviewed only by authorized LensShare admins. You can replace a file anytime — your latest upload is the one under review.</p>
     <p className="demo-note"><BadgeCheck size={12} /> Approval is manual: an admin reviews each document before your status changes.</p>
     {loaded && !submissions.length && <p className="demo-note">No submissions yet — start with your government ID.</p>}
-  </RenterShell>
+  </RenterHeadbar>
 }

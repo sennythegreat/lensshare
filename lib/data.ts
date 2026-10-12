@@ -15,7 +15,7 @@ import type {
   VerificationSubmissionWithUser,
 } from '@/lib/types'
 
-const BOOKING_SELECT = '*, listing:gear_listings(*), renter:profiles!bookings_renter_id_fkey(id, full_name), owner:profiles!bookings_owner_id_fkey(id, full_name)'
+const BOOKING_SELECT = '*, listing:gear_listings(*), renter:profiles!bookings_renter_id_fkey(id, full_name, verification_status, is_student, phone), owner:profiles!bookings_owner_id_fkey(id, full_name)'
 
 export async function fetchListings(): Promise<ListingWithOwner[]> {
   const supabase = createClient()

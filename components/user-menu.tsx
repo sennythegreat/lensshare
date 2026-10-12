@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { LogOut, UserRound } from 'lucide-react'
+import { LogOut, UserRound, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-export function UserMenu({ initials, name, subtitle, settingsHref, triggerClassName }: {
+export function UserMenu({ initials, name, subtitle, links, settingsHref, triggerClassName }: {
   initials: string
   name: string
   subtitle: string
+  links?: Array<{ href: string; label: string; icon?: LucideIcon }>
   settingsHref?: string
   triggerClassName: string
 }) {
@@ -37,6 +38,7 @@ export function UserMenu({ initials, name, subtitle, settingsHref, triggerClassN
     </button>
     {open && <div className="user-menu-panel">
       <div className="user-menu-head"><b>{name}</b><small>{subtitle}</small></div>
+      {links?.map(({ href, label, icon: Icon = UserRound }) => <Link key={href} href={href} onClick={() => setOpen(false)}><Icon size={14} /> {label}</Link>)}
       {settingsHref && <Link href={settingsHref} onClick={() => setOpen(false)}><UserRound size={14} /> Account settings</Link>}
       <button type="button" onClick={signOut}><LogOut size={14} /> Sign out</button>
     </div>}

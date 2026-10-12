@@ -1,28 +1,28 @@
 /* ============================================================
    Admin console — its own chrome, distinct from the owner pages.
-   Dark ink sidebar, same editorial type system.
+   Light sidebar, same editorial type system.
    ============================================================ */
 .admin-page{min-height:100vh;background:#f3f3f0;color:#17201d;display:flex;font:13px Arial,sans-serif}
-.admin-sidebar{width:236px;flex:none;background:#07100e;padding:26px 18px 20px;display:flex;flex-direction:column;min-height:100vh}
+.admin-sidebar{width:236px;flex:none;background:#fbfbf9;border-right:1px solid #e7e8e5;padding:26px 18px 20px;display:flex;flex-direction:column;min-height:100vh}
 .admin-logo{display:flex;gap:9px;align-items:center;margin:0 3px 28px}
 .admin-logo-mark{display:grid;place-items:center;width:28px;height:30px;flex:none}
-.admin-logo b{font:700 16px Georgia,serif;display:block;color:#fff}
+.admin-logo b{font:700 16px Georgia,serif;display:block;color:#17201d}
 .admin-logo small{font:8px 'DM Mono',monospace;letter-spacing:.18em;color:#7d8a84;line-height:1.55;display:block}
 .admin-sidebar nav{display:flex;flex-direction:column;gap:3px}
-.admin-sidebar nav a{display:flex;align-items:center;gap:11px;padding:11px 10px;color:#aebbb4;text-decoration:none;border-radius:4px;font-size:12px}
-.admin-sidebar nav a:hover{background:#13231e;color:#fff}
+.admin-sidebar nav a{display:flex;align-items:center;gap:11px;padding:11px 10px;color:#4c5854;text-decoration:none;border-radius:4px;font-size:12px}
+.admin-sidebar nav a:hover{background:#eef2ef;color:#17201d}
 .admin-sidebar nav a.active{background:#dcebe7;color:#0b241f;font-weight:bold}
-.admin-profile{margin-top:auto;display:flex;align-items:center;gap:9px;border-top:1px solid #1c2b26;padding-top:16px}
-.admin-profile .admin-initials{background:#dcebe7;color:#0b241f;border-radius:50%;display:grid;place-items:center;width:27px;height:27px;font-size:9px;flex:none}
+.admin-profile{margin-top:auto;display:flex;align-items:center;gap:9px;border-top:1px solid #e7e8e5;padding-top:16px}
+.admin-profile .admin-initials{background:#07100e;color:#fff;border-radius:50%;display:grid;place-items:center;width:27px;height:27px;font-size:9px;flex:none}
 .admin-profile div{display:flex;flex-direction:column}
-.admin-profile b{font-size:11px;color:#fff}
+.admin-profile b{font-size:11px;color:#17201d}
 .admin-profile small{font-size:9px;color:#7d8a84}
 .admin-main{flex:1;min-width:0}
 .admin-topbar{height:60px;border-bottom:1px solid #e3e6e2;display:flex;align-items:center;gap:16px;padding:0 28px;background:#fff}
 .admin-tag{font:9px 'DM Mono',monospace;letter-spacing:.14em;color:#53605b;background:#e9efe9;border-radius:14px;padding:7px 10px;margin-left:auto}
 .admin-avatar{background:#07100e;color:#fff;border-radius:50%;display:grid;place-items:center;width:27px;height:27px;font-size:9px}
 .admin-menu{display:none;border:0;background:transparent}
-.admin-content{padding:30px 30px 70px;max-width:1240px;margin:auto}
+.admin-content{padding:30px 34px 70px}
 .admin-eyebrow{font:9px 'DM Mono',monospace;letter-spacing:.12em;color:#67736e;text-transform:uppercase;display:block}
 .admin-heading h1{font:40px Georgia,serif;margin:9px 0 4px}
 .admin-heading p{margin:0;color:#69716e}
@@ -76,3 +76,19 @@
 .admin-topbar .user-menu{margin-left:14px}
 @media(max-width:800px){.user-menu-name{display:none}}
 .admin-logo-mark img{width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}
+
+/* Equipment grid view + dashboard row thumb spacing (appended) */
+.admin-gear-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+.admin-gear-card{background:#fff;border:1px solid #e7e8e5;overflow:hidden;display:flex;flex-direction:column}
+.admin-gear-photo{position:relative;height:160px;background:#eef1ee}
+.admin-gear-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.admin-gear-photo .admin-pill{position:absolute;top:10px;left:10px}
+.admin-gear-body{padding:14px;display:flex;flex-direction:column;gap:6px;flex:1}
+.admin-gear-body h3{font:16px Georgia,serif;margin:0}
+.admin-gear-body small{font-size:11px;color:#69716e}
+.admin-gear-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:12px}
+.admin-gear-foot strong{font:19px Georgia,serif}
+.admin-gear-foot strong em{font:10px Arial,sans-serif;font-style:normal;color:#69716e}
+.admin-row .admin-thumb{margin-right:12px}
+@media(max-width:800px){.admin-gear-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.admin-gear-grid{grid-template-columns:1fr}}

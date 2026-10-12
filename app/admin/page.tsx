@@ -53,6 +53,7 @@ export default function AdminDashboardPage() {
     <div className="admin-table">
       <div className="admin-row"><div><span className="admin-eyebrow">RECENT BOOKINGS · PLATFORM-WIDE</span></div></div>
       {recent.map((booking) => <div className="admin-row" key={booking.id}>
+        <img className="admin-thumb" src={booking.listing?.image_url || '/lensshare-camera.png'} alt="" />
         <div className="admin-row-main">
           <h3>{booking.listing?.name || 'Removed listing'}</h3>
           <small>{booking.renter?.full_name || 'Renter'} → {booking.owner?.full_name || 'Owner'} · {booking.start_date} → {booking.end_date} · {shortId(booking.id)}</small>

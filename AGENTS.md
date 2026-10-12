@@ -33,6 +33,8 @@ finishing any change.
   role a three-value enum: `owner | renter | admin` (admin replaces the old
   is_admin flag); `supabase/admin.sql` grants admins the
   console's extra policies (read all bookings, moderate any listing);
+  `supabase/storage.sql` re-asserts the two storage buckets and all of
+  their policies (standalone idempotent copy of the storage sections);
   `supabase/seed.sql` seeds demo data. All are
   idempotent and applied by pasting them into the Supabase dashboard SQL
   Editor. There is no local supabase CLI or migrations folder.
@@ -41,7 +43,9 @@ finishing any change.
   `verification_status`, `is_student`), `gear_listings` (publicly readable,
   owner-writable; category and status are enums), `bookings` (status enum
   lifecycle `pending → approved → active → returned → completed`, plus
-  `declined`; visible only to the booking's renter and owner), and
+  `declined`; visible only to the booking's renter and owner; creating a
+  booking requires the renter's `verification_status = 'verified'` — enforced
+  in the `renters create bookings` RLS policy, not just client-side), and
   `verification_submissions` (identity/student documents; users see their
   own, admins see all and review them). Identity documents live in the
   PRIVATE `verification-docs` bucket (accessed via signed URLs) — never move
@@ -68,8 +72,9 @@ finishing any change.
   `finance`, `settings`
 - `/renter/*` — renter workspace: `bookings`, `how-it-works`, `profile`,
   `verification` (real upload flow: government ID + selfie, student docs)
-- `/admin` — admin console with its own dark-sidebar chrome
-  (`components/admin-shell.tsx`, styles in `app/admin/admin.css`):
+- `/admin` — admin console with its own light-sidebar chrome and a
+  full-width content area (`components/admin-shell.tsx`, styles in
+  `app/admin/admin.css`):
   dashboard (platform stats), `verifications` (queue; approving a government
   ID verifies the account, approving student documents sets `is_student`),
   `users` (owners & renters directory), `equipment` (all listings + moderation

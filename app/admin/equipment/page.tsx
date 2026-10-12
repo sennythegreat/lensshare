@@ -45,23 +45,16 @@ export default function AdminEquipmentPage() {
       <span className="admin-tag" style={{ marginLeft: 'auto' }}>{visible.length} of {listings.length} listings</span>
     </div>
     {error && <div className="admin-table"><div className="admin-row"><p className="auth-error">{error}</p></div></div>}
-    <div className="admin-table">
-      {visible.map((listing) => <div className="admin-row" key={listing.id}>
-        <img className="admin-thumb" src={listing.image_url || '/lensshare-camera.png'} alt="" />
-        <div className="admin-row-main">
+    {loaded && !visible.length
+      ? <div className="admin-empty"><h3>No equipment found</h3><p>Try another search term.</p></div>
+      : <div className="admin-gear-grid">{visible.map((listing) => <article className="admin-gear-card" key={listing.id}>
+        <div className="admin-gear-photo"><img src={listing.image_url || '/lensshare-camera.png'} alt={listing.name} /><span className={`admin-pill ${listing.status}`}>{listing.status}</span></div>
+        <div className="admin-gear-body">
           <h3>{listing.name}</h3>
           <small>{listing.owner?.full_name || 'Unknown owner'} · {listing.category} · {listing.brand}</small>
+          <div className="admin-gear-foot"><strong>{pesos(Number(listing.daily_rate))}<em>/day</em></strong><button className="owner-button" disabled={busyId === listing.id} onClick={() => toggle(listing)}>{listing.status === 'available' ? 'Pause' : 'Activate'}</button></div>
         </div>
-        <div className="admin-chips">
-          <strong>{pesos(Number(listing.daily_rate))}<small style={{ fontSize: 10, color: '#69716e' }}>/day</small></strong>
-          <span className={`admin-pill ${listing.status}`}>{listing.status}</span>
-          <button className="owner-button" disabled={busyId === listing.id} onClick={() => toggle(listing)}>
-            {listing.status === 'available' ? 'Pause' : 'Activate'}
-          </button>
-        </div>
-      </div>)}
-      {loaded && !visible.length && <div className="admin-empty"><h3>No equipment found</h3><p>Try another search term.</p></div>}
-      {!loaded && <div className="admin-row"><p>Loading listings…</p></div>}
-    </div>
+      </article>)}</div>}
+    {!loaded && <div className="admin-table"><div className="admin-row"><p>Loading listings…</p></div></div>}
   </AdminShell>
 }

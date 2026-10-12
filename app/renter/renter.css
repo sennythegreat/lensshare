@@ -7,3 +7,7 @@
 .doc-slot-head strong{font:15px Georgia,serif;color:#17201d}
 .doc-slot p{margin:6px 0 10px;font-size:11px;color:#65716c}
 .doc-note{background:#f7e3e0;color:#8c3d31;padding:8px 10px;font-size:11px}
+
+/* ── Renter workspace: top headbar chrome, no sidebar (appended) ───────── */
+.owner-page.renter-page{display:block;overflow-x:hidden}
+.owner-page.renter-page .owner-main{width:100%;margin-left:0}
