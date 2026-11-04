@@ -20,3 +20,4 @@ supabase/schema.sql
 supabase/seed.sql
 supabase/admin.sql
 *.sql
+*.md

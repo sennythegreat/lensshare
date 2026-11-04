@@ -92,3 +92,4 @@
 .admin-row .admin-thumb{margin-right:12px}
 @media(max-width:800px){.admin-gear-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.admin-gear-grid{grid-template-columns:1fr}}
+.admin-mail-bar{display:flex;align-items:center;justify-content:space-between;gap:20px;background:#fff;border:1px solid #e7e8e5;padding:15px 18px;margin:22px 0 0}.admin-mail-bar p{font-size:11px;color:#69716e;margin:4px 0}.admin-mail-bar small{font-size:10px;color:#315f57}@media(max-width:600px){.admin-mail-bar{align-items:flex-start;flex-direction:column}}

@@ -1,6 +1,7 @@
 'use client'
 
 import { SiteHeadbar } from '@/components/site-headbar'
+import { VerifyBanner } from '@/components/verify-banner'
 import '../app/dashboard/owner-pages.css'
 import '../app/renter/renter.css'
 
@@ -16,6 +17,7 @@ export function RenterHeadbar({ children, title, subtitle }: { children: React.R
             <p>{subtitle}</p>
           </div>
         </div>
+        <VerifyBanner />
         {children}
       </div>
     </main>

@@ -24,7 +24,7 @@ export async function proxy(request: NextRequest) {
   // Validates the JWT with the auth server rather than trusting the cookie alone.
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
-  const isWorkspace = pathname.startsWith('/dashboard') || pathname.startsWith('/renter')
+  const isWorkspace = pathname.startsWith('/dashboard') || pathname.startsWith('/renter') || pathname.startsWith('/chat')
 
   if (!user) {
     if (isWorkspace) {
@@ -79,5 +79,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/renter/:path*', '/admin/:path*', '/login', '/signup'],
+  matcher: ['/dashboard/:path*', '/renter/:path*', '/admin/:path*', '/chat', '/login', '/signup'],
 }

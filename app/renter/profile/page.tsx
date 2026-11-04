@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { RenterHeadbar } from '@/components/renter-headbar'
 import { createClient } from '@/lib/supabase/client'
-import { updateProfile } from '@/lib/data'
+import { fetchReviewsOfUser, updateProfile } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
-import { initialsOf } from '@/lib/types'
+import { initialsOf, type ReviewWithNames } from '@/lib/types'
 import '../renter.css'
 
 export default function ProfilePage() {
@@ -17,6 +17,11 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [reviews, setReviews] = useState<ReviewWithNames[]>([])
+
+  useEffect(() => {
+    if (user) fetchReviewsOfUser(user.id).then(setReviews).catch(() => {})
+  }, [user])
 
   useEffect(() => {
     if (profile) { setFullName(profile.full_name); setPhone(profile.phone ?? '') }
@@ -52,5 +57,5 @@ export default function ProfilePage() {
     router.push('/login')
   }
 
-  return <RenterHeadbar title="My Profile" subtitle="Manage your renter identity and account preferences."><section className="renter-card profile-card"><div className="profile-avatar">{profile ? initialsOf(fullName || profile.full_name) : '…'}</div><div className="form-grid"><label>Full name<input value={fullName} onChange={(e) => { setFullName(e.target.value); setSaved(false) }} /></label><label>Email address<input value={user?.email ?? ''} readOnly /></label><label>Phone number<input value={phone} onChange={(e) => { setPhone(e.target.value); setSaved(false) }} placeholder="+63 917 555 0148" /></label><label>Account role<input value={loading ? '…' : 'Verified renter'} readOnly /></label></div><button className="owner-button dark" disabled={busy} onClick={handleSave}>{busy ? 'Saving…' : 'Save profile changes'}</button>{saved && <p className="auth-success">Profile saved.</p>}{error && <p className="auth-error">{error}</p>}<div className="profile-actions"><button className="owner-button" disabled={busy} onClick={handleSwitchRole}>Switch to owner workspace</button><button className="owner-button" onClick={handleSignOut}>Sign out</button></div><p className="demo-note">Your account starts as a renter — switching roles unlocks the owner dashboard with the same login.</p></section><section className="renter-card"><p className="eyebrow">ACCOUNT SAFETY</p><h2>Verification and privacy</h2><p>Your identity documents are private and only shared with authorized LensShare reviewers.</p></section></RenterHeadbar>
+  return <RenterHeadbar title="My Profile" subtitle="Manage your renter identity and account preferences."><section className="renter-card profile-card"><div className="profile-avatar">{profile ? initialsOf(fullName || profile.full_name) : '…'}</div><div className="form-grid"><label>Full name<input value={fullName} onChange={(e) => { setFullName(e.target.value); setSaved(false) }} /></label><label>Email address<input value={user?.email ?? ''} readOnly /></label><label>Phone number<input value={phone} onChange={(e) => { setPhone(e.target.value); setSaved(false) }} placeholder="+63 917 555 0148" /></label><label>Account role<input value={loading ? '…' : 'Verified renter'} readOnly /></label></div><button className="owner-button dark" disabled={busy} onClick={handleSave}>{busy ? 'Saving…' : 'Save profile changes'}</button>{saved && <p className="auth-success">Profile saved.</p>}{error && <p className="auth-error">{error}</p>}<div className="profile-actions"><button className="owner-button" disabled={busy} onClick={handleSwitchRole}>Switch to owner workspace</button><button className="owner-button" onClick={handleSignOut}>Sign out</button></div><p className="demo-note">Your account starts as a renter — switching roles unlocks the owner dashboard with the same login.</p></section><section className="renter-card"><p className="eyebrow">ACCOUNT SAFETY</p><h2>Verification and privacy</h2><p>Your identity documents are private and only shared with authorized LensShare reviewers.</p></section><section className="renter-card"><p className="eyebrow">TRUST RECORD</p><h2>Reviews received</h2>{reviews.length ? <div className="renter-reviews">{reviews.map((review) => <div className="renter-review" key={review.id}><div className="renter-review-head"><b>{review.reviewer?.full_name || 'LensShare member'}</b><span className="review-stars-inline">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span></div>{review.listing && <small>About the {review.listing.name} rental</small>}{review.comment && <p>{review.comment}</p>}</div>)}</div> : <p>Owners rate you after each completed rental. Complete your first shoot to build your trust record.</p>}</section></RenterHeadbar>
 }

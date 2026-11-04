@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AdminShell } from '@/components/admin-shell'
 import { PageCard, OwnerHeading, Status } from '@/components/owner-shell'
+import { EmptyState, SectionSkeleton } from '@/components/states'
 import { fetchSignedDocUrl, fetchVerificationQueue, reviewSubmission, updateProfile } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import type { VerificationDocType, VerificationSubmissionWithUser } from '@/lib/types'
@@ -92,7 +93,7 @@ export default function VerificationsPage() {
     {error && <PageCard><p className="auth-error">{error}</p></PageCard>}
     <PageCard>
       <OwnerHeading eyebrow="PENDING REVIEW" title={`${pending.length} submission${pending.length === 1 ? '' : 's'} waiting`} detail="Approving a government ID verifies the account. Approving school documents unlocks student (zero-deposit) eligibility."/>
-      {grouped.length ? grouped.map(([userId, entry]) => <div className="admin-user-card" key={userId}>
+      {!loaded ? <SectionSkeleton rows={3} /> : grouped.length ? grouped.map(([userId, entry]) => <div className="admin-user-card" key={userId}>
         <div className="owner-section-heading" style={{ display: 'block', borderBottom: 0, paddingBottom: 0, marginBottom: 4 }}>
           <h2 style={{ margin: '10px 0 2px', font: '18px Georgia,serif' }}>{entry.name}</h2>
           <p style={{ margin: 0, fontSize: 11, color: '#69716e' }}>{entry.email} · account <Status>{entry.verification.toUpperCase()}</Status> {entry.isStudent && <Status>STUDENT</Status>}</p>
@@ -108,7 +109,7 @@ export default function VerificationsPage() {
             <button className="owner-button" disabled={busyId === row.id} onClick={() => review(row, 'rejected')}>Reject</button>
           </div>
         </div>)}
-      </div>) : <div className="owner-empty"><h3>{loaded ? 'Queue is clear' : 'Loading the queue…'}</h3><p>{loaded ? 'No documents are waiting for review. New submissions appear here instantly after refresh.' : 'Fetching pending submissions.'}</p></div>}
+      </div>) : <EmptyState title="Queue is clear" hint="No documents are waiting for review. New submissions appear here after refresh." />}
     </PageCard>
     <PageCard>
       <OwnerHeading eyebrow="RECENTLY REVIEWED" title="Latest decisions" detail="Approved and rejected submissions, newest first."/>
@@ -119,7 +120,7 @@ export default function VerificationsPage() {
           <p>Reviewed {row.reviewed_at ? dateLabel(row.reviewed_at) : '—'}{row.review_note ? ` · “${row.review_note}”` : ''}</p>
         </div>
         <button className="owner-button" onClick={() => viewDoc(row)}>View document</button>
-      </div>)}</div> : <div className="owner-empty"><h3>No decisions yet</h3><p>Reviewed submissions will appear here.</p></div>}
+      </div>)}</div> : <EmptyState title="No decisions yet" hint="Reviewed submissions will appear here." />}
     </PageCard>
   </AdminShell>
 }

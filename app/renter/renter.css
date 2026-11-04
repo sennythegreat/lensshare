@@ -11,3 +11,17 @@
 /* ── Renter workspace: top headbar chrome, no sidebar (appended) ───────── */
 .owner-page.renter-page{display:block;overflow-x:hidden}
 .owner-page.renter-page .owner-main{width:100%;margin-left:0}
+/* ── Renter agreement, return confirmation, and reviews (appended) ────── */
+.renter-agreement-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.renter-return-box,.renter-review-box{margin-top:16px;background:#f0f1ee;padding:14px}
+.renter-return-box .eyebrow,.renter-review-box .eyebrow{margin-bottom:8px}
+.renter-review-box .review-comment{width:100%;min-height:80px;border:1px solid #d9deda;background:#fff;padding:10px;font:12px Arial;color:#33403b;resize:vertical;margin:10px 0}
+.renter-reviews{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.renter-review{border:1px solid #d9deda;background:#fff;padding:12px 14px}
+.renter-review-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.renter-review-head b{font:15px Georgia,serif;color:#17201d}
+.review-stars-inline{color:#c99a2e;font-size:13px;letter-spacing:2px}
+.renter-review small{color:#71807a;font-size:10px;display:block;margin-top:2px}
+.renter-review p{margin:8px 0 0;font-size:12px;color:#33403b;line-height:1.5}
+.renter-message-link{border:1px solid #d6dfdc;background:#fff;padding:9px 12px;display:flex;gap:6px;align-items:center;font-size:10px}
+.renter-page .thread-list+.state-empty{margin-top:0}

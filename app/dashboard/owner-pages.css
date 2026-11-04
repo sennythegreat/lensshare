@@ -78,3 +78,33 @@
 .renter-flag.verified{background:#dcebe7;color:#244b43}
 .renter-flag.pending{background:#f0e8cc;color:#75612d}
 .renter-flag.unverified{background:#f7e3e0;color:#8c3d31}
+/* ── Reviews modal (owner side, appended) ──────────────────────────────── */
+.review-modal{width:min(480px,100%)}.review-stars{display:flex;gap:4px;margin:14px 0}.review-stars .star{border:0;background:none;font-size:26px;color:#cfd6d2;cursor:pointer;padding:0;line-height:1}.review-stars .star.on{color:#c99a2e}.review-comment{width:100%;min-height:96px;border:1px solid #d9deda;background:#fff;padding:10px;font:12px Arial;color:#33403b;resize:vertical}
+
+/* Public per-item pickup locations */
+.owner-gear-pickup{overflow-wrap:anywhere;line-height:1.5}
+.owner-gear-edit:disabled{opacity:.45;cursor:default}
+.owner-listing-fields{border:0;padding:0;margin:0;min-width:0}
+.owner-location-field{min-width:0}
+.owner-location-field>label{display:flex;flex-direction:row;justify-content:space-between;align-items:center;margin-bottom:7px}
+.owner-location-field>label>span{font:10px Arial,sans-serif;text-transform:none;letter-spacing:0;color:#829186}
+.owner-location-field>input{width:100%;min-width:0}
+.owner-location-field>p{font:11px Arial,sans-serif;text-transform:none;letter-spacing:0;line-height:1.5;color:#687a6d;margin:8px 0 0}
+.owner-pickup-location{background:#f0f5f0;border:1px solid #d6e3d8;padding:16px;margin:18px 0;color:#3e654b}
+.owner-pickup-heading{display:flex;align-items:flex-start;gap:10px}
+.owner-pickup-heading>svg{flex-shrink:0;margin-top:2px}
+.owner-pickup-heading b{font:500 13px Arial,sans-serif;color:#284933}
+.owner-pickup-heading p{font:11px Arial,sans-serif;color:#65786a;line-height:1.55;margin:5px 0 0}
+.owner-location-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.owner-location-actions button,.owner-location-confirm button{min-height:44px;font-size:10px}
+.owner-location-confirm{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px;background:#fff;border:1px solid #cddbd0;margin-top:14px}
+.owner-location-confirm p{margin:0;font:11px Arial,sans-serif;line-height:1.5;color:#687b6c;min-width:0}
+.owner-location-confirm b,.owner-location-confirm span{display:block;overflow-wrap:anywhere}
+.owner-location-confirm b{color:#284933;margin-bottom:5px}
+.owner-location-confirm button{flex-shrink:0}
+.owner-location-status{display:flex;align-items:flex-start;gap:8px;font:11px Arial,sans-serif;line-height:1.5;margin:14px 0 0;color:#3c7150}
+.owner-location-status svg{flex-shrink:0;margin-top:2px}
+.owner-location-error{font:11px Arial,sans-serif;line-height:1.5;margin:12px 0 0;color:#994e39}
+.owner-pickup-location button:disabled{opacity:.6;cursor:not-allowed}
+.owner-listing-fields input:focus-visible,.owner-listing-fields select:focus-visible,.owner-listing-fields textarea:focus-visible,.owner-listing-fields button:focus-visible{outline:2px solid #5a8770;outline-offset:3px}
+@media(max-width:700px){.owner-location-confirm{flex-direction:column;align-items:stretch}.owner-location-confirm button{width:100%}.owner-location-actions button{flex:1}.owner-pickup-location{padding:14px}.owner-location-field>input{font-size:16px}}

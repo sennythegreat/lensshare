@@ -51,6 +51,9 @@ export type Listing = {
   description: string | null
   daily_rate: number
   image_url: string | null
+  pickup_address: string | null
+  pickup_latitude: number | null
+  pickup_longitude: number | null
   status: ListingStatus
   rating: number
   created_at: string
@@ -82,6 +85,68 @@ export type BookingWithRelations = Booking & {
   listing: Listing | null
   renter: Pick<Profile, 'id' | 'full_name' | 'verification_status' | 'is_student' | 'phone'> | null
   owner: Pick<Profile, 'id' | 'full_name'> | null
+}
+
+export type PayoutStatus = 'pending' | 'paid'
+
+export type Payout = {
+  id: string
+  booking_id: string
+  owner_id: string
+  gross: number
+  commission: number
+  net: number
+  status: PayoutStatus
+  paid_at: string | null
+  created_at: string
+}
+
+export type HandoffParty = 'owner' | 'renter'
+export type HandoffStage = 'agreement' | 'pickup' | 'return'
+
+export type BookingHandoff = {
+  id: string
+  booking_id: string
+  user_id: string
+  party: HandoffParty
+  stage: HandoffStage
+  checklist: Record<string, boolean>
+  created_at: string
+  updated_at: string
+}
+
+export type Review = {
+  id: string
+  booking_id: string
+  listing_id: string
+  reviewer_id: string
+  reviewee_id: string
+  rating: number
+  comment: string | null
+  created_at: string
+}
+
+export type ReviewWithNames = Review & {
+  reviewer: Pick<Profile, 'id' | 'full_name'> | null
+  reviewee: Pick<Profile, 'id' | 'full_name'> | null
+  listing: Pick<Listing, 'id' | 'name'> | null
+}
+
+export const COMMISSION_RATE = 0.15
+
+export type Message = {
+  id: string
+  booking_id: string
+  sender_id: string
+  body: string
+  read_at: string | null
+  created_at: string
+}
+
+export type PlatformStats = {
+  availableListings: number
+  verifiedMembers: number
+  completedBookings: number
 }
 
 export function initialsOf(name: string): string {

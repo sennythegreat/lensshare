@@ -3,32 +3,80 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { OwnerShell, PageCard, OwnerHeading, Status } from '@/components/owner-shell'
-import { fetchOwnerBookings } from '@/lib/data'
+import { SectionSkeleton, EmptyState } from '@/components/states'
+import { fetchOwnerBookings, fetchOwnerPayouts, markPayoutPaid } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
-import { pesos, type BookingWithRelations } from '@/lib/types'
+import { pesos, type BookingWithRelations, type Payout } from '@/lib/types'
+
+type PayoutRow = Payout & { booking: BookingWithRelations }
 
 export default function FinancePage() {
   const { user } = useProfile()
+  const [payouts, setPayouts] = useState<PayoutRow[]>([])
   const [bookings, setBookings] = useState<BookingWithRelations[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
-  useEffect(() => {
+  function load() {
     if (!user) return
-    fetchOwnerBookings(user.id).then(setBookings).catch(() => {})
-  }, [user])
+    setLoading(true)
+    Promise.all([fetchOwnerPayouts(user.id), fetchOwnerBookings(user.id)])
+      .then(([payoutRows, bookingRows]) => { setPayouts(payoutRows); setBookings(bookingRows) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }
+  useEffect(load, [user])
 
-  const completed = bookings.filter((b) => b.status === 'completed')
-  const gross = completed.reduce((sum, b) => sum + Number(b.total), 0)
-  const commission = Math.round(gross * 0.15)
-  const net = gross - commission
-  const pending = bookings.filter((b) => b.status === 'pending' || b.status === 'approved').reduce((sum, b) => sum + Number(b.total), 0)
+  async function handleMarkPaid(payoutId: string) {
+    setBusyId(payoutId)
+    // Optimistic update, rollback on error (same pattern as rentals decide()).
+    const previous = payouts
+    setPayouts((rows) => rows.map((row) => row.id === payoutId ? { ...row, status: 'paid' as const, paid_at: new Date().toISOString() } : row))
+    try {
+      await markPayoutPaid(payoutId)
+    } catch {
+      setPayouts(previous)
+    } finally {
+      setBusyId(null)
+    }
+  }
 
-  return <OwnerShell title="Revenue & Payouts" subtitle="Separate estimated earnings from money actually received. No payment integration is connected.">
+  const paid = payouts.filter((row) => row.status === 'paid')
+  const pendingPayouts = payouts.filter((row) => row.status === 'pending')
+  const totalPaid = paid.reduce((sum, row) => sum + Number(row.net), 0)
+  const pendingNet = pendingPayouts.reduce((sum, row) => sum + Number(row.net), 0)
+  const totalCommission = payouts.reduce((sum, row) => sum + Number(row.commission), 0)
+  const escrow = bookings
+    .filter((b) => b.status === 'pending' || b.status === 'approved')
+    .reduce((sum, b) => sum + Number(b.total), 0)
+
+  return <OwnerShell title="Revenue & Payouts" subtitle="Earnings from completed rentals. Each settled booking creates a payout entry — mark it paid once the money reaches you.">
     <div className="owner-stats">
-      <PageCard><span className="owner-eyebrow">COMPLETED RENTALS</span><strong>{pesos(gross)}</strong><p>{completed.length} settled {completed.length === 1 ? 'booking' : 'bookings'} · gross</p></PageCard>
-      <PageCard><span className="owner-eyebrow">PENDING IN ESCROW</span><strong>{pesos(pending)}</strong><p>Pending + approved bookings</p></PageCard>
-      <PageCard><span className="owner-eyebrow">OWNER NET (85%)</span><strong>{pesos(net)}</strong><p>After {pesos(commission)} co-op commission</p></PageCard>
+      <PageCard><span className="owner-eyebrow">PAID OUT</span><strong>{pesos(totalPaid)}</strong><p>{paid.length} settled {paid.length === 1 ? 'payout' : 'payouts'} · owner net</p></PageCard>
+      <PageCard><span className="owner-eyebrow">PENDING PAYOUT</span><strong>{pesos(pendingNet)}</strong><p>{pendingPayouts.length} awaiting settlement</p></PageCard>
+      <PageCard><span className="owner-eyebrow">CO-OP COMMISSION</span><strong>{pesos(totalCommission)}</strong><p>15% across all settled bookings</p></PageCard>
+      <PageCard><span className="owner-eyebrow">IN ESCROW</span><strong>{pesos(escrow)}</strong><p>Pending + approved bookings</p></PageCard>
     </div>
-    <div className="finance-grid"><PageCard><OwnerHeading eyebrow="SETTLEMENT FORMULA" title="15% co-op commission" detail="Gross rental revenue minus the co-op share equals your owner net."/><div className="finance-breakdown"><span>Gross rental revenue <b>{pesos(gross)}</b></span><span>Co-op commission (15%) <b>− {pesos(commission)}</b></span><span>Owner share <b>{pesos(net)}</b></span></div></PageCard><PageCard><OwnerHeading eyebrow="PAYOUT STATUS" title="Not connected" detail="Connect a payment provider before showing real settlements or bank details."/><Status>COMPUTED FROM BOOKINGS</Status></PageCard></div>
-    <PageCard><OwnerHeading eyebrow="TRANSACTION HISTORY" title="Rental earnings ledger"/><div className="owner-table">{bookings.map((booking) => <div className="owner-row" key={booking.id}><div><small>#{booking.id.slice(0, 8).toUpperCase()}</small><h3>{booking.listing?.name || 'Removed listing'}</h3><p>{booking.start_date} → {booking.end_date} · <Status>{booking.status.toUpperCase()}</Status></p></div><span>Gross <b>{pesos(Number(booking.total))}</b><br/>Net <b>{pesos(Math.round(Number(booking.total) * 0.85))}</b></span><Link className="owner-button" href="/dashboard/rentals">Details</Link></div>)}</div>{!bookings.length && <div className="owner-empty"><h3>No transactions yet</h3><p>Completed bookings will appear here as they settle.</p></div>}</PageCard>
+    <PageCard>
+      <OwnerHeading eyebrow="PAYOUT LEDGER" title="Settled & awaiting payouts" detail="Payout rows are created automatically when a booking is completed."/>
+      {loading ? <SectionSkeleton rows={3} /> : payouts.length ? <div className="owner-table">{payouts.map((row) => <div className="owner-row" key={row.id}>
+        <div>
+          <small>#{row.booking_id.slice(0, 8).toUpperCase()}</small>
+          <h3>{row.booking?.listing?.name || 'Removed listing'}</h3>
+          <p>{row.booking?.start_date} → {row.booking?.end_date} · gross {pesos(Number(row.gross))}</p>
+        </div>
+        <span>Commission <b>− {pesos(Number(row.commission))}</b><br/>Net <b>{pesos(Number(row.net))}</b></span>
+        {row.status === 'paid'
+          ? <Status>PAID</Status>
+          : <button className="owner-button dark" disabled={busyId === row.id} onClick={() => handleMarkPaid(row.id)}>{busyId === row.id ? 'Saving…' : 'Mark as paid'}</button>}
+      </div>)}</div> : <EmptyState title="No payouts yet" hint="Complete a rental from Manage Rentals and its payout will appear here." />}
+    </PageCard>
+    <PageCard><OwnerHeading eyebrow="SETTLEMENT FORMULA" title="15% co-op commission" detail="Gross rental revenue minus the co-op share equals your owner net."/>
+      <div className="finance-breakdown">
+        <span>Gross rental revenue <b>{pesos(payouts.reduce((sum, row) => sum + Number(row.gross), 0))}</b></span>
+        <span>Co-op commission (15%) <b>− {pesos(totalCommission)}</b></span>
+        <span>Owner share <b>{pesos(totalPaid + pendingNet)}</b></span>
+      </div>
+    </PageCard>
   </OwnerShell>
 }

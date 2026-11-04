@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { AdminShell } from '@/components/admin-shell'
+import { EmptyState, SectionSkeleton } from '@/components/states'
 import { fetchAdminUsers } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import type { AdminUserRow } from '@/lib/types'
@@ -53,8 +54,8 @@ export default function AdminUsersPage() {
           {chips(user)}
         </div>
       </div>)}
-      {loaded && !visible.length && <div className="admin-empty"><h3>No accounts found</h3><p>Try another tab or search term.</p></div>}
-      {!loaded && <div className="admin-row"><p>Loading accounts…</p></div>}
+      {loaded && !visible.length && <EmptyState title="No accounts found" hint="Try another tab or search term." />}
+      {!loaded && <SectionSkeleton rows={4} />}
     </div>
   </AdminShell>
 }

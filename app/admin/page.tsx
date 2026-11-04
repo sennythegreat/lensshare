@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AdminShell } from '@/components/admin-shell'
 import { Status } from '@/components/owner-shell'
-import { fetchAdminBookings, fetchAdminListings, fetchAdminUsers, fetchVerificationQueue } from '@/lib/data'
+import { fetchAdminBookings, fetchAdminListings, fetchAdminUsers, fetchVerificationQueue, sendQueuedNotifications } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import { pesos, type BookingWithRelations, type ListingWithOwner, type AdminUserRow, type VerificationSubmissionWithUser } from '@/lib/types'
 
@@ -19,6 +19,8 @@ export default function AdminDashboardPage() {
   const [bookings, setBookings] = useState<BookingWithRelations[]>([])
   const [submissions, setSubmissions] = useState<VerificationSubmissionWithUser[]>([])
   const [error, setError] = useState('')
+  const [mailState, setMailState] = useState<'idle' | 'sending'>('idle')
+  const [mailNote, setMailNote] = useState('')
 
   useEffect(() => {
     if (!profile || profile.role !== 'admin') return
@@ -36,8 +38,23 @@ export default function AdminDashboardPage() {
   const grossValue = useMemo(() => bookings.filter((b) => b.status !== 'declined').reduce((sum, b) => sum + Number(b.total), 0), [bookings])
   const recent = useMemo(() => bookings.slice(0, 5), [bookings])
 
+  async function flushNotifications() {
+    setMailState('sending')
+    setMailNote('')
+    try {
+      const result = await sendQueuedNotifications()
+      const failed = result.failures?.length ?? 0
+      setMailNote(failed ? `${result.sent} email${result.sent === 1 ? '' : 's'} sent; ${failed} stayed queued for retry.` : `${result.sent} queued email${result.sent === 1 ? '' : 's'} sent.`)
+    } catch (e) {
+      setMailNote(e instanceof Error ? e.message : 'Could not invoke the email function. Check its deployment and secrets.')
+    } finally {
+      setMailState('idle')
+    }
+  }
+
   return <AdminShell title="Platform Dashboard" subtitle="Everything happening across the LensShare co-op — people, gear, and bookings.">
     {error && <div className="admin-table"><div className="admin-row"><p className="auth-error">{error}</p></div></div>}
+    <div className="admin-mail-bar"><div><span className="admin-eyebrow">EMAIL QUEUE</span><p>Send booking and verification updates queued by database triggers.</p>{mailNote && <small>{mailNote}</small>}</div><button className="owner-button dark" disabled={mailState === 'sending'} onClick={flushNotifications}>{mailState === 'sending' ? 'Sending…' : 'Send queued notifications'}</button></div>
     <div className="admin-grid four">
       <div className="admin-card"><span className="admin-eyebrow">REGISTERED USERS</span><strong>{users.length}</strong><p>{owners} owners · {renters} renters</p></div>
       <div className="admin-card"><span className="admin-eyebrow">PENDING VERIFICATIONS</span><strong>{pendingVerifications}</strong><p>Documents waiting for review</p></div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { AdminShell } from '@/components/admin-shell'
+import { EmptyState, SectionSkeleton } from '@/components/states'
 import { fetchAdminListings, setListingStatus } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import { pesos, type ListingWithOwner } from '@/lib/types'
@@ -46,7 +47,7 @@ export default function AdminEquipmentPage() {
     </div>
     {error && <div className="admin-table"><div className="admin-row"><p className="auth-error">{error}</p></div></div>}
     {loaded && !visible.length
-      ? <div className="admin-empty"><h3>No equipment found</h3><p>Try another search term.</p></div>
+      ? <EmptyState title="No equipment found" hint="Try another search term." />
       : <div className="admin-gear-grid">{visible.map((listing) => <article className="admin-gear-card" key={listing.id}>
         <div className="admin-gear-photo"><img src={listing.image_url || '/lensshare-camera.png'} alt={listing.name} /><span className={`admin-pill ${listing.status}`}>{listing.status}</span></div>
         <div className="admin-gear-body">
@@ -55,6 +56,6 @@ export default function AdminEquipmentPage() {
           <div className="admin-gear-foot"><strong>{pesos(Number(listing.daily_rate))}<em>/day</em></strong><button className="owner-button" disabled={busyId === listing.id} onClick={() => toggle(listing)}>{listing.status === 'available' ? 'Pause' : 'Activate'}</button></div>
         </div>
       </article>)}</div>}
-    {!loaded && <div className="admin-table"><div className="admin-row"><p>Loading listings…</p></div></div>}
+    {!loaded && <div className="admin-table"><SectionSkeleton rows={4} /></div>}
   </AdminShell>
 }

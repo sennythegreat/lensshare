@@ -38,7 +38,11 @@ export function SiteHeadbar({
       : isAdmin
         ? 'Platform admin'
         : isRenter
-          ? 'Verified renter'
+          ? profile.verification_status === 'verified'
+            ? 'Verified renter'
+            : profile.verification_status === 'pending'
+              ? 'Verification pending'
+              : 'Unverified renter'
           : isOwner
             ? 'Verified owner'
             : 'Signed in'
@@ -65,6 +69,7 @@ export function SiteHeadbar({
         <Link className={pathname === '/packages' ? 'active' : ''} href="/packages">Packages &amp; Tiers</Link>
         {showRenterLinks && <Link className={pathname === '/renter/how-it-works' ? 'active' : ''} href="/renter/how-it-works">How It Works</Link>}
         {showRenterLinks && <Link className={pathname === '/renter/bookings' ? 'active' : ''} href="/renter/bookings">My Bookings</Link>}
+        {showRenterLinks && <Link className={pathname === '/renter/messages' ? 'active' : ''} href="/renter/messages">Messages</Link>}
       </nav>
       {onSearchChange && <div className="browse-search"><Search size={14} /><input value={searchValue ?? ''} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search equipment or brand..." /></div>}
       {isOwner && <Link className="earn-button" href="/dashboard/listings">+ List Gear / Earn</Link>}

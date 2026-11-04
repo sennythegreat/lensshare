@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { fetchPlatformStats } from '@/lib/data'
+import type { PlatformStats } from '@/lib/types'
 import { ArrowUpRight, Check, ChevronRight, CircleHelp, Heart, LockKeyhole, Menu, Repeat2, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, Tag, X } from 'lucide-react'
 
 const gear = [
@@ -17,6 +19,11 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export default function Page() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [active, setActive] = useState('All gear')
+  const [stats, setStats] = useState<PlatformStats | null>(null)
+
+  useEffect(() => {
+    fetchPlatformStats().then(setStats).catch(() => {})
+  }, [])
 
   return (
     <main>
@@ -31,7 +38,7 @@ export default function Page() {
 
       <section className="hero" id="top"><div className="shell hero-grid"><div className="hero-copy"><span className="kicker">Peer-to-peer camera & gear community</span><h1>LensShare</h1><p className="hero-lede">Stop letting expensive cameras sit idle. LensShare connects local creators, students, and hobbyists with insured cameras, lenses, and lighting — making creative projects, school outputs, and vlogs accessible to everyone.</p><div className="hero-actions"><a className="button dark" href="#gear">Find local gear <ArrowUpRight size={14} /></a><a className="button light" href="#owners">List your equipment <span>(earn ₱0–₱25k)</span></a></div><div className="trust-row"><span><LockKeyhole size={12} /> Locally insured equipment</span><span><ShieldCheck size={12} /> Identity-verified renters</span><span><Check size={12} /> Fresh 5% cancellation</span></div></div><div className="hero-visual"><img src="/lensshare-camera.png" alt="Black mirrorless camera on a pale blue surface" /><div className="floating-card community-card"><small>Local community</small><strong>Avg. ₱3,500/mo</strong><span>in owner payouts</span></div><div className="floating-card camera-card"><small>Featured today</small><strong>Sony ZV-E10</strong><span>₱450/day · 4.9 ★</span></div></div></div></section>
 
-      <section className="section shell" id="community"><SectionLabel>Market friction · the paradigm shift</SectionLabel><h2>Rebalancing Creative Capital</h2><div className="split-cards"><article className="problem-card"><span className="card-tag red">The market bottleneck</span><h3>Idle Gear Meets Prohibitive Retail Costs</h3><p>“Thousands” sit unused in creator bags, while new creators face a high barrier to entry. LensShare makes ownership useful again.</p><div className="stat-row"><b>₱42,000 – ₱50,000<small>Avg. creator buy cost</small></b><b>78%<small>First year sits unused</small></b></div></article><article className="dark-card"><span className="card-tag">LensShare</span><h3>A Peer-to-Peer Camera Co-Op for Locals</h3><p>Share equipment, recover costs, and unlock the next generation of local storytellers.</p><div className="stat-row"><b>80–85%<small>Owner net take-home</small></b><b>From ₱300<small>Daily rental rate floor</small></b></div></article></div></section>
+      <section className="section shell" id="community"><SectionLabel>Market friction · the paradigm shift</SectionLabel><h2>Rebalancing Creative Capital</h2><div className="live-stats" aria-label="LensShare platform activity"><div><strong>{stats ? stats.availableListings.toLocaleString() : '—'}</strong><span>Available gear listings</span></div><div><strong>{stats ? stats.verifiedMembers.toLocaleString() : '—'}</strong><span>Verified local members</span></div><div><strong>{stats ? stats.completedBookings.toLocaleString() : '—'}</strong><span>Completed rentals</span></div></div><div className="split-cards"><article className="problem-card"><span className="card-tag red">The market bottleneck</span><h3>Idle Gear Meets Prohibitive Retail Costs</h3><p>“Thousands” sit unused in creator bags, while new creators face a high barrier to entry. LensShare makes ownership useful again.</p><div className="stat-row"><b>₱42,000 – ₱50,000<small>Avg. creator buy cost</small></b><b>78%<small>First year sits unused</small></b></div></article><article className="dark-card"><span className="card-tag">LensShare</span><h3>A Peer-to-Peer Camera Co-Op for Locals</h3><p>Share equipment, recover costs, and unlock the next generation of local storytellers.</p><div className="stat-row"><b>80–85%<small>Owner net take-home</small></b><b>From ₱300<small>Daily rental rate floor</small></b></div></article></div></section>
 
       <section className="cream-section"><div className="section shell" id="how"><div className="center-heading"><SectionLabel>Built for both sides of the lens</SectionLabel><h2>The Peer Advantage</h2><p>A community platform designed to democratize high-end production tools while protecting individual ownership.</p></div><div className="advantage-grid">{[['⌂','Rent Without the Hefty Price Tag','Get access to creator-grade cameras, lenses, and lighting without a huge upfront cost.'],['◌','Turn Idle Gear Into Passive Income','Earn on your camera while it is not in use. Set your price, stay in control.'],['✦','Beyond Phone Cameras','Step into professional-grade tools with local help and real reviews.'],['◈','Fair & Transparent 15–20% Cut','Know exactly what you earn. Simple pricing, protected payouts.']].map(([icon,title,copy])=><article className="advantage" key={title}><span className="adv-icon">{icon}</span><h3>{title}</h3><p>{copy}</p><a href="#gear">Learn more <ChevronRight size={12}/></a></article>)}</div></div></section>
 
