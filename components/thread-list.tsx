@@ -8,6 +8,7 @@ import { fetchMyMessages, fetchOwnerBookings, fetchRenterBookings } from '@/lib/
 import { useProfile } from '@/lib/use-profile'
 import { EmptyState, ErrorState, SectionSkeleton } from '@/components/states'
 import type { BookingWithRelations, Message } from '@/lib/types'
+import './thread-list.css'
 
 export function ThreadList() {
   const { user, profile, loading: profileLoading } = useProfile()
