@@ -28,7 +28,9 @@ finishing any change.
 - `supabase/schema.sql` creates the base schema (tables, RLS, signup trigger,
   realtime, gear storage); `supabase/verification.sql` adds the verification
   layer (`verification_submissions` table, private `verification-docs` bucket,
-  `profiles.email`); `supabase/enums.sql` converts every constrained text
+  `profiles.email`); `supabase/renter-primary-use.sql` adds the optional,
+  self-reported `profiles.primary_rental_use` enum used for owner renter-mix
+  reporting; `supabase/enums.sql` converts every constrained text
   column to native Postgres enums (Table Editor dropdowns) and makes the
   role a three-value enum: `owner | renter | admin` (admin replaces the old
   is_admin flag); `supabase/admin.sql` grants admins the
@@ -40,7 +42,8 @@ finishing any change.
   Editor. There is no local supabase CLI or migrations folder.
 - Tables: `profiles` (extends `auth.users`; `role` is an enum:
   `owner` | `renter` | `admin` — exclusive, drives routing; plus
-  `verification_status`, `is_student`), `gear_listings` (publicly readable,
+  `verification_status`, `is_student`, and optional self-reported
+  `primary_rental_use`), `gear_listings` (publicly readable,
   owner-writable; category and status are enums), `bookings` (status enum
   lifecycle `pending → approved → active → returned → completed`, plus
   `declined`; visible only to the booking's renter and owner; creating a

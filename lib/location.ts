@@ -12,26 +12,33 @@ export function pickupCoordinates(item: { pickup_latitude?: number | null; picku
     ? { latitude, longitude } : null
 }
 
+export function approximateCoordinates({ latitude, longitude }: Coordinates): Coordinates {
+  return {
+    latitude: Number(latitude.toFixed(2)),
+    longitude: Number(longitude.toFixed(2)),
+  }
+}
+
 export function requestLocation(): Promise<LocationFix> {
   if (typeof window === 'undefined' || !window.isSecureContext) {
-    return Promise.reject(new Error('Location access needs HTTPS or localhost. You can still search by pickup area.'))
+    return Promise.reject(new Error('Location access needs HTTPS or localhost. You can still search by availability area.'))
   }
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
-    return Promise.reject(new Error('This browser does not support location access. You can still enter a pickup address or search an area.'))
+    return Promise.reject(new Error('This browser does not support location access. You can still enter or search an availability area.'))
   }
   return new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
       if (!validCoordinates(coords.latitude, coords.longitude) || !Number.isFinite(coords.accuracy) || coords.accuracy < 0) {
-        reject(new Error('Your location could not be determined reliably. Please try again or enter an address.'))
+        reject(new Error('Your location could not be determined reliably. Please try again or enter an availability area.'))
         return
       }
       resolve({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy })
     },
     (error) => reject(new Error(error.code === 1
-      ? 'Location permission was not granted. You can still search by pickup area.'
+      ? 'Location permission was not granted. You can still search by availability area.'
       : error.code === 3
-        ? 'Finding your location timed out. Try again or search by pickup area.'
-        : 'Your location is unavailable. Try again or search by pickup area.')),
+        ? 'Finding your location timed out. Try again or search by availability area.'
+        : 'Your location is unavailable. Try again or search by availability area.')),
     { enableHighAccuracy: true, timeout: 12_000, maximumAge: 60_000 },
   ))
 }

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, MessageCircle, Send } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fetchBookingById, fetchBookingMessages, markMessagesRead, sendMessage } from '@/lib/data'
@@ -18,6 +18,7 @@ export default function ChatPage() {
 
 function ChatContent() {
   const bookingId = useSearchParams().get('id') ?? ''
+  const router = useRouter()
   const { user, profile, loading: profileLoading } = useProfile()
   const [booking, setBooking] = useState<BookingWithRelations | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -77,8 +78,8 @@ function ChatContent() {
   if (profileLoading || loading) return <main className="chat-page"><SectionSkeleton rows={5} /></main>
   if (!booking) return <main className="chat-page"><ErrorState title="Conversation not available" hint={error || 'This booking does not exist or you are not a participant.'} /></main>
 
-  return <main className="chat-page">
-    <section className="chat-shell">
+  return <main className="chat-page" onClick={() => router.push(backHref)}>
+    <section className="chat-shell" onClick={(event) => event.stopPropagation()}>
       <header className="chat-header">
         <Link href={backHref} aria-label="Back to messages"><ArrowLeft size={18} /></Link>
         <img src={booking.listing?.image_url || '/lensshare-camera.png'} alt="" />

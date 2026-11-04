@@ -1,11 +1,24 @@
 export type Role = 'owner' | 'renter' | 'admin'
 
+export const PRIMARY_RENTAL_USE_OPTIONS = [
+  { value: 'school_film_video_projects', label: 'School film/video projects' },
+  { value: 'campus_journalism', label: 'Campus journalism' },
+  { value: 'freelance_client_productions', label: 'Freelance/client productions' },
+  { value: 'photography_content_creation', label: 'Photography/content creation' },
+  { value: 'personal_hobby_projects', label: 'Personal/hobby projects' },
+  { value: 'other', label: 'Other' },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+] as const
+
+export type PrimaryRentalUse = (typeof PRIMARY_RENTAL_USE_OPTIONS)[number]['value']
+
 export type Profile = {
   id: string
   full_name: string
   email: string | null
   phone: string | null
   role: Role
+  primary_rental_use: PrimaryRentalUse | null
   is_student: boolean
   verification_status: 'unverified' | 'pending' | 'verified'
   created_at: string
@@ -51,6 +64,7 @@ export type Listing = {
   description: string | null
   daily_rate: number
   image_url: string | null
+  image_urls: string[] | null
   pickup_address: string | null
   pickup_latitude: number | null
   pickup_longitude: number | null
@@ -83,7 +97,7 @@ export type ListingWithOwner = Listing & {
 
 export type BookingWithRelations = Booking & {
   listing: Listing | null
-  renter: Pick<Profile, 'id' | 'full_name' | 'verification_status' | 'is_student' | 'phone'> | null
+  renter: (Pick<Profile, 'id' | 'full_name' | 'verification_status' | 'is_student' | 'phone'> & Partial<Pick<Profile, 'primary_rental_use'>>) | null
   owner: Pick<Profile, 'id' | 'full_name'> | null
 }
 
@@ -147,6 +161,17 @@ export type PlatformStats = {
   availableListings: number
   verifiedMembers: number
   completedBookings: number
+}
+
+export function listingPhotos(listing: Pick<Listing, 'image_url' | 'image_urls'> | null | undefined): string[] {
+  if (!listing) return []
+  const photos = Array.isArray(listing.image_urls) ? listing.image_urls.filter((url): url is string => typeof url === 'string' && Boolean(url.trim())) : []
+  if (photos.length) return photos.slice(0, 5)
+  return listing.image_url?.trim() ? [listing.image_url] : []
+}
+
+export function availabilityArea(listing: Pick<Listing, 'pickup_address'> | null | undefined): string {
+  return listing?.pickup_address?.trim() || 'Availability area not added'
 }
 
 export function initialsOf(name: string): string {

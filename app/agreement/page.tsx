@@ -86,7 +86,7 @@ function AgreementContent() {
 
       <section className="agreement-terms">
         <h2>1 · Hand-off & return</h2>
-        <p>Hand-off occurs at the agreed pickup point on the start date. Current listing pickup address: {gear?.pickup_address?.trim() || 'Confirm pickup point with owner'}. Default pickup: 9:00 AM · Confirm with owner. The renter receives the equipment listed above, inspected by both parties at hand-off.</p>
+        <p>The listing&apos;s general availability area is {gear?.pickup_address?.trim() || 'not specified'}. This is not an exact pickup address. The owner and renter must agree on the precise handoff and return time and place privately through the booking&apos;s Messages before the rental starts. The renter receives the equipment listed above, inspected by both parties at hand-off.</p>
         <h2>2 · Care of equipment</h2>
         <p>The renter agrees to operate the equipment only for the stated shoot purpose, to keep it secure and dry, and to return it clean and complete with all included accessories by the end date. No sub-leasing or third-party use.</p>
         <h2>3 · Damage & loss</h2>

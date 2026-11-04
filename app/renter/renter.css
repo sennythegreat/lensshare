@@ -24,4 +24,10 @@
 .renter-review small{color:#71807a;font-size:10px;display:block;margin-top:2px}
 .renter-review p{margin:8px 0 0;font-size:12px;color:#33403b;line-height:1.5}
 .renter-message-link{border:1px solid #d6dfdc;background:#fff;padding:9px 12px;display:flex;gap:6px;align-items:center;font-size:10px}
+.renter-booking-area{display:inline-flex!important;width:max-content;max-width:100%;margin:0 0 8px!important;padding:4px 7px;background:#edf3ef;color:#416652!important;font:10px 'DM Mono',monospace!important;overflow-wrap:anywhere}
 .renter-page .thread-list+.state-empty{margin-top:0}
+
+/* Renter profile: optional self-reported rental use (appended) */
+.form-grid select{border:1px solid #d9deda;padding:12px;background:#fafbf9;font:13px Arial;color:#26332f}
+.profile-use-field{grid-column:1/-1}
+.profile-use-field small{max-width:560px;color:#71807a;font:10px Arial;text-transform:none;letter-spacing:0;line-height:1.45}

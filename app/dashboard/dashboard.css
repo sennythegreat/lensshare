@@ -97,3 +97,24 @@
 /* Studio Dashboard: real gear photos in booking rows + vault cards (appended) */
 .rental-row .gear-photo{width:57px;height:57px;object-fit:cover;border-radius:4px;flex:none;background:#dfe7e8}
 .vault-image .gear-photo{width:100%;height:100%;object-fit:cover;display:block}
+
+/* Studio Dashboard: owner-scoped primary rental use (appended) */
+.demographics-note{margin:-4px 0 16px;color:#69716e;font-size:10px;line-height:1.45}
+.demographics-chart{display:grid;grid-template-columns:116px minmax(0,1fr);gap:18px;align-items:center}
+.demographics-donut{width:116px;height:116px;border-radius:50%;display:grid;place-items:center;position:relative}
+.demographics-donut:after{content:'';position:absolute;inset:14px;border-radius:50%;background:#fff}
+.demographics-donut span{z-index:1;font:24px Georgia,serif;text-align:center;color:#18201e}
+.demographics-donut small{display:block;margin-top:2px;font:8px 'DM Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#68706c}
+.demographics-legend{display:flex;flex-direction:column;gap:9px;min-width:0}
+.demographics-legend>div{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:7px;align-items:center;font-size:10px}
+.demographics-legend i{width:8px;height:8px;display:block}
+.demographics-legend span{min-width:0;line-height:1.25;color:#34413d}
+.demographics-legend b{white-space:nowrap;font:9px 'DM Mono',monospace;color:#5f6c68}
+.demographics-state,.demographics-empty{min-height:116px;background:#f4f4f1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#68716e;padding:18px;font-size:11px}
+.demographics-state.error{background:#f7e3e0;color:#8c3d31}
+.demographics-empty p{margin:0 0 5px;color:#34413d;font:16px Georgia,serif}
+.demographics-empty small{max-width:250px;line-height:1.45}
+@media(max-width:1250px){.demographics-chart{grid-template-columns:1fr}.demographics-donut{margin:0 auto}.demographics-legend{width:100%}}
+@media(min-width:1001px) and (max-width:1250px){.dashboard-columns{grid-template-columns:minmax(0,1.7fr) minmax(250px,.8fr)}}
+@media(max-width:700px) and (min-width:381px){.demographics-chart{grid-template-columns:116px minmax(0,1fr)}.demographics-donut{margin:0}}
+@media(max-width:380px){.demographics-chart{grid-template-columns:1fr}.demographics-donut{margin:0 auto}.demographics-legend{width:100%}}

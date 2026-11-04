@@ -10,7 +10,7 @@ import { useProfile } from '@/lib/use-profile'
 import { SiteHeadbar } from '@/components/site-headbar'
 import { EmptyState, ErrorState, SectionSkeleton } from '@/components/states'
 import { VerifyBanner } from '@/components/verify-banner'
-import { initialsOf, rentalDays, type ListingWithOwner } from '@/lib/types'
+import { initialsOf, listingPhotos, rentalDays, type ListingWithOwner } from '@/lib/types'
 import { distanceKm, formatDistance, pickupCoordinates, requestLocation, type LocationFix } from '@/lib/location'
 
 const categories = ['All equipment', 'Cameras', 'Lenses', 'Lighting', 'Support', 'Audio']
@@ -50,6 +50,7 @@ export default function BrowsePage() {
   const [minRating, setMinRating] = useState(0)
   const [sort, setSort] = useState('Most Popular in Naga')
   const [selected, setSelected] = useState<ListingWithOwner | null>(null)
+  const [selectedPhoto, setSelectedPhoto] = useState(0)
   const [saved, setSaved] = useState<string[]>([])
   const [booked, setBooked] = useState(false)
   const [bookingBusy, setBookingBusy] = useState(false)
@@ -154,7 +155,7 @@ export default function BrowsePage() {
       && Number(item.rating) >= minRating
       && (!availabilityOnly || !availabilityReady || !unavailableIds.has(item.id))
   }).sort((a, b) => {
-    if (sort === 'Nearest pickup' && userLocation) {
+    if (sort === 'Nearest area' && userLocation) {
       const aDistance = distances.get(a.id) ?? Infinity
       const bDistance = distances.get(b.id) ?? Infinity
       if (aDistance !== bDistance) return aDistance - bDistance
@@ -189,13 +190,13 @@ export default function BrowsePage() {
       const location = await requestLocation()
       if (request !== locationRequest.current) return
       if (location.accuracy > 1000) {
-        setLocationError('Your location is too approximate for nearby sorting. Try again or search a pickup area.')
+        setLocationError('Your location is too approximate for nearby sorting. Try again or search an availability area.')
         return
       }
       setUserLocation(location)
-      setSort('Nearest pickup')
+      setSort('Nearest area')
     } catch (error) {
-      if (request === locationRequest.current) setLocationError(error instanceof Error ? error.message : 'Could not find your location. Search a pickup area instead.')
+      if (request === locationRequest.current) setLocationError(error instanceof Error ? error.message : 'Could not find your location. Search an availability area instead.')
     } finally {
       if (request === locationRequest.current) setLocationBusy(false)
     }
@@ -206,7 +207,7 @@ export default function BrowsePage() {
     setUserLocation(null)
     setLocationBusy(false)
     setLocationError('')
-    if (sort === 'Nearest pickup') setSort('Most Popular in Naga')
+    if (sort === 'Nearest area') setSort('Most Popular in Naga')
   }
 
   function changeDate(kind: 'start' | 'end', value: string) {
@@ -220,6 +221,7 @@ export default function BrowsePage() {
 
   function openDetails(item: ListingWithOwner) {
     setSelected(item)
+    setSelectedPhoto(0)
     setBooked(false)
     setBookingError('')
     setShootDescription('')
@@ -258,28 +260,31 @@ export default function BrowsePage() {
     }
   }
 
+  const selectedPhotos = selected ? listingPhotos(selected) : []
+  const activeSelectedPhoto = selectedPhotos[selectedPhoto] || selected?.image_url || '/lensshare-camera.png'
+
   return <main className="browse-page">
     <SiteHeadbar />
     <div className="browse-verify-wrap"><VerifyBanner /></div>
     <section className="browse-planner" aria-labelledby="browse-planner-title">
       <div className="browse-planner-top">
-        <div className="browse-planner-heading"><p className="browse-planner-eyebrow">PLAN YOUR NEXT SHOOT</p><h1 id="browse-planner-title">Good gear. Closer to you.</h1><p>Choose your rental dates and find a pickup that works for you.</p></div>
+        <div className="browse-planner-heading"><p className="browse-planner-eyebrow">PLAN YOUR NEXT SHOOT</p><h1 id="browse-planner-title">Good gear. Closer to you.</h1><p>Choose your rental dates and find gear available in an area that works for you.</p></div>
         <div className="browse-planner-location">
           <span className="browse-planner-pin"><MapPin size={19} aria-hidden="true" /></span>
-          <div className="browse-planner-location-copy"><b>{userLocation ? 'Using your location' : 'Pickup near you'}</b><span role="status">{userLocation ? `Approx. accuracy ±${Math.ceil(userLocation.accuracy)} m · not saved` : 'Each item has its own pickup point.'}</span></div>
+          <div className="browse-planner-location-copy"><b>{userLocation ? 'Using your location' : 'Gear near you'}</b><span role="status">{userLocation ? `Approx. accuracy ±${Math.ceil(userLocation.accuracy)} m · not saved` : 'Owners may share a broad availability area.'}</span></div>
           <div className="browse-planner-location-actions"><button className="browse-location-button" type="button" onClick={useMyLocation} disabled={locationBusy}><LocateFixed size={15} aria-hidden="true" />{locationBusy ? 'Locating…' : userLocation ? 'Update location' : 'Use my location'}</button>
           {(userLocation || locationBusy) && <button className="browse-location-clear" type="button" onClick={clearLocation} aria-label="Clear location"><X size={16} aria-hidden="true" /></button>}</div>
         </div>
       </div>
       <form className="browse-planner-form" onSubmit={(event) => { event.preventDefault(); document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' }) }}>
-        <label className="browse-planner-query"><span className="browse-planner-label">Gear or pickup area</span><span className="browse-planner-query-input"><Search size={18} aria-hidden="true" /><input type="search" aria-label="Gear or pickup area" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Camera, lens, brand or pickup address" /></span></label>
+        <label className="browse-planner-query"><span className="browse-planner-label">Gear or availability area</span><span className="browse-planner-query-input"><Search size={18} aria-hidden="true" /><input type="search" aria-label="Gear or availability area" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Camera, brand, city or town" /></span></label>
         <fieldset className="browse-planner-dates"><legend><span className="browse-planner-label">Rental dates</span><span className="browse-planner-duration" role="status">{datesInvalid ? 'Choose dates' : `${days} day${days === 1 ? '' : 's'}`}</span></legend><div className="browse-planner-date-pair"><label><span>Pick-up</span><input type="date" aria-label="Pick-up date" value={startDate} required onChange={(event) => changeDate('start', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-date-error' : undefined} /></label><span className="browse-planner-date-arrow"><ArrowRight size={16} aria-hidden="true" /></span><label><span>Return</span><input type="date" aria-label="Return date" value={endDate} required min={returnMin} onChange={(event) => changeDate('end', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-date-error' : undefined} /></label></div></fieldset>
         <button className="browse-planner-submit" type="submit">Find gear <ArrowRight size={17} aria-hidden="true" /></button>
       </form>
       <div className="browse-planner-footer"><span className="browse-planner-privacy">Location is optional. You can search an area instead.</span></div>
       {dateError && <p className="browse-planner-message error" id="browse-date-error" role="status">{dateError}</p>}
       {locationError && <p className="browse-planner-message error" role="status">{locationError}</p>}
-      {userLocation && <p className="browse-planner-message" role="status">{distances.size ? 'Distances are approximate, not travel distances. Items without pickup coordinates appear after located items.' : 'No pickup coordinates have been added yet. You can still browse gear or search an address.'}</p>}
+      {userLocation && <p className="browse-planner-message" role="status">{distances.size ? 'Distances use approximate area points, not exact addresses or travel distance. Items without coordinates appear after located items.' : 'No approximate coordinates have been added yet. You can still browse gear or search a city or municipality.'}</p>}
     </section>
     <div className="browse-layout" id="catalog">
       <aside className="filters">
@@ -307,16 +312,16 @@ export default function BrowsePage() {
           <div>
             <p className="eyebrow">VERIFIED LOCAL EQUIPMENT</p>
             <h2>Local gear: <span>{filtered.length} Listings</span></h2>
-            <p>All units include the automatic ₱100k LensCare™ co-op policy &amp; ₱0 deductible. Check each item’s pickup address and confirm hand-off details with the owner.</p>
+            <p>All units include the automatic ₱100k LensCare™ co-op policy &amp; ₱0 deductible. Check where each item is generally available, then arrange the exact handoff privately with the owner.</p>
           </div>
-          <label className="sort">Sort by<select value={sort} onChange={(e) => setSort(e.target.value)}><option>Most Popular in Naga</option><option>Price: low to high</option><option>Price: high to low</option><option disabled={!userLocation}>Nearest pickup</option></select></label>
+          <label className="sort">Sort by<select value={sort} onChange={(e) => setSort(e.target.value)}><option>Most Popular in Naga</option><option>Price: low to high</option><option>Price: high to low</option><option disabled={!userLocation}>Nearest area</option></select></label>
         </div>
         {loading ? <SectionSkeleton rows={4} /> : loadError ? <ErrorState title="Could not load listings" hint={loadError} retry={load} /> : filtered.length ? filtered.map((item) => {
           const unavailable = availabilityReady && unavailableIds.has(item.id)
           const distance = distances.get(item.id)
           return <article className={`gear-result ${unavailable ? 'date-unavailable' : ''}`} key={item.id}>
-          <div className="catalog-image"><span className={unavailable ? 'unavailable-badge' : ''}>{unavailable ? `BOOKED · ${dateRangeLabel}` : availabilityReady ? `AVAILABLE · ${dateRangeLabel}` : 'LISTED GEAR'}</span><button aria-label="Save listing" className={saved.includes(item.id) ? 'saved' : ''} onClick={() => toggleSaved(item.id)}><Heart size={16} fill={saved.includes(item.id) ? 'currentColor' : 'none'} /></button><img src={item.image_url || '/lensshare-camera.png'} alt={item.name} /></div>
-          <div className="result-copy"><small>{item.brand}　★ {item.rating} <em>{item.owner?.full_name || 'Verified owner'}</em></small><h3>{item.name}</h3><p>▣ {item.specs}</p>{item.included && <p>▤ {item.included}</p>}<p><ShieldCheck size={13} /> ₱0 deductible · Student escrow covered</p><p className="browse-pickup-address"><MapPin size={13} aria-hidden="true" /><span>{item.pickup_address?.trim() || 'Confirm pickup point with owner'}{distance !== undefined && <em className="browse-pickup-distance">Approx. {formatDistance(distance)} to pickup</em>}</span></p>{unavailable && <p>Unavailable {dateRangeLabel}</p>}</div>
+          <div className="catalog-image"><span className={unavailable ? 'unavailable-badge' : ''}>{unavailable ? `BOOKED · ${dateRangeLabel}` : availabilityReady ? `AVAILABLE · ${dateRangeLabel}` : 'LISTED GEAR'}</span><button aria-label="Save listing" className={saved.includes(item.id) ? 'saved' : ''} onClick={() => toggleSaved(item.id)}><Heart size={16} fill={saved.includes(item.id) ? 'currentColor' : 'none'} /></button><img src={listingPhotos(item)[0] || '/lensshare-camera.png'} alt={item.name} /></div>
+          <div className="result-copy"><small>{item.brand}　★ {item.rating} <em>{item.owner?.full_name || 'Verified owner'}</em></small><h3>{item.name}</h3>{(item.specs || item.description) && <p>▣ {item.specs || item.description}</p>}{item.included && <p>▤ {item.included}</p>}<p><ShieldCheck size={13} /> ₱0 deductible · Student escrow covered</p><p className="browse-pickup-address"><MapPin size={13} aria-hidden="true" /><span>{item.pickup_address?.trim() ? `Available in ${item.pickup_address.trim()}` : 'Availability area not added'}{distance !== undefined && <em className="browse-pickup-distance">Approx. {formatDistance(distance)} away</em>}</span></p>{unavailable && <p>Unavailable {dateRangeLabel}</p>}</div>
           <div className="rate-card"><small className="rate-tier">{tierOf(Number(item.daily_rate))}</small><strong>₱{Number(item.daily_rate).toLocaleString()}<em>/ day</em></strong><span>Owner rating ★ {item.rating}</span>{profile?.is_student && <span className="rate-student">STUDENT · DEPOSIT WAIVED</span>}<button disabled={unavailable} onClick={() => openDetails(item)}>{unavailable ? 'Booked for these dates' : 'Rent now'}</button><button className="secondary-action" onClick={() => openDetails(item)}>Quick details</button></div>
         </article>}) : <EmptyState icon={Camera} title="No gear matches these filters" hint="Try another category, brand, date range, or search term." action={<button onClick={resetFilters}>Clear filters</button>} />}
         <div className="pagination">Showing {filtered.length} verified local equipment units in Naga City</div>
@@ -324,7 +329,7 @@ export default function BrowsePage() {
     </div>
     <section className="browse-benefits"><span><b>Maxim / Lalamove Hub Couriers</b><small>Coordinate delivery or a direct hand-off with the owner.</small></span><span><b>Zero Cash Deposit for Students</b><small>Validated student IDs qualify for deposit waiver.</small></span><span><b>Optical Sensor Guaranteed Clean</b><small>Every camera is inspected before pick-up.</small></span></section>
     <footer className="browse-footer"><div><span className="browse-brand"><span className="logo-mark"><img src="/lensshare-logo.png" alt="" /></span><strong>LensShare</strong></span><p>A peer-to-peer optical cooperative connecting creators across Naga City.</p></div><div><b>MARKETPLACE</b><span>Mirrorless bodies</span><span>Fast primes & zooms</span><span>Production lighting</span></div><div><b>TRUST & PROTOCOL</b><span>Peer verification</span><span>Sensor cleaning standards</span><span>Damage dispute support</span></div><div><b>LENScare coverage</b><span>₱100,000 replacement guarantee</span><span>Auto-activated on every rental</span></div></footer>
-    {selected && <div className="detail-backdrop" role="presentation" onClick={() => setSelected(null)}><section className="detail-modal" role="dialog" aria-modal="true" aria-label="Equipment details" onClick={(e) => e.stopPropagation()}><button className="close-modal" onClick={() => setSelected(null)} aria-label="Close"><X size={18} /></button><img src={selected.image_url || '/lensshare-camera.png'} alt={selected.name} /><div className="detail-content"><p className="eyebrow">{selected.meta || selected.brand}</p><h2>{selected.name}</h2><p className="detail-price">₱{Number(selected.daily_rate).toLocaleString()}<small>/ day</small></p><p>{selected.specs}</p>{selected.included && <p>{selected.included}</p>}{selected.owner && <div className="detail-owner"><span>{initialsOf(selected.owner.full_name)}</span><div><b>{selected.owner.full_name}</b><small>Verified owner · ★ {selected.rating}</small></div></div>}<div className="browse-detail-pickup"><MapPin size={17} aria-hidden="true" /><div><b>Pickup point</b><span>{selected.pickup_address?.trim() || 'Confirm pickup point with owner'}</span>{distances.has(selected.id) && <small>Approx. {formatDistance(distances.get(selected.id)!)} to pickup · straight-line distance</small>}</div></div><label>Shoot description<textarea value={shootDescription} onChange={(e) => setShootDescription(e.target.value)} placeholder="Tell the owner what you are filming..." /></label><div className="detail-dates"><label>Pick-up date<input type="date" value={startDate} required disabled={bookingBusy} onChange={(e) => changeDate('start', e.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label><label>Return date<input type="date" value={endDate} required min={returnMin} disabled={bookingBusy} onChange={(e) => changeDate('end', e.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label></div>{dateError && <p className="browse-date-feedback" id="browse-detail-date-error" role="status">{dateError}</p>}{booked ? <div className="booking-success"><Check size={16} /> Booking request sent. The owner will confirm your hub handoff. <Link href="/renter/bookings">Track it in My Bookings →</Link></div> : needsVerification ? <div className="booking-verify"><ShieldCheck size={15} /><div><b>Identity verification required</b><span>Verify your government ID before your first rental — approvals usually take less than a day.</span><Link href="/renter/verification">Complete verification →</Link></div></div> : <button className="primary-booking" disabled={bookingBusy || datesInvalid} onClick={handleBooking}>{bookingBusy ? 'Sending request…' : datesInvalid ? 'Choose valid rental dates' : user ? `Request booking · ₱${(days * Number(selected.daily_rate)).toLocaleString()} (${days} day${days === 1 ? '' : 's'})` : 'Log in to request booking'}</button>}{bookingError && <p className="demo-note">{bookingError}</p>}</div></section></div>}
+    {selected && <div className="detail-backdrop" role="presentation" onClick={() => setSelected(null)}><section className="detail-modal" role="dialog" aria-modal="true" aria-label="Equipment details" onClick={(event) => event.stopPropagation()}><button className="close-modal" onClick={() => setSelected(null)} aria-label="Close"><X size={18} /></button><div className="browse-detail-gallery"><img src={activeSelectedPhoto} alt={`${selected.name} photo ${selectedPhoto + 1}`} />{selectedPhotos.length > 1 && <div className="browse-detail-thumbs">{selectedPhotos.map((photo, index) => <button className={selectedPhoto === index ? 'selected' : ''} type="button" key={photo} onClick={() => setSelectedPhoto(index)} aria-label={`View photo ${index + 1}`}><img src={photo} alt="" /></button>)}</div>}</div><div className="detail-content"><p className="eyebrow">{selected.meta || selected.brand}</p><h2>{selected.name}</h2><p className="detail-price">₱{Number(selected.daily_rate).toLocaleString()}<small>/ day</small></p>{(selected.specs || selected.description) && <p>{selected.specs || selected.description}</p>}{selected.included && <p>{selected.included}</p>}{selected.owner && <div className="detail-owner"><span>{initialsOf(selected.owner.full_name)}</span><div><b>{selected.owner.full_name}</b><small>Verified owner · ★ {selected.rating}</small></div></div>}<div className="browse-detail-pickup"><MapPin size={17} aria-hidden="true" /><div><b>Availability area</b><span>{selected.pickup_address?.trim() || 'Availability area not added'}</span>{distances.has(selected.id) && <small>Approx. {formatDistance(distances.get(selected.id)!)} away · based on a rounded area point</small>}<small>Arrange the exact handoff time and place privately with the owner in Messages.</small></div></div><label>Shoot description<textarea value={shootDescription} onChange={(event) => setShootDescription(event.target.value)} placeholder="Tell the owner what you are filming..." /></label><div className="detail-dates"><label>Pick-up date<input type="date" value={startDate} required disabled={bookingBusy} onChange={(event) => changeDate('start', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label><label>Return date<input type="date" value={endDate} required min={returnMin} disabled={bookingBusy} onChange={(event) => changeDate('end', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label></div>{dateError && <p className="browse-date-feedback" id="browse-detail-date-error" role="status">{dateError}</p>}{booked ? <div className="booking-success"><Check size={16} /> Booking request sent. Arrange the exact handoff with the owner in Messages. <Link href="/renter/bookings">Track it in My Bookings →</Link></div> : needsVerification ? <div className="booking-verify"><ShieldCheck size={15} /><div><b>Identity verification required</b><span>Verify your government ID before your first rental — approvals usually take less than a day.</span><Link href="/renter/verification">Complete verification →</Link></div></div> : <button className="primary-booking" disabled={bookingBusy || datesInvalid} onClick={handleBooking}>{bookingBusy ? 'Sending request…' : datesInvalid ? 'Choose valid rental dates' : user ? `Request booking · ₱${(days * Number(selected.daily_rate)).toLocaleString()} (${days} day${days === 1 ? '' : 's'})` : 'Log in to request booking'}</button>}{bookingError && <p className="demo-note">{bookingError}</p>}</div></section></div>}
   </main>
 }
 

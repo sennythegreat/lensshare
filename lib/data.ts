@@ -24,6 +24,12 @@ import type {
 } from '@/lib/types'
 
 const BOOKING_SELECT = '*, listing:gear_listings(*), renter:profiles!bookings_renter_id_fkey(id, full_name, verification_status, is_student, phone), owner:profiles!bookings_owner_id_fkey(id, full_name)'
+const OWNER_BOOKING_SELECT = '*, listing:gear_listings(*), renter:profiles!bookings_renter_id_fkey(id, full_name, verification_status, is_student, phone, primary_rental_use), owner:profiles!bookings_owner_id_fkey(id, full_name)'
+
+function missingPrimaryRentalUseColumn(error: { message?: string } | null): boolean {
+  const message = error?.message ?? ''
+  return /primary_rental_use/.test(message) && /(column|schema cache|does not exist)/i.test(message)
+}
 
 export async function fetchListings(): Promise<ListingWithOwner[]> {
   const supabase = createClient()
@@ -53,40 +59,74 @@ export type NewListing = Pick<Listing, 'name' | 'brand' | 'category' | 'daily_ra
   included?: string | null
   description?: string | null
   image_url?: string | null
+  image_urls?: string[]
   pickup_address?: string | null
   pickup_latitude?: number | null
   pickup_longitude?: number | null
+  status?: ListingStatus
 }
 
 function listingErrorMessage(error: { code?: string; message?: string }): string {
-  if ((error.code === 'PGRST204' || error.code === '42703') && /pickup_(address|latitude|longitude)/.test(error.message ?? '')) {
-    return 'Pickup addresses are not set up yet. Run supabase/listing-locations.sql in the Supabase SQL Editor, then try again.'
+  const message = error.message ?? ''
+  if ((error.code === 'PGRST204' || error.code === '42703') && /image_urls/.test(message)) {
+    return 'Photo galleries are not set up yet. Run supabase/listing-media.sql in the Supabase SQL Editor, then try again.'
   }
-  return error.message || 'Saving the listing failed.'
+  if ((error.code === 'PGRST204' || error.code === '42703') && /pickup_(address|latitude|longitude)/.test(message)) {
+    return 'Availability areas are not set up yet. Run supabase/listing-locations.sql in the Supabase SQL Editor, then try again.'
+  }
+  if (error.code === '23503' && /owner_id/.test(message)) {
+    return 'Your owner profile is not ready yet. Sign out and back in, or ask an administrator to restore your profile.'
+  }
+  if (/row-level security|policy/i.test(message)) {
+    return 'LensShare could not save this listing with your owner account. Check the listing and storage policies in Supabase.'
+  }
+  return message || 'Saving the listing failed.'
+}
+
+function missingListingColumn(error: { code?: string; message?: string } | null, column: string): boolean {
+  return Boolean(error && (error.code === 'PGRST204' || error.code === '42703') && new RegExp(`\\b${column}\\b`).test(error.message ?? ''))
 }
 
 export async function insertListing(ownerId: string, values: NewListing): Promise<Listing> {
   const supabase = createClient()
-  const { data, error } = await supabase
+  const save = (payload: Record<string, unknown>) => supabase
     .from('gear_listings')
-    .insert({ ...values, owner_id: ownerId })
+    .insert({ ...payload, owner_id: ownerId })
     .select('*')
     .single()
+
+  let { data, error } = await save(values)
+  if (missingListingColumn(error, 'image_urls') && (values.image_urls?.length ?? 0) <= 1) {
+    const { image_urls: _imageUrls, ...legacyValues } = values
+    const legacyResult = await save(legacyValues)
+    data = legacyResult.data
+    error = legacyResult.error
+    if (data) data = { ...data, image_urls: values.image_urls ?? null }
+  }
   if (error) throw new Error(listingErrorMessage(error))
   return data as Listing
 }
 
 export async function updateListing(id: string, ownerId: string, values: NewListing): Promise<Listing> {
-  const fields = ['name', 'brand', 'category', 'daily_rate', 'meta', 'specs', 'included', 'description', 'image_url', 'pickup_address', 'pickup_latitude', 'pickup_longitude'] as const
+  const fields = ['name', 'brand', 'category', 'daily_rate', 'meta', 'specs', 'included', 'description', 'image_url', 'image_urls', 'pickup_address', 'pickup_latitude', 'pickup_longitude', 'status'] as const
   const updates = Object.fromEntries(fields.filter((field) => values[field] !== undefined).map((field) => [field, values[field]]))
   const supabase = createClient()
-  const { data, error } = await supabase
+  const save = (payload: Record<string, unknown>) => supabase
     .from('gear_listings')
-    .update(updates)
+    .update(payload)
     .eq('id', id)
     .eq('owner_id', ownerId)
     .select('*')
     .single()
+
+  let { data, error } = await save(updates)
+  if (missingListingColumn(error, 'image_urls') && (values.image_urls?.length ?? 0) <= 1) {
+    const { image_urls: _imageUrls, ...legacyUpdates } = updates
+    const legacyResult = await save(legacyUpdates)
+    data = legacyResult.data
+    error = legacyResult.error
+    if (data) data = { ...data, image_urls: values.image_urls ?? null }
+  }
   if (error) throw new Error(listingErrorMessage(error))
   return data as Listing
 }
@@ -97,24 +137,75 @@ export async function setListingStatus(id: string, status: ListingStatus): Promi
   if (error) throw error
 }
 
-export async function uploadGearPhoto(userId: string, file: File): Promise<string> {
+export type UploadedGearPhoto = { path: string; url: string }
+
+export async function uploadGearPhoto(userId: string, file: File): Promise<UploadedGearPhoto> {
   const supabase = createClient()
-  const path = `${userId}/${Date.now()}-${file.name.replace(/\s+/g, '-')}`
-  const { error } = await supabase.storage.from('gear-photos').upload(path, file, { upsert: true })
-  if (error) throw error
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'gear-photo'
+  const path = `${userId}/${crypto.randomUUID()}-${safeName}`
+  const { error } = await supabase.storage.from('gear-photos').upload(path, file)
+  if (error) throw new Error(listingErrorMessage(error))
   const { data } = supabase.storage.from('gear-photos').getPublicUrl(path)
-  return data.publicUrl
+  return { path, url: data.publicUrl }
+}
+
+async function removeGearPhotoPaths(paths: string[]): Promise<void> {
+  if (!paths.length) return
+  const supabase = createClient()
+  const { error } = await supabase.storage.from('gear-photos').remove(paths)
+  if (error) throw new Error(listingErrorMessage(error))
+}
+
+export async function deleteUnreferencedGearPhotos(ownerId: string, candidates: UploadedGearPhoto[]): Promise<void> {
+  if (!candidates.length) return
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('gear_listings')
+    .select('image_url, image_urls')
+    .eq('owner_id', ownerId)
+  if (error && !missingListingColumn(error, 'image_urls')) throw new Error(listingErrorMessage(error))
+
+  let rows = data as Pick<Listing, 'image_url' | 'image_urls'>[] | null
+  if (missingListingColumn(error, 'image_urls')) {
+    const legacyResult = await supabase.from('gear_listings').select('image_url').eq('owner_id', ownerId)
+    if (legacyResult.error) throw new Error(listingErrorMessage(legacyResult.error))
+    rows = (legacyResult.data ?? []).map((row) => ({ ...row, image_urls: null }))
+  }
+
+  const referenced = new Set((rows ?? []).flatMap((row) => [row.image_url, ...(row.image_urls ?? [])]).filter((url): url is string => Boolean(url)))
+  const paths = candidates.filter((photo) => !referenced.has(photo.url)).map((photo) => photo.path)
+  await removeGearPhotoPaths(paths)
+}
+
+export function gearPhotoPath(url: string, userId: string): string | null {
+  try {
+    const marker = '/storage/v1/object/public/gear-photos/'
+    const parsed = new URL(url)
+    const index = parsed.pathname.indexOf(marker)
+    if (index < 0) return null
+    const path = decodeURIComponent(parsed.pathname.slice(index + marker.length))
+    return path.startsWith(`${userId}/`) ? path : null
+  } catch {
+    return null
+  }
 }
 
 export async function fetchOwnerBookings(ownerId: string): Promise<BookingWithRelations[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
+  const fetchBookings = (select: string) => supabase
     .from('bookings')
-    .select(BOOKING_SELECT)
+    .select(select)
     .eq('owner_id', ownerId)
     .order('start_date', { ascending: true })
+
+  let { data, error } = await fetchBookings(OWNER_BOOKING_SELECT)
+  if (missingPrimaryRentalUseColumn(error)) {
+    const legacyResult = await fetchBookings(BOOKING_SELECT)
+    data = legacyResult.data
+    error = legacyResult.error
+  }
   if (error) throw error
-  return (data ?? []) as BookingWithRelations[]
+  return (data ?? []) as unknown as BookingWithRelations[]
 }
 
 export async function fetchRenterBookings(renterId: string): Promise<BookingWithRelations[]> {
@@ -282,7 +373,7 @@ export async function submitReview(input: {
 
 export async function updateProfile(
   id: string,
-  values: Partial<Pick<import('@/lib/types').Profile, 'full_name' | 'phone' | 'role' | 'verification_status' | 'is_student'>>,
+  values: Partial<Pick<import('@/lib/types').Profile, 'full_name' | 'phone' | 'role' | 'primary_rental_use' | 'verification_status' | 'is_student'>>,
 ): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase.from('profiles').update(values).eq('id', id)
