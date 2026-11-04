@@ -7,6 +7,38 @@
 .doc-slot-head strong{font:15px Georgia,serif;color:#17201d}
 .doc-slot p{margin:6px 0 10px;font-size:11px;color:#65716c}
 .doc-note{background:#f7e3e0;color:#8c3d31;padding:8px 10px;font-size:11px}
+.verification-overview{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,.85fr);gap:30px;align-items:center;background:#07100e;color:#fff;padding:25px 28px;margin-bottom:18px;border:1px solid #07100e}
+.verification-overview-copy .eyebrow{display:flex;align-items:center;gap:7px;color:#a9c7bf;margin:0}
+.verification-overview-copy h2{font:28px Georgia,serif;margin:9px 0;color:#fff}
+.verification-overview-copy>p:last-child{color:#c3ceca;font-size:12px;line-height:1.6;margin:0;max-width:640px}
+.verification-track-list{display:flex;flex-direction:column;gap:13px}
+.verification-track{border:1px solid rgba(255,255,255,.16);padding:13px 14px;background:rgba(255,255,255,.04)}
+.verification-track>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.verification-track>div>span{font:10px 'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em;color:#e7eeeb}
+.verification-track progress{display:block;appearance:none;width:100%;height:6px;border:0;background:#35413d;margin:11px 0 7px}
+.verification-track progress::-webkit-progress-bar{background:#35413d}.verification-track progress::-webkit-progress-value{background:#8fbab0}.verification-track progress::-moz-progress-bar{background:#8fbab0}
+.verification-track small{font-size:10px;color:#acb9b4}
+.verification-card{margin-bottom:0}
+.verification-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.verification-card-head .eyebrow{display:flex;align-items:center;gap:7px;margin:0}
+.verification-feedback{display:flex;align-items:flex-start;gap:8px;margin:0 0 16px;padding:11px 13px;border:1px solid #c8dcd5;background:#edf6f2;color:#315c53}
+.verification-feedback.auth-error{border-color:#e1b9b1;background:#f9e9e6;color:#8c3d31}
+.verification-feedback svg{flex:none;margin-top:1px}
+.doc-slot.needs-attention{border-style:solid;border-color:#dfb9b1;background:#fff9f8}
+.doc-slot-head{align-items:flex-start}
+.doc-slot-head>div{min-width:0}
+.doc-slot-head strong{display:block}
+.doc-slot-head small{display:block;margin-top:4px;color:#82908a;font-size:9px}
+.doc-note{color:#8c3d31!important}
+.doc-replacement-note{color:#75612d!important;background:#f7f2e2;padding:7px 9px}
+.doc-pending-note{color:#5e6c67!important;background:#eef2ef;padding:7px 9px}
+.doc-validation-error{color:#8c3d31!important;font-weight:700}
+.doc-slot .owner-button:disabled{opacity:.55;cursor:not-allowed}
+.verification-file-rules{margin-top:16px}
+.verification-file-rules,.renter-page>.demo-note{display:flex;align-items:flex-start;gap:6px}
+.verification-file-rules svg,.renter-page>.demo-note svg{flex:none;margin-top:1px}
+@media(max-width:900px){.verification-overview{grid-template-columns:1fr}}
+@media(max-width:700px){.verification-overview{padding:21px}.verification-overview-copy h2{font-size:24px}.verification-track>div,.verification-card-head{align-items:flex-start}.verification-card-head{flex-direction:column}.doc-slot-head{flex-direction:column}}
 
 /* ── Renter workspace: top headbar chrome, no sidebar (appended) ───────── */
 .owner-page.renter-page{display:block;overflow-x:hidden}
@@ -24,6 +56,7 @@
 .renter-review small{color:#71807a;font-size:10px;display:block;margin-top:2px}
 .renter-review p{margin:8px 0 0;font-size:12px;color:#33403b;line-height:1.5}
 .renter-message-link{border:1px solid #d6dfdc;background:#fff;padding:9px 12px;display:flex;gap:6px;align-items:center;font-size:10px}
+.renter-hub-link{background:#07100e;color:#fff;border-color:#07100e;text-transform:uppercase;font-weight:700;letter-spacing:.04em}
 .renter-booking-area{display:inline-flex!important;width:max-content;max-width:100%;margin:0 0 8px!important;padding:4px 7px;background:#edf3ef;color:#416652!important;font:10px 'DM Mono',monospace!important;overflow-wrap:anywhere}
 .renter-page .thread-list+.state-empty{margin-top:0}
 

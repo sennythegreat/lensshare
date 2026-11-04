@@ -91,6 +91,8 @@ export type Booking = {
   total: number
   shoot_description: string | null
   status: BookingStatus
+  /** Present when hub-operations.sql is installed; legacy rows are version 1. */
+  workflow_version?: 1 | 2
   created_at: string
   updated_at: string
 }
@@ -160,6 +162,17 @@ export type RentalHubParty = 'owner' | 'renter'
 export type RentalInspectionKind = 'pre_rental' | 'post_rental'
 export type HubInspectionStage = 'pre_release' | 'post_return'
 
+export type RawHubCustodyState = 'owner' | 'hub' | 'renter' | 'hub_return' | 'owner_returned'
+export type RawDepositState =
+  | 'waived_student'
+  | 'awaiting_payment'
+  | 'pending_review'
+  | 'held'
+  | 'refund_pending'
+  | 'refunded'
+  | 'forfeited'
+  | 'rejected'
+
 export type RentalCustodyState =
   | 'with_owner'
   | 'at_hub_pre_rental'
@@ -179,12 +192,14 @@ export type HubCustodyState =
 export type RentalDepositStatus =
   | 'proof_required'
   | 'pending_review'
-  | 'accepted'
-  | 'rejected'
+  | 'verified'
   | 'waived'
   | 'refund_pending'
   | 'refunded'
-  | 'retained'
+  | 'issue_hold'
+  | 'partially_forfeited'
+  | 'forfeited'
+  | 'rejected'
 
 export type HubDepositStatus = 'not_submitted' | 'pending_review' | 'accepted' | 'rejected' | 'waived'
 export type RentalAgreementStatus = 'awaiting_signatures' | 'partially_signed' | 'signed'
@@ -198,8 +213,37 @@ export type RentalConfirmationKind =
   | 'post_inspection'
   | 'owner_collection'
 
+export type HubTransferKind = 'owner_to_hub' | 'hub_to_renter' | 'renter_to_hub' | 'hub_to_owner'
 export type HubPhysicalAction = 'receive_from_owner' | 'release_to_renter' | 'receive_from_renter' | 'release_to_owner'
 export type HubQueueBucket = 'pickup_due' | 'return_due' | 'issue_hold' | 'completed'
+
+export type IncidentStatus = 'submitted' | 'under_review' | 'resolved'
+export type IncidentCategory = 'damage' | 'loss' | 'accessory_missing' | 'late_return' | 'misconduct' | 'other'
+
+export type Incident = {
+  id: string
+  booking_id: string
+  listing_id: string | null
+  reported_by: string
+  reporter_role: 'owner' | 'renter' | 'admin'
+  category: IncidentCategory
+  description: string
+  incident_date: string
+  photo_paths: string[]
+  status: IncidentStatus
+  resolution_note: string | null
+  resolved_by: string | null
+  resolved_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type NewIncidentInput = {
+  booking_id: string
+  category: IncidentCategory
+  description: string
+  incident_date: string
+}
 
 export type HubSettingsInput = {
   exact_address: string
@@ -209,6 +253,9 @@ export type HubSettingsInput = {
   gcash_mobile_number: string
   deposit_amount: number
   deposit_policy: string
+  hub_latitude: number | null
+  hub_longitude: number | null
+  service_radius_km: number
 }
 
 export type HubSettings = HubSettingsInput & {
@@ -241,8 +288,10 @@ export type RentalHubConfig = {
 /** Private owner/admin listing metadata. It must never be selected in public listing queries. */
 export type ListingAsset = {
   listing_id: string
-  owner_id: string
+  owner_id?: string
   serial_number: string
+  asset_tag: string | null
+  acquisition_note: string | null
   created_at: string
   updated_at: string
 }
@@ -252,6 +301,10 @@ export type RentalOperation = {
   workflow_version: RentalWorkflowVersion
   hub_config_id: string | null
   custody_state: RentalCustodyState
+  /** Alias retained for participant UI callers while SQL uses raw_custody_state. */
+  custody_display_state: RentalCustodyState
+  /** Canonical persisted SQL state, exposed for diagnostics only. */
+  raw_custody_state: RawHubCustodyState
   assigned_operator_id: string | null
   assigned_operator_name: string | null
   issue_hold_reason: string | null
@@ -285,6 +338,8 @@ export type RentalDeposit = {
   booking_id: string
   amount: number
   currency: 'PHP'
+  /** Canonical persisted SQL status, exposed for diagnostics only. */
+  raw_status: RawDepositState
   status: RentalDepositStatus
   waived: boolean
   waiver_reason: string | null

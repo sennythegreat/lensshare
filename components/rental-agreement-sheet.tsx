@@ -44,7 +44,7 @@ export function RentalAgreementSheet({ booking, handoffs = [], rentalHub = null 
     <section className="agreement-parties">
       <div><small>OWNER (LENDER)</small><b>{booking.owner?.full_name || '—'}</b></div>
       <div><small>RENTER</small><b>{booking.renter?.full_name || '—'}</b>{booking.renter && <span className={`agreement-verified ${booking.renter.verification_status === 'verified' ? 'ok' : ''}`}>{booking.renter.verification_status === 'verified' ? '✓ Identity verified' : 'Verification pending'}</span>}</div>
-      <div><small>EQUIPMENT</small><b>{equipmentName}</b><span>{equipmentBrand} · {equipmentCategory}</span>{gear?.serial && <span className="agreement-serial">Serial · {gear.serial}</span>}</div>
+      <div><small>EQUIPMENT</small><b>{equipmentName}</b><span>{equipmentBrand} · {equipmentCategory}</span>{gear?.serial_number && <span className="agreement-serial">Serial · {gear.serial_number}</span>}</div>
       <div><small>PERIOD</small><b>{booking.start_date} → {booking.end_date}</b><span>{booking.days} {booking.days === 1 ? 'day' : 'days'}</span></div>
     </section>
 
@@ -59,7 +59,7 @@ export function RentalAgreementSheet({ booking, handoffs = [], rentalHub = null 
     </section>
 
     <section className="agreement-deposit">
-      <div><small>SECURITY DEPOSIT · SEPARATE FROM RENTAL PRICE</small><strong>{depositWaived ? 'Waived for this booking' : pesos(depositAmount)}</strong><span>{depositWaived ? `Verified-student waiver${waiverReason ? ` · ${waiverReason}` : ''}` : 'GCash receipt is reviewed manually by authorized Naga Hub staff. Receipt submission is not provider confirmation and the deposit is not escrow.'}</span></div>
+      <div><small>SECURITY DEPOSIT · SEPARATE FROM RENTAL PRICE</small><strong>{depositWaived ? 'Waived for this booking' : pesos(depositAmount)}</strong><span>{depositWaived ? `Verified-student waiver${waiverReason ? ` · ${waiverReason}` : ''}` : 'Authorized Naga Hub staff manually review the GCash receipt. Receipt submission alone is not payment-provider confirmation.'}</span></div>
       <span className={`agreement-deposit-status ${depositWaived ? 'waived' : ''}`}>{humanize(deposit?.status || (depositWaived ? 'waived' : 'proof required'))}</span>
     </section>
 

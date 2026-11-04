@@ -9,6 +9,17 @@ import { fetchAdminHubSettings, saveAdminHubSettings } from '@/lib/data'
 import { pesos, type HubSettings, type HubSettingsInput } from '@/lib/types'
 
 const FIXED_DEPOSIT_AMOUNT = 2000
+const NAGA_HUB_DEFAULTS = {
+  latitude: 13.6218,
+  longitude: 123.1948,
+  serviceRadiusKm: 15,
+} as const
+
+type HubGeoForm = {
+  latitude: string
+  longitude: string
+  serviceRadiusKm: string
+}
 
 const EMPTY_SETTINGS: HubSettingsInput = {
   exact_address: '',
@@ -18,10 +29,22 @@ const EMPTY_SETTINGS: HubSettingsInput = {
   gcash_mobile_number: '',
   deposit_amount: FIXED_DEPOSIT_AMOUNT,
   deposit_policy: '',
+  hub_latitude: NAGA_HUB_DEFAULTS.latitude,
+  hub_longitude: NAGA_HUB_DEFAULTS.longitude,
+  service_radius_km: NAGA_HUB_DEFAULTS.serviceRadiusKm,
+}
+
+function geoFormFromSettings(settings: Pick<HubSettingsInput, 'hub_latitude' | 'hub_longitude' | 'service_radius_km'>): HubGeoForm {
+  return {
+    latitude: settings.hub_latitude?.toString() ?? '',
+    longitude: settings.hub_longitude?.toString() ?? '',
+    serviceRadiusKm: settings.service_radius_km.toString(),
+  }
 }
 
 export default function AdminHubSettingsPage() {
   const [values, setValues] = useState<HubSettingsInput>(EMPTY_SETTINGS)
+  const [geoForm, setGeoForm] = useState<HubGeoForm>(() => geoFormFromSettings(EMPTY_SETTINGS))
   const [savedSettings, setSavedSettings] = useState<HubSettings | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [saving, setSaving] = useState(false)
@@ -34,7 +57,7 @@ export default function AdminHubSettingsPage() {
     try {
       const settings = await fetchAdminHubSettings()
       setSavedSettings(settings)
-      setValues({
+      const nextValues: HubSettingsInput = {
         exact_address: settings.exact_address ?? '',
         location_notes: settings.location_notes ?? '',
         operating_hours: settings.operating_hours ?? '',
@@ -42,7 +65,12 @@ export default function AdminHubSettingsPage() {
         gcash_mobile_number: settings.gcash_mobile_number ?? '',
         deposit_amount: FIXED_DEPOSIT_AMOUNT,
         deposit_policy: settings.deposit_policy ?? '',
-      })
+        hub_latitude: settings.hub_latitude ?? null,
+        hub_longitude: settings.hub_longitude ?? null,
+        service_radius_km: Number.isFinite(settings.service_radius_km) ? settings.service_radius_km : NAGA_HUB_DEFAULTS.serviceRadiusKm,
+      }
+      setValues(nextValues)
+      setGeoForm(geoFormFromSettings(nextValues))
       setState('ready')
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Could not load the Naga Hub settings.')
@@ -57,25 +85,82 @@ export default function AdminHubSettingsPage() {
     setValues((current) => ({ ...current, [key]: value }))
   }
 
+  function changeGeo(key: keyof HubGeoForm, value: string) {
+    setSaved(false)
+    setGeoForm((current) => ({ ...current, [key]: value }))
+  }
+
+  function resetGeoDefaults() {
+    const defaults: HubGeoForm = {
+      latitude: NAGA_HUB_DEFAULTS.latitude.toString(),
+      longitude: NAGA_HUB_DEFAULTS.longitude.toString(),
+      serviceRadiusKm: NAGA_HUB_DEFAULTS.serviceRadiusKm.toString(),
+    }
+    setGeoForm(defaults)
+    setValues((current) => ({
+      ...current,
+      hub_latitude: NAGA_HUB_DEFAULTS.latitude,
+      hub_longitude: NAGA_HUB_DEFAULTS.longitude,
+      service_radius_km: NAGA_HUB_DEFAULTS.serviceRadiusKm,
+    }))
+    setSaved(false)
+    setError('')
+  }
+
+  function clearGeoCoordinates() {
+    setGeoForm((current) => ({ ...current, latitude: '', longitude: '' }))
+    setValues((current) => ({ ...current, hub_latitude: null, hub_longitude: null }))
+    setSaved(false)
+    setError('')
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!values.exact_address.trim() || !values.operating_hours.trim() || !values.gcash_account_name.trim() || !values.gcash_mobile_number.trim() || !values.deposit_policy.trim()) {
       setError('Complete the exact address, operating hours, GCash details, and deposit policy before saving.')
       return
     }
+    const latitudeText = geoForm.latitude.trim()
+    const longitudeText = geoForm.longitude.trim()
+    const radiusText = geoForm.serviceRadiusKm.trim()
+    const latitude = latitudeText === '' ? null : Number(latitudeText)
+    const longitude = longitudeText === '' ? null : Number(longitudeText)
+    const serviceRadiusKm = Number(radiusText)
+    if (!radiusText || !Number.isFinite(serviceRadiusKm) || serviceRadiusKm < 0.5 || serviceRadiusKm > 200) {
+      setError('The service radius must be a number between 0.5 and 200 km.')
+      return
+    }
+    if ((latitude === null) !== (longitude === null)) {
+      setError('Set both hub coordinates together, or leave both blank to disable service-area enforcement.')
+      return
+    }
+    if (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) {
+      setError('Hub latitude must be a number between −90 and 90.')
+      return
+    }
+    if (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) {
+      setError('Hub longitude must be a number between −180 and 180.')
+      return
+    }
+    const nextValues: HubSettingsInput = {
+      ...values,
+      hub_latitude: latitude,
+      hub_longitude: longitude,
+      service_radius_km: serviceRadiusKm,
+    }
     setSaving(true)
     setSaved(false)
     setError('')
     try {
       await saveAdminHubSettings({
-        ...values,
-        exact_address: values.exact_address.trim(),
-        location_notes: values.location_notes.trim(),
-        operating_hours: values.operating_hours.trim(),
-        gcash_account_name: values.gcash_account_name.trim(),
-        gcash_mobile_number: values.gcash_mobile_number.trim(),
+        ...nextValues,
+        exact_address: nextValues.exact_address.trim(),
+        location_notes: nextValues.location_notes.trim(),
+        operating_hours: nextValues.operating_hours.trim(),
+        gcash_account_name: nextValues.gcash_account_name.trim(),
+        gcash_mobile_number: nextValues.gcash_mobile_number.trim(),
         deposit_amount: FIXED_DEPOSIT_AMOUNT,
-        deposit_policy: values.deposit_policy.trim(),
+        deposit_policy: nextValues.deposit_policy.trim(),
       })
       await load(false)
       setSaved(true)
@@ -100,6 +185,12 @@ export default function AdminHubSettingsPage() {
             <div className="admin-hub-settings-fields">
               <label className="wide" htmlFor="hub-address"><span>Exact street address <b>Required</b></span><textarea id="hub-address" required maxLength={500} value={values.exact_address} onChange={(event) => change('exact_address', event.target.value)} placeholder="Building, street, barangay, Naga City, Camarines Sur" /></label>
               <label className="wide" htmlFor="hub-location-notes"><span>Arrival and landmark notes</span><textarea id="hub-location-notes" maxLength={700} value={values.location_notes} onChange={(event) => change('location_notes', event.target.value)} placeholder="Landmark, floor or unit, entrance, parking, and who to ask for." /></label>
+              <label htmlFor="hub-latitude"><span>Hub latitude <b>Optional</b></span><input id="hub-latitude" name="hub_latitude" type="number" inputMode="decimal" step="any" min={-90} max={90} value={geoForm.latitude} onChange={(event) => changeGeo('latitude', event.target.value)} placeholder={NAGA_HUB_DEFAULTS.latitude.toString()} aria-describedby="hub-geo-help" /></label>
+              <label htmlFor="hub-longitude"><span>Hub longitude <b>Optional</b></span><input id="hub-longitude" name="hub_longitude" type="number" inputMode="decimal" step="any" min={-180} max={180} value={geoForm.longitude} onChange={(event) => changeGeo('longitude', event.target.value)} placeholder={NAGA_HUB_DEFAULTS.longitude.toString()} aria-describedby="hub-geo-help" /></label>
+              <label htmlFor="hub-radius"><span>Service radius (km) <b>Required</b></span><input id="hub-radius" name="service_radius_km" type="number" inputMode="decimal" step="0.5" min={0.5} max={200} required value={geoForm.serviceRadiusKm} onChange={(event) => changeGeo('serviceRadiusKm', event.target.value)} placeholder={NAGA_HUB_DEFAULTS.serviceRadiusKm.toString()} aria-describedby="hub-radius-help" /></label>
+              <div className="admin-handoff-proof-actions wide"><button className="owner-button" type="button" onClick={resetGeoDefaults}>Use Naga defaults</button><button className="owner-button" type="button" onClick={clearGeoCoordinates}>Clear coordinates</button></div>
+              <p id="hub-geo-help" className="wide admin-hub-geo-note">Naga defaults: {NAGA_HUB_DEFAULTS.latitude}, {NAGA_HUB_DEFAULTS.longitude}. Enter both coordinates or leave both blank. Blank coordinates are saved as null and disable coordinate-based service-area enforcement.</p>
+              <p id="hub-radius-help" className="wide admin-hub-geo-note">The service radius remains configured even when coordinates are blank. Allowed range: 0.5–200 km; default: {NAGA_HUB_DEFAULTS.serviceRadiusKm} km.</p>
             </div>
           </section>
 

@@ -122,3 +122,57 @@
 .owner-serial-field>p{font:10px Arial,sans-serif!important;text-transform:none!important;letter-spacing:0!important;line-height:1.5;color:#71807a;margin:0}
 .owner-serial-field .owner-serial-warning{display:flex;align-items:flex-start;gap:6px;color:#8c3d31!important;background:#f9e9e6;padding:8px 9px;margin-top:2px!important}
 .owner-serial-warning svg{flex:none;margin-top:1px}
+
+/* ---------- Owner availability blackout calendar ---------- */
+
+.owner-blackout-field { margin-top: 4px; }
+
+.owner-blackout {
+  border: 1px solid rgba(7, 16, 14, 0.14);
+  border-radius: 10px;
+  background: #fffdf8;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.owner-blackout-head { display: flex; gap: 10px; align-items: flex-start; }
+.owner-blackout-head b { display: block; font-family: Georgia, serif; font-size: 15px; }
+.owner-blackout-head span { display: block; font-size: 12px; color: #5c6662; }
+
+.owner-blackout-nav { display: flex; align-items: center; justify-content: space-between; }
+.owner-blackout-nav span { font-family: Arial, sans-serif; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+.owner-blackout-nav button { border: 1px solid rgba(7, 16, 14, 0.18); background: transparent; border-radius: 6px; width: 28px; height: 28px; display: grid; place-items: center; cursor: pointer; }
+.owner-blackout-nav button:hover { background: rgba(7, 16, 14, 0.06); }
+
+.owner-blackout-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.owner-blackout-weekday { font-family: "DM Mono", monospace; font-size: 10px; text-align: center; color: #8a948f; text-transform: uppercase; }
+.owner-blackout-day { aspect-ratio: 1; border: 1px solid rgba(7, 16, 14, 0.12); background: transparent; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.owner-blackout-day:disabled { opacity: 0.35; cursor: default; }
+.owner-blackout-day.today { border-color: #07100e; }
+.owner-blackout-day.blocked { background: #07100e; color: #f8f8f5; border-color: #07100e; }
+.owner-blackout-day:not(:disabled):hover { border-color: #07100e; }
+
+.owner-blackout-foot { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #5c6662; }
+
+.owner-blackout-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #5c6662; margin: 0; }
+.owner-blackout-status.error { color: #a03123; }
+
+@keyframes owner-spin { to { transform: rotate(360deg); } }
+.owner-spin { animation: owner-spin 0.9s linear infinite; }
+
+/* ---------- Report incident modal ---------- */
+
+.report-incident-modal form { display: grid; gap: 12px; }
+.report-incident-modal label { display: grid; gap: 4px; font-size: 13px; }
+.report-incident-modal label span { font-family: Arial, sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #5c6662; }
+.report-incident-modal select, .report-incident-modal input, .report-incident-modal textarea { border: 1px solid rgba(7, 16, 14, 0.2); border-radius: 8px; padding: 9px 10px; font: inherit; }
+.report-incident-modal textarea { min-height: 110px; }
+.report-incident-head { display: flex; gap: 10px; align-items: flex-start; }
+.report-incident-head h2 { font-family: Georgia, serif; margin: 0; }
+.report-incident-head p { margin: 4px 0 0; font-size: 12px; color: #5c6662; }
+.report-incident-photos { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #5c6662; }
+.report-incident-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.report-incident-thumbs figure { margin: 0; position: relative; }
+.report-incident-thumbs img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(7, 16, 14, 0.14); display: block; }
+.report-incident-thumbs button { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(7, 16, 14, 0.3); background: #fff; cursor: pointer; font-size: 12px; line-height: 1; }

@@ -280,3 +280,51 @@
 @media(max-width:1120px){.admin-handoff-summary{grid-template-columns:repeat(3,1fr)}.admin-handoff-hero{grid-template-columns:110px 1fr}.admin-handoff-hero>img{width:110px}.admin-handoff-hero dl{grid-column:1/-1}.admin-handoff-detail-grid{grid-template-columns:1fr}.admin-handoff-detail-side{display:grid;grid-template-columns:1fr 1fr;align-items:start}.admin-handoff-detail-side .admin-handoff-transition-panel,.admin-handoff-detail-side .admin-handoff-panel:last-child{grid-column:1/-1}}
 @media(max-width:800px){.admin-handoff-summary{grid-template-columns:repeat(2,1fr)}.admin-handoff-controls{align-items:stretch;flex-direction:column}.admin-handoff-search{min-width:0}.admin-handoff-card{grid-template-columns:1fr}.admin-handoff-card-side{border-left:0;border-top:1px solid #e8ebe8;padding:14px 0 0;display:grid;grid-template-columns:1fr 1fr}.admin-handoff-value,.admin-handoff-assign{grid-column:1/-1}.admin-handoff-detail-side{grid-template-columns:1fr}.admin-handoff-detail-side .admin-handoff-transition-panel,.admin-handoff-detail-side .admin-handoff-panel:last-child{grid-column:auto}.admin-handoff-custody ol{grid-template-columns:1fr;gap:7px}.admin-handoff-custody ol:before{left:14px;right:auto;top:14px;bottom:14px;width:1px;height:auto}.admin-handoff-custody li{display:grid;grid-template-columns:29px 1fr;text-align:left}.admin-handoff-custody li b{padding-left:4px}.admin-handoff-section-head{align-items:flex-start}}
 @media(max-width:600px){.admin-handoff-toolbar,.admin-handoff-detail-nav,.admin-hub-settings-actions{align-items:stretch;flex-direction:column}.admin-handoff-toolbar-actions{width:100%}.admin-handoff-toolbar-actions>*{flex:1}.admin-handoff-summary{grid-template-columns:1fr 1fr}.admin-handoff-card{padding:13px}.admin-handoff-card-main{grid-template-columns:78px 1fr;gap:12px}.admin-handoff-card-main>img{width:78px;height:86px;min-height:86px}.admin-handoff-card-side{grid-template-columns:1fr}.admin-handoff-card-side>*{grid-column:1/-1}.admin-handoff-hero{grid-template-columns:78px 1fr;padding:13px;gap:12px}.admin-handoff-hero>img{width:78px;height:78px}.admin-handoff-hero h2{font-size:20px}.admin-handoff-hero dl,.admin-handoff-facts,.admin-hub-settings-fields{grid-template-columns:1fr}.admin-handoff-hero dl>div,.admin-handoff-facts>div{border-left:0;border-top:1px solid #e6e9e6}.admin-handoff-hero dl>div:first-child,.admin-handoff-facts>div:first-child{border-top:0}.admin-handoff-panel,.admin-handoff-custody{padding:16px}.admin-handoff-signatures{grid-template-columns:1fr}.admin-handoff-section-head>.owner-button{width:100%}.admin-handoff-section-head{flex-direction:column}.admin-handoff-proof-actions{align-items:flex-start;flex-direction:column}.admin-handoff-review-form>div{align-items:stretch;flex-direction:column}.admin-handoff-existing-photos>div{align-items:stretch;flex-direction:column}.admin-handoff-existing-photos .owner-button{width:100%}.admin-hub-settings-fields .wide{grid-column:auto}.admin-hub-settings-actions .owner-button{width:100%}.admin-handoff-detail-skeleton{grid-template-columns:1fr}.admin-handoff-detail-skeleton>span{height:100px}}
+
+.admin-hub-geo-note { font-size: 12px; color: #5c6662; margin: 0; }
+
+/* ---------- Incident / dispute queue ---------- */
+
+.admin-incident-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.admin-incident-filters button {
+  border: 1px solid rgba(7, 16, 14, 0.18); background: transparent; border-radius: 999px;
+  padding: 5px 14px; font-family: Arial, sans-serif; font-size: 12px; cursor: pointer; color: #07100e;
+}
+.admin-incident-filters button.active { background: #07100e; color: #f8f8f5; border-color: #07100e; }
+
+.admin-incident-list { display: grid; gap: 14px; }
+.admin-incident-card { border: 1px solid rgba(7, 16, 14, 0.14); border-radius: 10px; background: #fffdf8; padding: 16px; display: grid; gap: 10px; }
+.admin-incident-card.status-resolved { opacity: 0.75; }
+
+.admin-incident-head { display: flex; align-items: flex-start; gap: 10px; }
+.admin-incident-icon { width: 30px; height: 30px; border-radius: 8px; background: rgba(7, 16, 14, 0.06); display: grid; place-items: center; flex-shrink: 0; }
+.admin-incident-head b { display: block; font-family: Georgia, serif; font-size: 15px; }
+.admin-incident-head small { display: block; font-size: 12px; color: #5c6662; }
+.admin-incident-head > :nth-child(2) { flex: 1; }
+
+.admin-incident-status { font-family: Arial, sans-serif; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; border-radius: 999px; padding: 4px 10px; flex-shrink: 0; }
+.admin-incident-status.s-submitted { background: #fdeea9; color: #6b5200; }
+.admin-incident-status.s-under_review { background: #d8e6f5; color: #1f4a70; }
+.admin-incident-status.s-resolved { background: #d9ead9; color: #256029; }
+
+.admin-incident-description { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+
+.admin-incident-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.admin-incident-link { font-size: 13px; color: #07100e; }
+.admin-incident-photos-count { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #5c6662; }
+
+.admin-incident-review { border-top: 1px dashed rgba(7, 16, 14, 0.2); padding-top: 12px; display: grid; gap: 10px; }
+.admin-incident-review label span { display: block; font-family: Arial, sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+.admin-incident-review textarea { width: 100%; min-height: 96px; border: 1px solid rgba(7, 16, 14, 0.2); border-radius: 8px; padding: 10px; font: inherit; }
+.admin-incident-review-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.admin-incident-hint { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #5c6662; margin: 0; }
+
+.admin-incident-photo { margin: 0; display: grid; gap: 4px; }
+.admin-incident-photo img { max-width: 320px; max-height: 220px; border-radius: 8px; border: 1px solid rgba(7, 16, 14, 0.14); }
+.admin-incident-photo-loading { width: 120px; height: 80px; display: grid; place-items: center; background: rgba(7, 16, 14, 0.05); border-radius: 8px; }
+.admin-incident-photo figcaption { font-size: 11px; color: #8a948f; word-break: break-all; }
+
+.admin-incident-resolution { border-top: 1px dashed rgba(7, 16, 14, 0.2); padding-top: 10px; }
+.admin-incident-resolution b { font-family: Arial, sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; display: block; }
+.admin-incident-resolution p { margin: 4px 0; font-size: 13px; white-space: pre-wrap; }
+.admin-incident-resolution small { font-size: 11px; color: #8a948f; }

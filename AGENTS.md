@@ -25,6 +25,15 @@ finishing any change.
 
 - Env vars live in `.env`: `NEXT_PUBLIC_SUPABASE_URL` and
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+- Dashboard SQL deployment order for a fresh or upgraded installation is:
+  `schema.sql` → `verification.sql` → `renter-primary-use.sql` → `enums.sql` →
+  `admin.sql` → `listing-locations.sql` → `listing-media.sql` → `features.sql` →
+  `community.sql` → `message-actions.sql` → `emails.sql` → `promo-pass.sql` →
+  `storage.sql` → **`hub-operations.sql` LAST**. `seed.sql` is optional/demo-only
+  and destructive for the resolved demo owner; never use it as a migration.
+  `hub-operations.sql` owns the final overlapping booking/verification RPCs,
+  v2 transition guards, aggregate verification, and private hub storage policies.
+  If any earlier canonical file is rerun, rerun `hub-operations.sql` afterwards.
 - `supabase/schema.sql` creates the base schema (tables, RLS, signup trigger,
   realtime, gear storage); `supabase/verification.sql` adds the verification
   layer (`verification_submissions` table, private `verification-docs` bucket,
@@ -33,31 +42,39 @@ finishing any change.
   reporting; `supabase/enums.sql` converts every constrained text
   column to native Postgres enums (Table Editor dropdowns) and makes the
   role a three-value enum: `owner | renter | admin` (admin replaces the old
-  is_admin flag); `supabase/admin.sql` grants admins the
-  console's extra policies (read all bookings, moderate any listing);
-  `supabase/storage.sql` re-asserts the two storage buckets and all of
-  their policies (standalone idempotent copy of the storage sections);
-  `supabase/seed.sql` seeds demo data. All are
+  is_admin flag); `supabase/admin.sql` grants admins the console's extra
+  policies (read all bookings, moderate any listing); `supabase/storage.sql`
+  re-asserts all storage buckets/policies; `supabase/hub-operations.sql` adds the
+  approved Naga hub operations layer (workflow-v2 snapshots, private serials,
+  assigned admin operators, custody/events, deposits, immutable agreements,
+  inspections/transfers, aggregate verification, secured RPCs, RLS, storage and
+  realtime) while preserving workflow-v1 and Saver Pass accounting;
+  `supabase/seed.sql` seeds demo data. Setup/upgrade SQL files are
   idempotent and applied by pasting them into the Supabase dashboard SQL
   Editor. There is no local supabase CLI or migrations folder.
 - Tables: `profiles` (extends `auth.users`; `role` is an enum:
   `owner` | `renter` | `admin` — exclusive, drives routing; plus
   `verification_status`, `is_student`, and optional self-reported
   `primary_rental_use`), `gear_listings` (publicly readable,
-  owner-writable; category and status are enums), `bookings` (status enum
-  lifecycle `pending → approved → active → returned → completed`, plus
-  `declined`; visible only to the booking's renter and owner; creating a
-  booking requires the renter's `verification_status = 'verified'` — enforced
-  in the `renters create bookings` RLS policy, not just client-side), and
-  `verification_submissions` (identity/student documents; users see their
-  own, admins see all and review them). Identity documents live in the
-  PRIVATE `verification-docs` bucket (accessed via signed URLs) — never move
-  them to the public `gear-photos` bucket.
+  owner-writable; category and status are enums), `listing_assets` (private
+  owner/admin inventory serials; never expose serials through `gear_listings`),
+  `bookings` (same status enum; `workflow_version=1` preserves legacy flow and
+  version 2 is hub-gated), and the version-2 operation/deposit/agreement/
+  inspection/transfer/event tables installed by `hub-operations.sql`.
+  Booking and verification writes are RPC-only. Version-2 identity requires both
+  approved government ID and selfie; student status/waiver requires both approved
+  student ID and proof of enrollment. The student deposit waiver is independent
+  of Saver Pass. Identity documents live in the PRIVATE append-only
+  `verification-docs` bucket (signed URLs; 10 MB JPEG/PNG/WebP/PDF) — never move
+  them to public `gear-photos`. Deposit proofs use private `deposit-proofs`
+  (`{renter_id}/{booking_id}/{filename}`); inspection evidence uses private
+  `inspection-photos` (`{booking_id}/{inspection_id}/{filename}`).
 - Row Level Security is the security core — the browser queries Supabase
   directly with the publishable key. Never replace RLS with client-side
   checks.
-- Realtime: the owner rentals page and renter bookings page subscribe to
-  `postgres_changes` on `bookings`, filtered by their own id.
+- Realtime: `bookings` and the version-2 operation/deposit/inspection/transfer/
+  event tables are published to `supabase_realtime`; clients must still filter by
+  their booking/operator identifiers and RLS remains authoritative.
 - Gear photos upload to the public `gear-photos` storage bucket under
   `{user_id}/…`.
 - Seed/demo accounts (password `demo1234`): `lensshare.owner@example.com` (Mateo Rossi)
@@ -78,10 +95,9 @@ finishing any change.
 - `/admin` — admin console with its own light-sidebar chrome and a
   full-width content area (`components/admin-shell.tsx`, styles in
   `app/admin/admin.css`):
-  dashboard (platform stats), `verifications` (queue; approving a government
-  ID verifies the account, approving student documents sets `is_student`),
-  `users` (owners & renters directory), `equipment` (all listings + moderation
-  pause/activate)
+  dashboard, aggregate verification queue (identity is government ID + selfie;
+  student is student ID + enrollment proof), users, equipment moderation, and
+  the workflow-v2 Naga hub operations queue.
 - `proxy.ts` (Next 16's middleware) refreshes sessions and guards routes by
   role: owners only reach `/dashboard/*`, renters only `/renter/*`, and
   `/admin/*` requires `profiles.is_admin`.
@@ -120,8 +136,9 @@ finishing any change.
 
 ## Scope
 
-The database, auth, booking lifecycle, and the verification queue are real;
-payments/payouts, escrow, reviews, and the other admin screens (bookings/
-hand-offs, disputes, payouts) are not yet built. Don't add new tables, auth
-providers, or state libraries without being asked.
+The database, auth, booking lifecycle, verification queue, Saver Pass accounting,
+and version-2 Naga hub operations are real. Payments remain manual GCash proof
+and admin review (no payment processor or automated escrow). Reviews and the
+remaining dispute/payout UI are limited to the existing schema/scope. Don't add
+new auth providers or state libraries without being asked.
 Dev machine is Windows (Git Bash); write commands accordingly.

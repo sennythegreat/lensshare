@@ -3,15 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BadgeCheck, Camera, Check, CircleAlert, FileUp, GraduationCap, IdCard } from 'lucide-react'
 import { RenterHeadbar, Status } from '@/components/renter-headbar'
-import { fetchMySubmissions, replaceVerificationSubmission } from '@/lib/data'
+import { fetchMySubmissions, replaceVerificationSubmission, validateVerificationDocument } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import type { VerificationDocType, VerificationSubmission } from '@/lib/types'
 import '../renter.css'
 
 const IDENTITY_DOCS: VerificationDocType[] = ['government_id', 'selfie']
 const STUDENT_DOCS: VerificationDocType[] = ['student_id', 'proof_of_enrollment']
-const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
-const ACCEPTED_DOCUMENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
 const ACCEPTED_DOCUMENTS = 'image/jpeg,image/png,image/webp,application/pdf'
 
 const DOC_LABELS: Record<VerificationDocType, string> = {
@@ -58,11 +56,13 @@ function aggregateTone(state: AggregateState) {
   return 'pending'
 }
 
-function validateDocument(file: File): string | null {
-  if (!ACCEPTED_DOCUMENT_TYPES.has(file.type)) return `“${file.name}” is not supported. Upload a JPG, PNG, WEBP, or PDF file.`
-  if (!file.size) return `“${file.name}” is empty. Choose a file that contains your document.`
-  if (file.size > MAX_DOCUMENT_BYTES) return `“${file.name}” is larger than 10 MB. Choose a smaller file.`
-  return null
+function validationMessage(file: File): string | null {
+  try {
+    validateVerificationDocument(file)
+    return null
+  } catch (error) {
+    return error instanceof Error ? error.message : 'Choose a JPG, PNG, WEBP, or PDF file up to 10 MB.'
+  }
 }
 
 function latestByType(submissions: VerificationSubmission[]) {
@@ -113,11 +113,12 @@ function DocSlot({
     </div>
     <p>{hint}</p>
     {submission?.status === 'rejected' && submission.review_note && <p className="doc-note">Reviewer note: “{submission.review_note}”</p>}
-    {submission?.status === 'approved' && <p className="doc-replacement-note">Replacing an approved file sends the latest version back for review.</p>}
+    {submission?.status === 'approved' && <p className="doc-replacement-note">Replacing an approved file immediately returns this check to review until the new file is approved.</p>}
+    {submission?.status === 'pending' && <p className="doc-pending-note">This latest file is already queued. You can replace it after an admin approves or rejects it.</p>}
     {error && <p className="doc-validation-error" role="alert">{error}</p>}
     <input ref={inputRef} type="file" accept={ACCEPTED_DOCUMENTS} hidden onChange={handleChange} />
-    <button className="owner-button" type="button" disabled={disabled} onClick={() => inputRef.current?.click()}>
-      <FileUp size={14} /> {uploading ? 'Uploading…' : submission ? 'Replace latest file' : 'Choose file'}
+    <button className="owner-button" type="button" disabled={disabled || submission?.status === 'pending'} onClick={() => inputRef.current?.click()}>
+      <FileUp size={14} /> {uploading ? 'Uploading…' : submission?.status === 'pending' ? 'Awaiting review' : submission ? 'Replace latest file' : 'Choose file'}
     </button>
   </div>
 }
@@ -153,7 +154,7 @@ export default function VerificationPage() {
 
   async function handleFile(docType: VerificationDocType, file: File) {
     if (!user) return
-    const validationError = validateDocument(file)
+    const validationError = validationMessage(file)
     setFieldErrors((current) => ({ ...current, [docType]: validationError ?? undefined }))
     setError('')
     setSuccess('')

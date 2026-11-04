@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { ArrowLeftRight, BadgePercent, LayoutDashboard, Menu, Package, ShieldCheck, Users, X } from 'lucide-react'
+import { ArrowLeftRight, BadgePercent, LayoutDashboard, Menu, Package, ShieldCheck, Siren, Users, X } from 'lucide-react'
 import { useProfile } from '@/lib/use-profile'
 import { initialsOf } from '@/lib/types'
 import { UserMenu } from '@/components/user-menu'
@@ -14,6 +14,7 @@ const navLinks = [
   ['/admin/verifications', ShieldCheck, 'Verification'],
   ['/admin/promo-passes', BadgePercent, 'Saver Passes'],
   ['/admin/handoffs', ArrowLeftRight, 'Hub Hand-offs'],
+  ['/admin/incidents', Siren, 'Incidents'],
   ['/admin/users', Users, 'Owners & Renters'],
   ['/admin/equipment', Package, 'Equipment'],
 ] as const

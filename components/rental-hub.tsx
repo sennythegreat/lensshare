@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   AlertCircle,
@@ -15,7 +15,6 @@ import {
   MapPin,
   MessageCircle,
   PackageCheck,
-  ReceiptText,
   RefreshCw,
   ShieldCheck,
   Signature,
@@ -28,11 +27,11 @@ import {
   confirmRentalStep,
   decideRentalRequest,
   fetchInspectionPhotoUrl,
-  fetchRentalHub,
   signRentalAgreement,
   submitDepositProof,
 } from '@/lib/data'
 import { pesos } from '@/lib/types'
+import { useRentalHub } from '@/lib/use-rental-hub'
 import type {
   BookingWithRelations,
   RentalConfirmationKind,
@@ -71,41 +70,23 @@ type RentalHubProps = {
 }
 
 export function RentalHub({ bookingId, party }: RentalHubProps) {
-  const [hubData, setHubData] = useState<RentalHubData | null>(null)
-  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [error, setError] = useState('')
+  const { data: hubData, loading, error: loadError, refresh } = useRentalHub(bookingId, party)
+  const [actionError, setActionError] = useState('')
   const [busyAction, setBusyAction] = useState('')
   const [depositReference, setDepositReference] = useState('')
   const [depositFile, setDepositFile] = useState<File | null>(null)
   const [notice, setNotice] = useState('')
 
-  const load = useCallback(async (background = false) => {
-    if (!bookingId) return
-    if (!background) setState('loading')
-    try {
-      const next = await fetchRentalHub(bookingId)
-      if (!next) throw new Error('This rental hub is not available to your account.')
-      setHubData(next)
-      setError('')
-      setState('ready')
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The rental hub could not be loaded.')
-      if (!background) setState('error')
-    }
-  }, [bookingId])
-
-  useEffect(() => { load() }, [load])
-
   async function perform(action: string, operation: () => Promise<unknown>, success: string) {
     setBusyAction(action)
-    setError('')
+    setActionError('')
     setNotice('')
     try {
       await operation()
       setNotice(success)
-      await load(true)
+      await refresh(true)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'That action could not be completed.')
+      setActionError(cause instanceof Error ? cause.message : 'That action could not be completed.')
     } finally {
       setBusyAction('')
     }
@@ -114,7 +95,7 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
   async function submitDeposit() {
     if (!depositFile || !depositReference.trim()) return
     if (depositFile.size > MAX_DEPOSIT_BYTES) {
-      setError('Deposit proof must be 10 MB or smaller.')
+      setActionError('Deposit proof must be 10 MB or smaller.')
       return
     }
     await perform('deposit', () => submitDepositProof(bookingId, depositReference.trim(), depositFile), 'Deposit receipt submitted for manual review.')
@@ -122,8 +103,8 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
     setDepositReference('')
   }
 
-  if (state === 'loading') return <div className="hub-loading"><SectionSkeleton rows={6} /></div>
-  if (state === 'error' || !hubData) return <ErrorState title="Rental hub not available" hint={error || 'This booking does not exist, is not a hub rental, or you are not a participant.'} retry={() => load()} />
+  if (loading) return <div className="hub-loading"><SectionSkeleton rows={6} /></div>
+  if (!hubData) return <ErrorState title="Rental hub not available" hint={loadError?.message || 'This booking does not exist, is not a hub rental, or you are not a participant.'} retry={() => { void refresh() }} />
 
   const { booking } = hubData
   const backHref = party === 'owner' ? '/dashboard/rentals' : '/renter/bookings'
@@ -143,7 +124,7 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
     <div className="hub-topbar">
       <Link href={backHref} className="hub-back"><ArrowLeft size={15} /> Back to {party === 'owner' ? 'rentals' : 'bookings'}</Link>
       <div className="hub-top-actions">
-        <button type="button" className="hub-text-button" onClick={() => load(true)} disabled={Boolean(busyAction)}><RefreshCw size={13} /> Refresh</button>
+        <button type="button" className="hub-text-button" onClick={() => { void refresh(true) }} disabled={Boolean(busyAction)}><RefreshCw size={13} /> Refresh</button>
         {!isDeclined && <Link href={`/chat?id=${booking.id}`} className="hub-text-button"><MessageCircle size={13} /> Messages</Link>}
         <Link href={`/agreement?id=${booking.id}`} className="hub-text-button"><FileCheck2 size={13} /> Agreement</Link>
       </div>
@@ -155,7 +136,7 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
         <p className="hub-kicker">RENTAL HUB · BOOKING #{shortId(booking.id)}</p>
         <div className="hub-title-row"><h1>{agreementEquipmentName(hubData) || booking.listing?.name || 'Rental equipment'}</h1><HubBadge value={booking.status} /></div>
         <p>{dateRange(booking)} · {booking.days} {booking.days === 1 ? 'day' : 'days'} · with {counterpart || (party === 'owner' ? 'renter' : 'owner')}</p>
-        <div className="hub-hero-meta"><span><PackageCheck size={14} /> {custodyLabel(hubData.operation?.custody_state)}</span><span><MapPin size={14} /> {hubData.hub?.name || 'Naga City Hub'}</span></div>
+        <div className="hub-hero-meta"><span><PackageCheck size={14} /> {custodyLabel(hubData.operation?.custody_display_state)}</span><span><MapPin size={14} /> {hubData.hub?.name || 'Naga City Hub'}</span></div>
       </div>
     </header>
 
@@ -167,7 +148,7 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
     {isPending && party === 'renter' && <section className="hub-waiting"><Clock3 size={17} /><div><strong>Waiting for owner approval</strong><span>Your price request is recorded. Hub operations, the deposit receipt, and agreement signatures open only after approval creates an immutable booking snapshot.</span></div></section>}
     {isDeclined && <section className="hub-waiting declined"><AlertCircle size={17} /><div><strong>This request was declined</strong><span>The hub record is retained as a read-only booking history.</span></div></section>}
     {notice && <p className="hub-notice" role="status"><CheckCircle2 size={15} /> {notice}</p>}
-    {error && <p className="hub-error" role="alert"><AlertCircle size={15} /> {error}</p>}
+    {actionError && <p className="hub-error" role="alert"><AlertCircle size={15} /> {actionError}</p>}
 
     <div className="hub-layout">
       <div className="hub-main-column">
@@ -248,7 +229,7 @@ function HubSection({ eyebrow, title, icon, children, compact = false }: { eyebr
 }
 
 function CustodyTimeline({ data }: { data: RentalHubData }) {
-  const currentState = data.operation?.custody_state ?? 'with_owner'
+  const currentState = data.operation?.custody_display_state ?? 'with_owner'
   const currentIndex = CUSTODY_STEPS.findIndex((step) => step.state === currentState)
   const issueHold = currentState === 'issue_hold'
   const timestamps: Record<string, string | null | undefined> = {
@@ -286,7 +267,7 @@ function PriceAndDeposit({ data }: { data: RentalHubData }) {
 
   return <div className="hub-money-grid">
     <article className="hub-money-card rental"><p className="hub-kicker">RENTAL PRICE</p><dl><div><dt>Rental subtotal</dt><dd>{pesos(subtotal)}</dd></div>{discount > 0 && <div className="saving"><dt>Saver Pass saving</dt><dd>− {pesos(discount)}</dd></div>}<div className="total"><dt>Renter total</dt><dd>{pesos(total)}</dd></div></dl><p>Saver Pass changes only the rental price. It never changes or pays the security deposit.</p></article>
-    <article className={`hub-money-card deposit ${waived ? 'waived' : ''}`}><p className="hub-kicker">SECURITY DEPOSIT</p><strong>{waived ? 'Waived' : pesos(depositAmount)}</strong><HubBadge value={deposit?.status || (waived ? 'waived' : 'created after approval')} />{waived ? <p>Booking-level verified-student waiver{deposit?.waiver_reason || snapshot?.deposit?.waiver_reason ? ` · ${deposit?.waiver_reason || snapshot?.deposit?.waiver_reason}` : ''}. This is separate from Saver Pass.</p> : <p>Manually verified GCash security deposit. It is not escrow and is not included in the rental total.</p>}{deposit?.gcash_reference && <small>Receipt reference · {deposit.gcash_reference}</small>}{deposit?.review_note && <small className="hub-review-note">Review note · {deposit.review_note}</small>}{deposit?.refund_reference && <small>Refund reference · {deposit.refund_reference}</small>}</article>
+    <article className={`hub-money-card deposit ${waived ? 'waived' : ''}`}><p className="hub-kicker">SECURITY DEPOSIT</p><strong>{waived ? 'Waived' : pesos(depositAmount)}</strong><HubBadge value={deposit?.status || (waived ? 'waived' : 'created after approval')} />{waived ? <p>Booking-level verified-student waiver{deposit?.waiver_reason || snapshot?.deposit?.waiver_reason ? ` · ${deposit?.waiver_reason || snapshot?.deposit?.waiver_reason}` : ''}. This is separate from Saver Pass.</p> : <p>Manually verified GCash security deposit. It is separate from and not included in the rental total.</p>}{deposit?.gcash_reference && <small>Receipt reference · {deposit.gcash_reference}</small>}{deposit?.review_note && <small className="hub-review-note">Review note · {deposit.review_note}</small>}{deposit?.refund_reference && <small>Refund reference · {deposit.refund_reference}</small>}</article>
   </div>
 }
 

@@ -119,9 +119,6 @@ export default function VerificationsPage() {
 
   const entries = useMemo(() => buildEntries(queue), [queue])
   const pendingCount = useMemo(() => entries.reduce((count, entry) => count + Array.from(entry.latest.values()).filter((row) => row.status === 'pending').length, 0), [entries])
-  const activeEntries = useMemo(() => entries.filter((entry) =>
-    Array.from(entry.latest.values()).some((row) => row.status === 'pending') || entry.verification === 'verified' || entry.isStudent,
-  ), [entries])
   const reviewed = useMemo(() => queue.filter((row) => row.status !== 'pending').slice(0, 12), [queue])
 
   async function viewDoc(row: VerificationSubmissionWithUser) {
@@ -248,7 +245,7 @@ export default function VerificationsPage() {
     {notice && <PageCard><p className="auth-success admin-verification-feedback" role="status">{notice}</p></PageCard>}
     <PageCard className="admin-verification-card">
       <OwnerHeading eyebrow="LATEST DOCUMENT SETS" title={`${pendingCount} document${pendingCount === 1 ? '' : 's'} waiting`} detail="Only the newest upload for each document type is actionable. Approving one document never completes a two-document check." />
-      {!loaded ? <SectionSkeleton rows={3} /> : activeEntries.length ? <div className="admin-verification-users">{activeEntries.map((entry) => <article className="admin-user-card admin-verification-user" key={entry.userId}>
+      {!loaded ? <SectionSkeleton rows={3} /> : entries.length ? <div className="admin-verification-users">{entries.map((entry) => <article className="admin-user-card admin-verification-user" key={entry.userId}>
         <header className="admin-verification-user-head">
           <div><h2>{entry.name}</h2><p>{entry.email}</p></div>
           <div className="admin-verification-profile-flags"><span>Profile flags</span><ReviewBadge status={entry.verification} />{entry.isStudent && <span className="admin-pill student">student</span>}</div>

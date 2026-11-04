@@ -21,6 +21,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/lib/use-profile'
 import { pesos, renterVerificationLabel } from '@/lib/types'
+import { isHubWorkflow } from '@/lib/rental-workflow'
 import type { BookingHandoff, BookingStatus, BookingWithRelations, Message, MessageAttachment } from '@/lib/types'
 import './chat.css'
 
@@ -168,6 +169,9 @@ function ChatContent() {
   const counterpart = profile?.role === 'owner' ? booking?.renter?.full_name : booking?.owner?.full_name
   const isOwner = Boolean(booking && user && profile?.role === 'owner' && booking.owner_id === user.id)
   const conversationClosed = booking?.status === 'declined'
+  const bookingHref = booking && isHubWorkflow(booking)
+    ? profile?.role === 'owner' ? `/dashboard/rentals/${booking.id}` : `/renter/bookings/${booking.id}`
+    : profile?.role === 'owner' ? '/dashboard/rentals' : '/renter/bookings'
   const canSend = Boolean(body.trim() || files.length)
 
   if (!bookingId) return <main className="chat-page"><EmptyState icon={MessageCircle} title="Choose a booking conversation" hint="Open Messages from your workspace to choose a thread." /></main>
@@ -182,7 +186,7 @@ function ChatContent() {
         <div><small>{booking.listing?.name || 'Removed listing'} · {booking.status}</small><h1>{counterpart || 'Booking participant'}</h1><p>{booking.start_date} → {booking.end_date} · #{booking.id.slice(0, 8).toUpperCase()}</p></div>
         <div className="chat-header-actions">
           <button type="button" onClick={openAgreement}>Rental agreement</button>
-          <Link href={profile?.role === 'owner' ? '/dashboard/rentals' : '/renter/bookings'}>View booking</Link>
+          <Link href={bookingHref}>{isHubWorkflow(booking) ? 'Open rental hub' : 'View booking'}</Link>
         </div>
       </header>
       <div className="chat-notices">
@@ -217,7 +221,7 @@ function ChatContent() {
       </form>
       {agreementOpen && <div className="chat-agreement-backdrop" onClick={() => setAgreementOpen(false)}>
         <section className="chat-agreement-modal" role="dialog" aria-modal="true" aria-label="Rental agreement" onClick={(event) => event.stopPropagation()}>
-          <div className="chat-agreement-toolbar"><div><span>Booking agreement</span><p>Read-only view · signing remains in the booking agreement flow</p></div><button type="button" aria-label="Close rental agreement" onClick={() => setAgreementOpen(false)}><X size={18} /></button></div>
+          <div className="chat-agreement-toolbar"><div><span>Booking agreement</span><p>Read-only preview · {isHubWorkflow(booking) ? 'sign both parties’ immutable terms in the rental hub' : 'signing remains in the booking agreement flow'}</p></div><button type="button" aria-label="Close rental agreement" onClick={() => setAgreementOpen(false)}><X size={18} /></button></div>
           {agreementState === 'loading' && <SectionSkeleton rows={5} />}
           {agreementState === 'error' && <ErrorState title="Agreement not available" hint="The signature record could not be loaded. Try again from the booking page." />}
           {agreementState === 'ready' && <RentalAgreementSheet booking={booking} handoffs={handoffs} />}

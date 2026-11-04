@@ -102,7 +102,7 @@ export function deriveRentalBlockers(data: RentalHubData): RentalWorkflowBlocker
   if (!operation.assigned_operator_id) {
     addBlocker(blockers, 'operator_required', 'owner_dropoff', 'A hub operator must be assigned before physical custody begins.', 'operator')
   }
-  if (operation.issue_hold_reason || operation.custody_state === 'issue_hold') {
+  if (operation.issue_hold_reason) {
     addBlocker(blockers, 'issue_hold', 'next_step', operation.issue_hold_reason || 'This rental is on a hub issue hold.', 'operator')
   }
   if (!agreement?.owner_signed_at) {
@@ -111,7 +111,7 @@ export function deriveRentalBlockers(data: RentalHubData): RentalWorkflowBlocker
   if (!agreement?.renter_signed_at) {
     addBlocker(blockers, 'renter_signature_required', 'renter_pickup', 'The renter must sign the immutable rental agreement.', 'renter')
   }
-  if (deposit && !['accepted', 'waived', 'refunded', 'retained'].includes(deposit.status)) {
+  if (deposit && !['held', 'waived_student', 'refunded', 'forfeited'].includes(deposit.raw_status)) {
     addBlocker(blockers, 'deposit_unresolved', 'renter_pickup', 'The security deposit proof must be accepted or the booking waiver must apply.', 'renter')
   }
 
@@ -138,7 +138,7 @@ export function missingInspectionRequirements(
     if (item.required && !inspection.checklist?.[item.key]) missing.push(item.key)
   }
   for (const definition of HUB_INSPECTION_PHOTO_DEFINITIONS) {
-    if (definition.requiredFor.includes(inspection.kind) && !inspection.photos?.some((photo) => photo.kind === definition.kind)) {
+    if ((definition.requiredFor as readonly RentalInspectionKind[]).includes(inspection.kind) && !inspection.photos?.some((photo) => photo.kind === definition.kind)) {
       missing.push(`${definition.kind}_photo`)
     }
   }
