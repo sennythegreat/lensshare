@@ -48,6 +48,13 @@
 .agreement-verified { display: inline-block; font-size: 11px; color: var(--muted); margin-top: 2px; }
 .agreement-verified.ok { color: #2e6e5e; }
 
+.agreement-price { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.agreement-price div { display: flex; justify-content: space-between; gap: 20px; padding: 4px 0; font-size: 12px; color: var(--muted); }
+.agreement-price b { font-family: Georgia, serif; color: var(--ink); }
+.agreement-price .discount,.agreement-price .discount b { color: #2e6e5e; }
+.agreement-price .total { border-top: 1px solid var(--line); margin-top: 5px; padding-top: 9px; color: var(--ink); }
+.agreement-price .total b { font-size: 16px; }
+
 .agreement-terms { padding: 20px 0; border-bottom: 1px solid var(--line); }
 .agreement-terms h2 { font-family: Georgia, serif; font-size: 14px; margin: 14px 0 4px; }
 .agreement-terms h2:first-child { margin-top: 0; }

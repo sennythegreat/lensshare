@@ -30,4 +30,63 @@
 /* Renter profile: optional self-reported rental use (appended) */
 .form-grid select{border:1px solid #d9deda;padding:12px;background:#fafbf9;font:13px Arial;color:#26332f}
 .profile-use-field{grid-column:1/-1}
-.profile-use-field small{max-width:560px;color:#71807a;font:10px Arial;text-transform:none;letter-spacing:0;line-height:1.45}
+
+.renter-pass-summary{display:flex;align-items:center;justify-content:space-between;gap:24px}
+.renter-pass-summary>div{max-width:620px}
+.renter-pass-summary .owner-button{text-decoration:none;white-space:nowrap}
+.renter-pass-saving{display:block;color:#315f57;font:9px 'DM Mono',monospace;margin-top:5px;text-transform:uppercase;letter-spacing:.04em}
+.renter-price-discount{display:block!important;color:#315f57!important;font-size:10px!important;line-height:1.6;margin-top:5px}
+@media(max-width:700px){.renter-pass-summary{align-items:flex-start;flex-direction:column}.renter-pass-summary .owner-button{white-space:normal}}
+
+/* Saver Pass */
+.saver-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:32px;align-items:center;background:#07100e;color:#fff;padding:34px;margin-bottom:18px;overflow:hidden;position:relative}
+.saver-hero:after{content:"";position:absolute;width:210px;height:210px;border:1px solid rgba(255,255,255,.1);border-radius:50%;right:-85px;bottom:-125px}
+.saver-hero .eyebrow{color:#a9c7bf;display:flex;align-items:center;gap:7px}
+.saver-hero h2{font:34px Georgia,serif;margin:10px 0;color:#fff;max-width:720px}
+.saver-hero>div>p:last-child{color:#c4ceca;line-height:1.65;max-width:650px;margin-bottom:0}
+.saver-rate{display:flex;flex-direction:column;align-items:flex-end;position:relative;z-index:1;min-width:145px}
+.saver-rate strong{font:54px Georgia,serif;line-height:1}
+.saver-rate span{font:9px 'DM Mono',monospace;letter-spacing:.12em;color:#a9c7bf;margin-top:7px}
+.saver-state-card{display:flex;gap:16px;align-items:flex-start;background:#fff;border:1px solid #e0e4e1;padding:22px;margin-bottom:18px}
+.saver-state-card>p{margin:3px 0;color:#65716c}
+.saver-state-icon{width:42px;height:42px;display:grid;place-items:center;flex:none;background:#e3efeb;color:#315c53;border-radius:50%}
+.saver-state-card h2{font:24px Georgia,serif;margin:8px 0;color:#17201d}
+.saver-state-card p{color:#65716c;font-size:12px;line-height:1.6;margin:6px 0}
+.saver-state-card .owner-button{margin-top:10px}
+.saver-state-attention .saver-state-icon{background:#f0e8cc;color:#75612d}
+.saver-state-rejected .saver-state-icon{background:#f7e3e0;color:#8c3d31}
+.saver-state-body{min-width:0;flex:1}
+.saver-active-card.exhausted{border-color:#d8cda7}
+.saver-active-card svg{vertical-align:-2px;margin-right:4px}
+.saver-progress{height:9px;background:#e6ebe8;margin:18px 0 8px;overflow:hidden;border-radius:10px}
+.saver-progress span{display:block;height:100%;background:#315c53;border-radius:10px}
+.saver-progress-labels{display:flex;gap:14px;justify-content:space-between;color:#71807a;font:9px 'DM Mono',monospace;text-transform:uppercase;letter-spacing:.04em;flex-wrap:wrap}
+.saver-progress-labels strong{color:#17201d}
+.saver-purchase-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:18px;margin-bottom:18px}
+.saver-payment-card,.saver-payment-form{margin-bottom:0}
+.saver-gcash-details{margin:20px 0 14px;border-top:1px solid #e5e8e5}
+.saver-gcash-details div{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #e5e8e5;padding:13px 0}
+.saver-gcash-details dt{color:#71807a;font:9px 'DM Mono',monospace;text-transform:uppercase;letter-spacing:.08em}
+.saver-gcash-details dd{margin:0;color:#17201d;font-weight:700;text-align:right}
+.saver-config-notice{background:#f0e8cc;border:1px solid #dfd09a;padding:14px;margin:18px 0;color:#5f512c}
+.saver-config-notice p{color:#75612d;margin:5px 0 0}
+.saver-payment-form{display:flex;flex-direction:column;align-items:stretch}
+.saver-payment-form label{display:flex;justify-content:space-between;gap:12px;color:#52605b;font:10px 'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em;margin:12px 0 7px}
+.saver-payment-form label span{font:9px Arial;text-transform:none;letter-spacing:0;color:#84908b}
+.saver-payment-form input{border:1px solid #d9deda;padding:12px;background:#fafbf9;color:#26332f;font:13px Arial;width:100%}
+.saver-payment-form input[type=file]{padding:9px}
+.saver-payment-form input:focus{outline:2px solid #8eb1a8;outline-offset:2px}
+.saver-payment-form input:disabled{background:#efefec;color:#8a918e}
+.saver-payment-form .owner-button{align-self:flex-start;margin-top:14px}
+.saver-file-note,.saver-fine-print{font-size:10px!important;color:#71807a!important;line-height:1.5!important}
+.saver-success{background:#dcebe7;border:1px solid #b8d4cc;color:#315c53!important;padding:10px 12px;margin-top:12px!important}
+.saver-terms{margin-bottom:0}
+.saver-terms-grid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #e2e6e3;margin:20px 0}
+.saver-terms-grid div{padding:18px;border-left:1px solid #e2e6e3}
+.saver-terms-grid div:first-child{border-left:0}
+.saver-terms-grid strong{display:block;font:23px Georgia,serif;color:#17201d}
+.saver-terms-grid span{display:block;color:#71807a;font-size:10px;line-height:1.45;margin-top:5px}
+.saver-terms ul{margin:0;padding-left:19px;color:#55625d;font-size:12px;line-height:1.7}
+.saver-terms li+li{margin-top:6px}
+@media(max-width:800px){.saver-purchase-grid{grid-template-columns:1fr}.saver-terms-grid{grid-template-columns:1fr 1fr}.saver-terms-grid div:nth-child(3){border-left:0;border-top:1px solid #e2e6e3}.saver-terms-grid div:nth-child(4){border-top:1px solid #e2e6e3}}
+@media(max-width:600px){.saver-hero{grid-template-columns:1fr;padding:24px}.saver-hero h2{font-size:27px}.saver-rate{align-items:flex-start}.saver-state-card{padding:18px}.saver-progress-labels{flex-direction:column;gap:5px}.saver-payment-form label{flex-direction:column;gap:4px}.saver-terms-grid{grid-template-columns:1fr}.saver-terms-grid div{border-left:0;border-top:1px solid #e2e6e3}.saver-terms-grid div:first-child{border-top:0}}

@@ -84,11 +84,59 @@ export type Booking = {
   start_date: string
   end_date: string
   days: number
+  daily_rate_snapshot: number | null
+  subtotal: number
+  discount_amount: number
+  promo_pass_id: string | null
   total: number
   shoot_description: string | null
   status: BookingStatus
   created_at: string
   updated_at: string
+}
+
+export type PromoPassStatus = 'pending_review' | 'active' | 'rejected'
+export type PromoRedemptionState = 'reserved' | 'consumed' | 'released'
+
+export type PromoPass = {
+  id: string
+  renter_id: string
+  status: PromoPassStatus
+  fee_amount: number
+  currency: 'PHP'
+  discount_rate: number
+  discount_cap: number
+  reserved_amount: number
+  redeemed_amount: number
+  gcash_reference: string
+  proof_path: string
+  review_note: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  approved_at: string | null
+  valid_from: string | null
+  valid_until_exclusive: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type PromoPassWithRenter = PromoPass & {
+  renter: Pick<Profile, 'id' | 'full_name' | 'email' | 'verification_status'> | null
+}
+
+export type BookingQuote = {
+  listing_id: string
+  daily_rate: number
+  days: number
+  subtotal: number
+  discount_amount: number
+  total: number
+  promo_pass_id: string | null
+  pass_status: PromoPassStatus | 'expired' | null
+  pass_valid_from: string | null
+  pass_valid_until_exclusive: string | null
+  remaining_cap: number
+  eligibility_reason: string
 }
 
 export type ListingWithOwner = Listing & {
@@ -148,11 +196,19 @@ export type ReviewWithNames = Review & {
 
 export const COMMISSION_RATE = 0.15
 
+export type MessageAttachment = {
+  path: string
+  name: string
+  type: string
+  size: number
+}
+
 export type Message = {
   id: string
   booking_id: string
   sender_id: string
-  body: string
+  body: string | null
+  attachments: MessageAttachment[]
   read_at: string | null
   created_at: string
 }

@@ -5,12 +5,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Camera, Check, Heart, LocateFixed, MapPin, Search, ShieldCheck, SlidersHorizontal, X } from 'lucide-react'
 import './browse.css'
-import { bookingErrorMessage, checkAvailability, createBooking, fetchListings, fetchUnavailableListingIds } from '@/lib/data'
+import { bookingErrorMessage, checkAvailability, createBooking, fetchListings, fetchUnavailableListingIds, quoteBooking } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import { SiteHeadbar } from '@/components/site-headbar'
 import { EmptyState, ErrorState, SectionSkeleton } from '@/components/states'
 import { VerifyBanner } from '@/components/verify-banner'
-import { initialsOf, listingPhotos, rentalDays, type ListingWithOwner } from '@/lib/types'
+import { initialsOf, listingPhotos, pesos, rentalDays, type BookingQuote, type ListingWithOwner } from '@/lib/types'
 import { distanceKm, formatDistance, pickupCoordinates, requestLocation, type LocationFix } from '@/lib/location'
 
 const categories = ['All equipment', 'Cameras', 'Lenses', 'Lighting', 'Support', 'Audio']
@@ -67,6 +67,9 @@ export default function BrowsePage() {
   const [availabilityError, setAvailabilityError] = useState('')
   const [availabilityRange, setAvailabilityRange] = useState('')
   const [shootDescription, setShootDescription] = useState('')
+  const [bookingQuote, setBookingQuote] = useState<BookingQuote | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(false)
+  const [quoteError, setQuoteError] = useState('')
 
   const dateError = !startDate || !endDate ? 'Choose both a pick-up and return date.'
     : !Number.isFinite(new Date(startDate).getTime()) || !Number.isFinite(new Date(endDate).getTime()) ? 'Choose valid rental dates.'
@@ -113,6 +116,28 @@ export default function BrowsePage() {
       .finally(() => { if (!cancelled) setAvailabilityLoading(false) })
     return () => { cancelled = true }
   }, [startDate, endDate, datesInvalid])
+
+  useEffect(() => {
+    if (!selected || datesInvalid || !user || profile?.role !== 'renter' || profile.verification_status !== 'verified') {
+      setBookingQuote(null)
+      setQuoteLoading(false)
+      setQuoteError('')
+      return
+    }
+    let cancelled = false
+    setQuoteLoading(true)
+    setQuoteError('')
+    quoteBooking(selected.id, startDate, endDate)
+      .then((value) => { if (!cancelled) setBookingQuote(value) })
+      .catch((error) => {
+        if (!cancelled) {
+          setBookingQuote(null)
+          setQuoteError(error instanceof Error ? error.message : 'Could not calculate the booking total.')
+        }
+      })
+      .finally(() => { if (!cancelled) setQuoteLoading(false) })
+    return () => { cancelled = true }
+  }, [selected, startDate, endDate, datesInvalid, user, profile])
 
   const rateBounds = useMemo(() => {
     if (!listings.length) return { min: 0, max: 1500 }
@@ -215,6 +240,8 @@ export default function BrowsePage() {
     else setEndDate(value)
     setBooked(false)
     setBookingError('')
+    setBookingQuote(null)
+    setQuoteError('')
   }
 
   function toggleSaved(id: string) { setSaved((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
@@ -224,6 +251,8 @@ export default function BrowsePage() {
     setSelectedPhoto(0)
     setBooked(false)
     setBookingError('')
+    setBookingQuote(null)
+    setQuoteError('')
     setShootDescription('')
   }
 
@@ -242,16 +271,22 @@ export default function BrowsePage() {
         setBookingBusy(false)
         return
       }
-      await createBooking({
+      const booking = await createBooking({
         listing_id: selected.id,
-        renter_id: user.id,
-        owner_id: selected.owner_id,
         start_date: startDate,
         end_date: endDate,
-        days,
-        total: days * Number(selected.daily_rate),
+        expected_daily_rate: Number(selected.daily_rate),
         shoot_description: shootDescription || null,
       })
+      setBookingQuote((current) => current ? {
+        ...current,
+        daily_rate: Number(booking.daily_rate_snapshot ?? current.daily_rate),
+        days: booking.days,
+        subtotal: Number(booking.subtotal),
+        discount_amount: Number(booking.discount_amount),
+        total: Number(booking.total),
+        promo_pass_id: booking.promo_pass_id,
+      } : current)
       setBooked(true)
     } catch (error) {
       setBookingError(bookingErrorMessage(error))
@@ -262,6 +297,11 @@ export default function BrowsePage() {
 
   const selectedPhotos = selected ? listingPhotos(selected) : []
   const activeSelectedPhoto = selectedPhotos[selectedPhoto] || selected?.image_url || '/lensshare-camera.png'
+  const fallbackSubtotal = selected && !datesInvalid ? days * Number(selected.daily_rate) : 0
+  const quotedSubtotal = bookingQuote ? Number(bookingQuote.subtotal) : fallbackSubtotal
+  const quotedDiscount = bookingQuote ? Number(bookingQuote.discount_amount) : 0
+  const quotedTotal = bookingQuote ? Number(bookingQuote.total) : fallbackSubtotal
+  const quoteReason = bookingQuote?.eligibility_reason
 
   return <main className="browse-page">
     <SiteHeadbar />
@@ -329,7 +369,7 @@ export default function BrowsePage() {
     </div>
     <section className="browse-benefits"><span><b>Maxim / Lalamove Hub Couriers</b><small>Coordinate delivery or a direct hand-off with the owner.</small></span><span><b>Zero Cash Deposit for Students</b><small>Validated student IDs qualify for deposit waiver.</small></span><span><b>Optical Sensor Guaranteed Clean</b><small>Every camera is inspected before pick-up.</small></span></section>
     <footer className="browse-footer"><div><span className="browse-brand"><span className="logo-mark"><img src="/lensshare-logo.png" alt="" /></span><strong>LensShare</strong></span><p>A peer-to-peer optical cooperative connecting creators across Naga City.</p></div><div><b>MARKETPLACE</b><span>Mirrorless bodies</span><span>Fast primes & zooms</span><span>Production lighting</span></div><div><b>TRUST & PROTOCOL</b><span>Peer verification</span><span>Sensor cleaning standards</span><span>Damage dispute support</span></div><div><b>LENScare coverage</b><span>₱100,000 replacement guarantee</span><span>Auto-activated on every rental</span></div></footer>
-    {selected && <div className="detail-backdrop" role="presentation" onClick={() => setSelected(null)}><section className="detail-modal" role="dialog" aria-modal="true" aria-label="Equipment details" onClick={(event) => event.stopPropagation()}><button className="close-modal" onClick={() => setSelected(null)} aria-label="Close"><X size={18} /></button><div className="browse-detail-gallery"><img src={activeSelectedPhoto} alt={`${selected.name} photo ${selectedPhoto + 1}`} />{selectedPhotos.length > 1 && <div className="browse-detail-thumbs">{selectedPhotos.map((photo, index) => <button className={selectedPhoto === index ? 'selected' : ''} type="button" key={photo} onClick={() => setSelectedPhoto(index)} aria-label={`View photo ${index + 1}`}><img src={photo} alt="" /></button>)}</div>}</div><div className="detail-content"><p className="eyebrow">{selected.meta || selected.brand}</p><h2>{selected.name}</h2><p className="detail-price">₱{Number(selected.daily_rate).toLocaleString()}<small>/ day</small></p>{(selected.specs || selected.description) && <p>{selected.specs || selected.description}</p>}{selected.included && <p>{selected.included}</p>}{selected.owner && <div className="detail-owner"><span>{initialsOf(selected.owner.full_name)}</span><div><b>{selected.owner.full_name}</b><small>Verified owner · ★ {selected.rating}</small></div></div>}<div className="browse-detail-pickup"><MapPin size={17} aria-hidden="true" /><div><b>Availability area</b><span>{selected.pickup_address?.trim() || 'Availability area not added'}</span>{distances.has(selected.id) && <small>Approx. {formatDistance(distances.get(selected.id)!)} away · based on a rounded area point</small>}<small>Arrange the exact handoff time and place privately with the owner in Messages.</small></div></div><label>Shoot description<textarea value={shootDescription} onChange={(event) => setShootDescription(event.target.value)} placeholder="Tell the owner what you are filming..." /></label><div className="detail-dates"><label>Pick-up date<input type="date" value={startDate} required disabled={bookingBusy} onChange={(event) => changeDate('start', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label><label>Return date<input type="date" value={endDate} required min={returnMin} disabled={bookingBusy} onChange={(event) => changeDate('end', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label></div>{dateError && <p className="browse-date-feedback" id="browse-detail-date-error" role="status">{dateError}</p>}{booked ? <div className="booking-success"><Check size={16} /> Booking request sent. Arrange the exact handoff with the owner in Messages. <Link href="/renter/bookings">Track it in My Bookings →</Link></div> : needsVerification ? <div className="booking-verify"><ShieldCheck size={15} /><div><b>Identity verification required</b><span>Verify your government ID before your first rental — approvals usually take less than a day.</span><Link href="/renter/verification">Complete verification →</Link></div></div> : <button className="primary-booking" disabled={bookingBusy || datesInvalid} onClick={handleBooking}>{bookingBusy ? 'Sending request…' : datesInvalid ? 'Choose valid rental dates' : user ? `Request booking · ₱${(days * Number(selected.daily_rate)).toLocaleString()} (${days} day${days === 1 ? '' : 's'})` : 'Log in to request booking'}</button>}{bookingError && <p className="demo-note">{bookingError}</p>}</div></section></div>}
+    {selected && <div className="detail-backdrop" role="presentation" onClick={() => setSelected(null)}><section className="detail-modal" role="dialog" aria-modal="true" aria-label="Equipment details" onClick={(event) => event.stopPropagation()}><button className="close-modal" onClick={() => setSelected(null)} aria-label="Close"><X size={18} /></button><div className="browse-detail-gallery"><img src={activeSelectedPhoto} alt={`${selected.name} photo ${selectedPhoto + 1}`} />{selectedPhotos.length > 1 && <div className="browse-detail-thumbs">{selectedPhotos.map((photo, index) => <button className={selectedPhoto === index ? 'selected' : ''} type="button" key={photo} onClick={() => setSelectedPhoto(index)} aria-label={`View photo ${index + 1}`}><img src={photo} alt="" /></button>)}</div>}</div><div className="detail-content"><p className="eyebrow">{selected.meta || selected.brand}</p><h2>{selected.name}</h2><p className="detail-price">₱{Number(selected.daily_rate).toLocaleString()}<small>/ day</small></p>{(selected.specs || selected.description) && <p>{selected.specs || selected.description}</p>}{selected.included && <p>{selected.included}</p>}{selected.owner && <div className="detail-owner"><span>{initialsOf(selected.owner.full_name)}</span><div><b>{selected.owner.full_name}</b><small>Verified owner · ★ {selected.rating}</small></div></div>}<div className="browse-detail-pickup"><MapPin size={17} aria-hidden="true" /><div><b>Availability area</b><span>{selected.pickup_address?.trim() || 'Availability area not added'}</span>{distances.has(selected.id) && <small>Approx. {formatDistance(distances.get(selected.id)!)} away · based on a rounded area point</small>}<small>Arrange the exact handoff time and place privately with the owner in Messages.</small></div></div><label>Shoot description<textarea value={shootDescription} onChange={(event) => setShootDescription(event.target.value)} placeholder="Tell the owner what you are filming..." /></label><div className="detail-dates"><label>Pick-up date<input type="date" value={startDate} required disabled={bookingBusy} onChange={(event) => changeDate('start', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label><label>Return date<input type="date" value={endDate} required min={returnMin} disabled={bookingBusy} onChange={(event) => changeDate('end', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label></div>{dateError && <p className="browse-date-feedback" id="browse-detail-date-error" role="status">{dateError}</p>}{user && profile?.role === 'renter' && profile.verification_status === 'verified' && !datesInvalid && <div className="browse-price-breakdown" aria-live="polite">{quoteLoading ? <p className="browse-quote-state">Calculating your protected total…</p> : <><div><span>Rental subtotal</span><b>{pesos(quotedSubtotal)}</b></div>{quotedDiscount > 0 && <div className="discount"><span>30-Day Saver Pass · 5%</span><b>− {pesos(quotedDiscount)}</b></div>}<div className="total"><span>Booking total</span><b>{pesos(quotedTotal)}</b></div>{quoteReason === 'applied' && <p className="browse-pass-note applied">Saver Pass applied automatically. {pesos(Number(bookingQuote?.remaining_cap ?? 0))} remains before this reservation.</p>}{quoteReason === 'outside_pass_window' && <p className="browse-pass-note">Your active pass does not cover this complete rental period. <Link href="/renter/saver-pass">View pass dates</Link></p>}{quoteReason === 'discount_cap_reached' && <p className="browse-pass-note">Your Saver Pass discount cap has been reached. <Link href="/renter/saver-pass">View pass</Link></p>}{quoteReason === 'no_active_pass' && <p className="browse-pass-note">No active Saver Pass. <Link href="/renter/saver-pass">Save 5% with a ₱99 pass</Link></p>}{quoteError && <p className="browse-pass-note error">{quoteError}</p>}</>}</div>}{booked ? <div className="booking-success"><Check size={16} /> Booking request sent. Arrange the exact handoff with the owner in Messages. <Link href="/renter/bookings">Track it in My Bookings →</Link></div> : needsVerification ? <div className="booking-verify"><ShieldCheck size={15} /><div><b>Identity verification required</b><span>Verify your government ID before your first rental — approvals usually take less than a day.</span><Link href="/renter/verification">Complete verification →</Link></div></div> : <button className="primary-booking" disabled={bookingBusy || datesInvalid || (Boolean(user) && profile?.role === 'renter' && profile.verification_status === 'verified' && (quoteLoading || !bookingQuote))} onClick={handleBooking}>{bookingBusy ? 'Sending request…' : quoteLoading ? 'Calculating total…' : datesInvalid ? 'Choose valid rental dates' : user ? `Request booking · ${pesos(quotedTotal)} (${days} day${days === 1 ? '' : 's'})` : 'Log in to request booking'}</button>}{bookingError && <p className="demo-note">{bookingError}</p>}</div></section></div>}
   </main>
 }
 

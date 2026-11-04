@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { OwnerShell, PageCard, OwnerHeading } from '@/components/owner-shell'
 import { createClient } from '@/lib/supabase/client'
-import { updateProfile } from '@/lib/data'
+import { switchWorkspaceRole, updateProfile } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 
 export default function SettingsPage() {
@@ -24,7 +24,7 @@ export default function SettingsPage() {
     if (!user) return
     setBusy(true); setError(''); setSaved(false)
     try {
-      await updateProfile(user.id, { full_name: fullName, phone: phone || null })
+      await updateProfile({ full_name: fullName, phone: phone || null })
       setSaved(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Saving failed.')
@@ -37,7 +37,7 @@ export default function SettingsPage() {
     if (!user) return
     setBusy(true)
     try {
-      await updateProfile(user.id, { role: 'renter' })
+      await switchWorkspaceRole('renter')
       router.push('/renter/bookings')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Role switch failed.')

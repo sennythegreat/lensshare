@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BadgeCheck, Search, ShieldCheck, UserRound } from 'lucide-react'
+import { BadgeCheck, BadgePercent, Search, ShieldCheck, UserRound } from 'lucide-react'
 import { useProfile } from '@/lib/use-profile'
 import { initialsOf } from '@/lib/types'
 import { UserMenu } from '@/components/user-menu'
@@ -56,18 +56,22 @@ export function SiteHeadbar({
     : isAdmin
       ? [{ href: '/admin', label: 'Admin console', icon: ShieldCheck }]
       : isRenter
-        ? [{ href: '/renter/profile', label: 'My Profile', icon: UserRound }, { href: '/renter/verification', label: 'Verification', icon: BadgeCheck }]
+        ? [
+            { href: '/renter/profile', label: 'My Profile', icon: UserRound },
+            { href: '/renter/verification', label: 'Verification', icon: BadgeCheck },
+            { href: '/renter/saver-pass', label: 'Saver Pass', icon: BadgePercent },
+          ]
         : [{ href: '/dashboard/settings', label: 'My Profile', icon: UserRound }]
 
   const showSubnav = Boolean(breadcrumb || subnavRight)
 
   return <>
     <header className={onSearchChange ? 'browse-nav' : 'browse-nav browse-nav-compact'}>
-      <Link href="/" className="browse-brand"><span className="logo-mark"><img src="/lensshare-logo.png" alt="" /></span><strong>LensShare</strong><small>/ ARCHIVE<br />P2P OPTICAL CO-OP</small></Link>
-      <nav>
+      <Link href="/" className="browse-brand"><span className="logo-mark"><img src="/lensshare-logo.png" alt="" /></span><strong>LensShare</strong></Link>
+      <nav aria-label="Primary navigation">
         <Link className={pathname === '/browse' ? 'active' : ''} href="/browse">Browse Equipment</Link>
-        <Link className={pathname === '/packages' ? 'active' : ''} href="/packages">Packages &amp; Tiers</Link>
-        {showRenterLinks && <Link className={pathname === '/renter/how-it-works' ? 'active' : ''} href="/renter/how-it-works">How It Works</Link>}
+        <Link className={pathname === '/packages' ? 'active' : ''} href="/packages">Creator Guides</Link>
+        {isRenter && <Link className={pathname === '/renter/saver-pass' ? 'active' : ''} href="/renter/saver-pass">Saver Pass</Link>}
         {showRenterLinks && <Link className={pathname === '/renter/bookings' ? 'active' : ''} href="/renter/bookings">My Bookings</Link>}
         {showRenterLinks && <Link className={pathname === '/renter/messages' ? 'active' : ''} href="/renter/messages">Messages</Link>}
       </nav>

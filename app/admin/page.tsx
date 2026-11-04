@@ -35,7 +35,7 @@ export default function AdminDashboardPage() {
   const liveListings = listings.filter((l) => l.status === 'available').length
   const pendingBookings = bookings.filter((b) => b.status === 'pending').length
   const activeBookings = bookings.filter((b) => b.status === 'active' || b.status === 'approved').length
-  const grossValue = useMemo(() => bookings.filter((b) => b.status !== 'declined').reduce((sum, b) => sum + Number(b.total), 0), [bookings])
+  const grossValue = useMemo(() => bookings.filter((b) => b.status !== 'declined').reduce((sum, b) => sum + Number(b.subtotal), 0), [bookings])
   const recent = useMemo(() => bookings.slice(0, 5), [bookings])
 
   async function flushNotifications() {
@@ -77,7 +77,7 @@ export default function AdminDashboardPage() {
         </div>
         <div className="admin-chips">
           <Status>{booking.status.toUpperCase()}</Status>
-          <strong>{pesos(Number(booking.total))}</strong>
+          <strong>{pesos(Number(booking.subtotal))}</strong>
         </div>
       </div>)}
       {!recent.length && <div className="admin-row"><p>{loading ? 'Loading bookings…' : 'No bookings on the platform yet.'}</p></div>}

@@ -48,7 +48,7 @@ export default function FinancePage() {
   const totalCommission = payouts.reduce((sum, row) => sum + Number(row.commission), 0)
   const escrow = bookings
     .filter((b) => b.status === 'pending' || b.status === 'approved')
-    .reduce((sum, b) => sum + Number(b.total), 0)
+    .reduce((sum, b) => sum + Number(b.subtotal), 0)
 
   return <OwnerShell title="Revenue & Payouts" subtitle="Earnings from completed rentals. Each settled booking creates a payout entry — mark it paid once the money reaches you.">
     <div className="owner-stats">
@@ -71,7 +71,7 @@ export default function FinancePage() {
           : <button className="owner-button dark" disabled={busyId === row.id} onClick={() => handleMarkPaid(row.id)}>{busyId === row.id ? 'Saving…' : 'Mark as paid'}</button>}
       </div>)}</div> : <EmptyState title="No payouts yet" hint="Complete a rental from Manage Rentals and its payout will appear here." />}
     </PageCard>
-    <PageCard><OwnerHeading eyebrow="SETTLEMENT FORMULA" title="15% co-op commission" detail="Gross rental revenue minus the co-op share equals your owner net."/>
+    <PageCard><OwnerHeading eyebrow="SETTLEMENT FORMULA" title="15% co-op commission" detail="Gross uses the undiscounted rental subtotal. Saver Pass discounts are funded by LensShare and do not reduce your 85% share."/>
       <div className="finance-breakdown">
         <span>Gross rental revenue <b>{pesos(payouts.reduce((sum, row) => sum + Number(row.gross), 0))}</b></span>
         <span>Co-op commission (15%) <b>− {pesos(totalCommission)}</b></span>

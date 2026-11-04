@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AdminShell } from '@/components/admin-shell'
 import { PageCard, OwnerHeading, Status } from '@/components/owner-shell'
 import { EmptyState, SectionSkeleton } from '@/components/states'
-import { fetchSignedDocUrl, fetchVerificationQueue, reviewSubmission, updateProfile } from '@/lib/data'
+import { fetchSignedDocUrl, fetchVerificationQueue, reviewSubmission } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import type { VerificationDocType, VerificationSubmissionWithUser } from '@/lib/types'
 
@@ -21,7 +21,7 @@ function dateLabel(value: string) {
 }
 
 export default function VerificationsPage() {
-  const { user, profile, loading } = useProfile()
+  const { profile, loading } = useProfile()
   const [queue, setQueue] = useState<VerificationSubmissionWithUser[]>([])
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -63,7 +63,6 @@ export default function VerificationsPage() {
   }
 
   async function review(row: VerificationSubmissionWithUser, status: 'approved' | 'rejected') {
-    if (!user) return
     let note: string | null = null
     if (status === 'rejected') {
       note = window.prompt('Reason for rejection (shown to the renter):') ?? null
@@ -72,15 +71,7 @@ export default function VerificationsPage() {
     setBusyId(row.id)
     setError('')
     try {
-      await reviewSubmission(row.id, status, note, user.id)
-      if (status === 'approved') {
-        if (row.doc_type === 'government_id') {
-          await updateProfile(row.user_id, { verification_status: 'verified' })
-        }
-        if (row.doc_type === 'student_id' || row.doc_type === 'proof_of_enrollment') {
-          await updateProfile(row.user_id, { is_student: true })
-        }
-      }
+      await reviewSubmission(row.id, status, note)
       load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Review action failed.')

@@ -93,3 +93,33 @@
 @media(max-width:800px){.admin-gear-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.admin-gear-grid{grid-template-columns:1fr}}
 .admin-mail-bar{display:flex;align-items:center;justify-content:space-between;gap:20px;background:#fff;border:1px solid #e7e8e5;padding:15px 18px;margin:22px 0 0}.admin-mail-bar p{font-size:11px;color:#69716e;margin:4px 0}.admin-mail-bar small{font-size:10px;color:#315f57}@media(max-width:600px){.admin-mail-bar{align-items:flex-start;flex-direction:column}}
+
+/* Saver Pass payment review */
+.admin-pass-warning{display:flex;gap:12px;align-items:flex-start;background:#f7f0d8;border:1px solid #e0d29e;color:#5c4e27;padding:15px 18px;margin:24px 0 16px}
+.admin-pass-warning svg{flex:none;margin-top:1px}
+.admin-pass-warning strong{font:15px Georgia,serif;color:#463b20}
+.admin-pass-warning p{font-size:11px;line-height:1.55;margin:4px 0 0;color:#75612d}
+.admin-pass-section{margin-bottom:18px}
+.admin-pass-list{display:flex;flex-direction:column;gap:14px}
+.admin-pass-card{border:1px solid #e3e6e2;background:#fbfbf9;padding:18px}
+.admin-pass-card-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}
+.admin-pass-card-head h3,.admin-pass-reviewed-row h3{font:18px Georgia,serif;margin:8px 0 3px;color:#17201d}
+.admin-pass-card-head p,.admin-pass-reviewed-row p{font-size:11px;color:#69716e;margin:3px 0;line-height:1.5}
+.admin-pass-card-head>strong{font:25px Georgia,serif;color:#17201d;white-space:nowrap}
+.admin-pass-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:16px 0;border:1px solid #e5e8e5}
+.admin-pass-facts div{padding:12px;border-left:1px solid #e5e8e5;min-width:0}
+.admin-pass-facts div:first-child{border-left:0}
+.admin-pass-facts dt{font:8px 'DM Mono',monospace;letter-spacing:.08em;color:#7d8a84;text-transform:uppercase;margin-bottom:5px}
+.admin-pass-facts dd{margin:0;color:#303b37;font-size:11px;overflow-wrap:anywhere}
+.admin-pass-confirm{display:flex;align-items:center;gap:8px;color:#53605b;font-size:11px;margin:2px 0 15px}
+.admin-pass-confirm input{accent-color:#315c53}
+.admin-pass-actions{display:flex;gap:8px;flex-wrap:wrap}
+.admin-pass-actions .owner-button:disabled{cursor:not-allowed;opacity:.45}
+.admin-pass-reviewed{display:flex;flex-direction:column}
+.admin-pass-reviewed-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:16px 0;border-bottom:1px solid #eceeeb}
+.admin-pass-reviewed-row:last-child{border-bottom:0}
+.admin-pass-reviewed-main{min-width:0}
+.admin-pill.active{background:#dcebe7;color:#244b43}
+.admin-pill.rejected{background:#f7e3e0;color:#8c3d31}
+@media(max-width:900px){.admin-pass-facts{grid-template-columns:1fr 1fr}.admin-pass-facts div:nth-child(3){border-left:0;border-top:1px solid #e5e8e5}.admin-pass-facts div:nth-child(4){border-top:1px solid #e5e8e5}}
+@media(max-width:600px){.admin-content{padding:24px 16px 60px}.admin-heading h1{font-size:32px}.admin-grid,.admin-grid.four{grid-template-columns:1fr}.admin-pass-card-head{flex-direction:column}.admin-pass-facts{grid-template-columns:1fr}.admin-pass-facts div{border-left:0;border-top:1px solid #e5e8e5}.admin-pass-facts div:first-child{border-top:0}.admin-pass-actions{flex-direction:column;align-items:stretch}.admin-pass-reviewed-row{grid-template-columns:1fr}.admin-pass-reviewed-row>.owner-button{justify-self:start}}

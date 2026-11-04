@@ -95,3 +95,17 @@
 
 /* Date availability filter and verification banner */
 .browse-verify-wrap{padding:12px 3vw 0;background:#fff}.browse-verify-wrap .verify-banner{margin-bottom:0}.availability-toggle{display:flex;gap:10px;align-items:flex-start;padding:16px 0;border-bottom:1px solid #e0e7e4;cursor:pointer}.availability-toggle input{margin-top:3px;accent-color:#315f57}.availability-toggle span,.availability-toggle b,.availability-toggle small{display:block}.availability-toggle b{font:12px Arial,sans-serif;color:#17201d}.availability-toggle small{font:9px 'DM Mono',monospace;color:#75817d;margin-top:4px;line-height:1.45}.gear-result.date-unavailable{opacity:.68}.catalog-image>span.unavailable-badge{background:#745d34}.rate-card button:disabled{background:#9ba5a1;cursor:not-allowed}.results>.state-skeleton{background:#fff;border:1px solid #e0e7e4;padding:20px}.results>.state-empty{background:#fff;border:1px solid #e0e7e4;padding:80px 20px}
+
+/* Saver Pass booking quote */
+.browse-price-breakdown{margin-top:14px;padding:14px;border:1px solid #d7e3de;background:#f7f9f7}
+.browse-price-breakdown>div{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:5px 0;color:#586762;font-size:11px}
+.browse-price-breakdown>div b{font:15px Georgia,serif;color:#17201d}
+.browse-price-breakdown>div.discount{color:#315f57}
+.browse-price-breakdown>div.discount b{color:#315f57}
+.browse-price-breakdown>div.total{border-top:1px solid #d7e3de;margin-top:5px;padding-top:11px;color:#17201d}
+.browse-price-breakdown>div.total b{font-size:20px}
+.browse-quote-state,.browse-pass-note{margin:2px 0!important;color:#65716c!important;font-size:10px!important;line-height:1.5!important}
+.browse-pass-note{border-top:1px solid #e0e7e4;margin-top:8px!important;padding-top:9px}
+.browse-pass-note.applied{color:#315f57!important}
+.browse-pass-note.error{color:#945139!important}
+.browse-pass-note a{color:#315f57;font-weight:700;text-underline-offset:2px}

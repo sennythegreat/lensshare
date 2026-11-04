@@ -13,8 +13,13 @@ import type {
   ListingStatus,
   ListingWithOwner,
   Message,
+  MessageAttachment,
   Payout,
   PlatformStats,
+  PromoPass,
+  PromoPassWithRenter,
+  BookingQuote,
+  PrimaryRentalUse,
   Review,
   ReviewWithNames,
   Role,
@@ -226,18 +231,32 @@ export async function checkAvailability(listingId: string, start: string, end: s
   return !unavailable.includes(listingId)
 }
 
+export async function quoteBooking(listingId: string, startDate: string, endDate: string): Promise<BookingQuote> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .rpc('quote_booking', { p_listing_id: listingId, p_start_date: startDate, p_end_date: endDate })
+    .single()
+  if (error) throw error
+  return data as BookingQuote
+}
+
 export async function createBooking(input: {
   listing_id: string
-  renter_id: string
-  owner_id: string
   start_date: string
   end_date: string
-  days: number
-  total: number
   shoot_description: string | null
+  expected_daily_rate: number
 }): Promise<Booking> {
   const supabase = createClient()
-  const { data, error } = await supabase.from('bookings').insert(input).select('*').single()
+  const { data, error } = await supabase
+    .rpc('create_booking', {
+      p_listing_id: input.listing_id,
+      p_start_date: input.start_date,
+      p_end_date: input.end_date,
+      p_shoot_description: input.shoot_description,
+      p_expected_daily_rate: input.expected_daily_rate,
+    })
+    .single()
   if (error) throw error
   return data as Booking
 }
@@ -250,8 +269,14 @@ export function bookingErrorMessage(error: unknown): string {
     return 'Those dates are already booked for this gear. Please pick a different range.'
   }
   const message = err?.message ?? ''
-  if (/row-level security|policy/i.test(message)) {
+  if (/verified renter|identity verification/i.test(message)) {
     return 'Booking blocked: your account must be a verified renter before you can request a rental.'
+  }
+  if (/listing rate changed/i.test(message)) {
+    return 'The owner changed this listing’s daily rate. Review the updated total and try again.'
+  }
+  if (/row-level security|policy|permission denied/i.test(message)) {
+    return 'Booking blocked: your account or the booking service is not ready for this request.'
   }
   return message || 'Something went wrong. Please try again.'
 }
@@ -267,10 +292,13 @@ export async function fetchBookingById(bookingId: string): Promise<BookingWithRe
   return (data as BookingWithRelations | null) ?? null
 }
 
-export async function updateBookingStatus(id: string, status: BookingStatus): Promise<void> {
+export async function updateBookingStatus(id: string, status: BookingStatus): Promise<Booking> {
   const supabase = createClient()
-  const { error } = await supabase.from('bookings').update({ status }).eq('id', id)
+  const { data, error } = await supabase
+    .rpc('transition_booking_status', { p_booking_id: id, p_new_status: status })
+    .single()
   if (error) throw error
+  return data as Booking
 }
 
 // ---------- Payouts ----------
@@ -317,11 +345,19 @@ export async function saveHandoff(
   const supabase = createClient()
   const { error } = await supabase
     .from('booking_handoffs')
-    .upsert(
-      { booking_id: bookingId, user_id: userId, party, stage, checklist },
-      { onConflict: 'booking_id,party,stage' },
-    )
-  if (error) throw error
+    .insert({ booking_id: bookingId, user_id: userId, party, stage, checklist })
+
+  if (!error) return
+  if (error.code !== '23505') throw error
+  if (stage === 'agreement') return
+
+  const { error: updateError } = await supabase
+    .from('booking_handoffs')
+    .update({ checklist })
+    .eq('booking_id', bookingId)
+    .eq('party', party)
+    .eq('stage', stage)
+  if (updateError) throw updateError
 }
 
 // ---------- Reviews ----------
@@ -372,11 +408,20 @@ export async function submitReview(input: {
 }
 
 export async function updateProfile(
-  id: string,
-  values: Partial<Pick<import('@/lib/types').Profile, 'full_name' | 'phone' | 'role' | 'primary_rental_use' | 'verification_status' | 'is_student'>>,
+  values: { full_name: string; phone: string | null; primary_rental_use?: PrimaryRentalUse | null },
 ): Promise<void> {
   const supabase = createClient()
-  const { error } = await supabase.from('profiles').update(values).eq('id', id)
+  const { error } = await supabase.rpc('update_own_profile', {
+    p_full_name: values.full_name,
+    p_phone: values.phone,
+    p_primary_rental_use: values.primary_rental_use ?? null,
+  })
+  if (error) throw error
+}
+
+export async function switchWorkspaceRole(role: Exclude<Role, 'admin'>): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.rpc('switch_workspace_role', { p_role: role })
   if (error) throw error
 }
 
@@ -435,14 +480,88 @@ export async function reviewSubmission(
   id: string,
   status: 'approved' | 'rejected',
   reviewNote: string | null,
-  reviewedBy: string,
-): Promise<void> {
+): Promise<VerificationSubmission> {
   const supabase = createClient()
-  const { error } = await supabase
-    .from('verification_submissions')
-    .update({ status, review_note: reviewNote, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() })
-    .eq('id', id)
+  const { data, error } = await supabase
+    .rpc('review_verification_submission', {
+      p_submission_id: id,
+      p_status: status,
+      p_review_note: reviewNote,
+    })
+    .single()
   if (error) throw error
+  return data as VerificationSubmission
+}
+
+export async function fetchMyPromoPasses(renterId: string): Promise<PromoPass[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('promo_passes')
+    .select('*')
+    .eq('renter_id', renterId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as PromoPass[]
+}
+
+export async function uploadPromoPaymentProof(userId: string, file: File): Promise<string> {
+  const supabase = createClient()
+  const ext = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : 'jpg'
+  const safeExt = ext && /^[a-z0-9]+$/.test(ext) ? ext : 'jpg'
+  const path = `${userId}/${crypto.randomUUID()}.${safeExt}`
+  const { error } = await supabase.storage.from('promo-payment-proofs').upload(path, file, {
+    cacheControl: '3600',
+    contentType: file.type,
+    upsert: false,
+  })
+  if (error) throw error
+  return path
+}
+
+export async function submitPromoPassPayment(reference: string, proofPath: string): Promise<PromoPass> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .rpc('submit_promo_pass_payment', {
+      p_gcash_reference: reference.trim(),
+      p_proof_path: proofPath,
+    })
+    .single()
+  if (error) throw error
+  return data as PromoPass
+}
+
+export async function fetchPromoPassQueue(): Promise<PromoPassWithRenter[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('promo_passes')
+    .select('*, renter:profiles!promo_passes_renter_id_fkey(id, full_name, email, verification_status)')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as PromoPassWithRenter[]
+}
+
+export async function fetchSignedPromoProofUrl(proofPath: string): Promise<string> {
+  const supabase = createClient()
+  const { data, error } = await supabase.storage.from('promo-payment-proofs').createSignedUrl(proofPath, 300)
+  if (error) throw error
+  return data.signedUrl
+}
+
+export async function reviewPromoPass(
+  passId: string,
+  decision: 'approved' | 'rejected',
+  note: string | null,
+): Promise<PromoPass> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .rpc('review_promo_pass', {
+      p_pass_id: passId,
+      p_decision: decision,
+      p_review_note: note,
+    })
+    .single()
+  if (error) throw error
+  return data as PromoPass
 }
 
 export async function fetchAdminUsers(): Promise<AdminUserRow[]> {
@@ -495,12 +614,92 @@ export async function fetchBookingMessages(bookingId: string): Promise<Message[]
   return (data ?? []) as Message[]
 }
 
-export async function sendMessage(bookingId: string, senderId: string, body: string): Promise<void> {
+export const MESSAGE_ATTACHMENT_LIMIT = 5
+export const MESSAGE_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+const MESSAGE_ATTACHMENT_FILE_TYPES: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  txt: 'text/plain',
+  csv: 'text/csv',
+}
+
+export const MESSAGE_ATTACHMENT_TYPES = new Set(Object.values(MESSAGE_ATTACHMENT_FILE_TYPES))
+
+function messageAttachmentType(file: File): { extension: string; type: string } | null {
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
+  const type = MESSAGE_ATTACHMENT_FILE_TYPES[extension]
+  return type ? { extension, type } : null
+}
+
+function messageAttachmentError(file: File): string | null {
+  if (!messageAttachmentType(file)) return `${file.name} is not an accepted file type.`
+  if (file.size > MESSAGE_ATTACHMENT_MAX_BYTES) return `${file.name} is larger than 10 MB.`
+  if (!file.size) return `${file.name} is empty.`
+  return null
+}
+
+export function validateMessageAttachments(files: File[]): void {
+  if (files.length > MESSAGE_ATTACHMENT_LIMIT) throw new Error('Attach no more than 5 files to one message.')
+  for (const file of files) {
+    const error = messageAttachmentError(file)
+    if (error) throw new Error(error)
+  }
+}
+
+function messageAttachmentPath(bookingId: string, senderId: string, extension: string): string {
+  return `${bookingId}/${senderId}/${crypto.randomUUID()}.${extension}`
+}
+
+export async function sendMessage(
+  bookingId: string,
+  senderId: string,
+  body: string,
+  files: File[] = [],
+): Promise<void> {
+  const messageBody = body.trim()
+  if (!messageBody && !files.length) throw new Error('Write a message or attach at least one file.')
+  validateMessageAttachments(files)
+
   const supabase = createClient()
-  const { error } = await supabase
-    .from('messages')
-    .insert({ booking_id: bookingId, sender_id: senderId, body: body.trim() })
+  const attachments: MessageAttachment[] = []
+  const uploadedPaths: string[] = []
+
+  try {
+    for (const file of files) {
+      const attachmentType = messageAttachmentType(file)!
+      const path = messageAttachmentPath(bookingId, senderId, attachmentType.extension)
+      const { error } = await supabase.storage.from('message-attachments').upload(path, file, {
+        cacheControl: '3600',
+        contentType: attachmentType.type,
+        upsert: false,
+      })
+      if (error) throw error
+      uploadedPaths.push(path)
+      attachments.push({ path, name: file.name, type: attachmentType.type, size: file.size })
+    }
+
+    const { error } = await supabase
+      .from('messages')
+      .insert({ booking_id: bookingId, sender_id: senderId, body: messageBody || null, attachments })
+    if (error) throw error
+  } catch (error) {
+    if (uploadedPaths.length) await supabase.storage.from('message-attachments').remove(uploadedPaths)
+    throw error
+  }
+}
+
+export async function fetchMessageAttachmentUrl(path: string): Promise<string> {
+  const supabase = createClient()
+  const { data, error } = await supabase.storage.from('message-attachments').createSignedUrl(path, 300)
   if (error) throw error
+  return data.signedUrl
 }
 
 // Mark the other party's messages as read (caller is the reader).
