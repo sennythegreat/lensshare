@@ -41,7 +41,7 @@
 @media(max-width:700px){.verification-overview{padding:21px}.verification-overview-copy h2{font-size:24px}.verification-track>div,.verification-card-head{align-items:flex-start}.verification-card-head{flex-direction:column}.doc-slot-head{flex-direction:column}}
 
 /* ── Renter workspace: top headbar chrome, no sidebar (appended) ───────── */
-.owner-page.renter-page{display:block;overflow-x:hidden}
+.owner-page.renter-page{display:block;overflow-x:clip}
 .owner-page.renter-page .owner-main{width:100%;margin-left:0}
 /* ── Renter agreement, return confirmation, and reviews (appended) ────── */
 .renter-agreement-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
@@ -123,3 +123,12 @@
 .saver-terms li+li{margin-top:6px}
 @media(max-width:800px){.saver-purchase-grid{grid-template-columns:1fr}.saver-terms-grid{grid-template-columns:1fr 1fr}.saver-terms-grid div:nth-child(3){border-left:0;border-top:1px solid #e2e6e3}.saver-terms-grid div:nth-child(4){border-top:1px solid #e2e6e3}}
 @media(max-width:600px){.saver-hero{grid-template-columns:1fr;padding:24px}.saver-hero h2{font-size:27px}.saver-rate{align-items:flex-start}.saver-state-card{padding:18px}.saver-progress-labels{flex-direction:column;gap:5px}.saver-payment-form label{flex-direction:column;gap:4px}.saver-terms-grid{grid-template-columns:1fr}.saver-terms-grid div{border-left:0;border-top:1px solid #e2e6e3}.saver-terms-grid div:first-child{border-top:0}}
+
+/* Verification footnotes: aligned icon + text rows instead of loose notes */
+.verification-footnotes{list-style:none;margin:22px 0 0;padding:0;display:flex;flex-direction:column;gap:9px}
+.verification-footnotes li{display:flex;align-items:flex-start;gap:9px;font-size:11px;color:#71807a;line-height:1.5}
+.verification-footnotes li svg{flex:none;margin-top:1px;color:#8b968f}
+.verification-footnotes li span b{color:#5c6662;font-weight:700}
+
+/* Per-slot upload error: calm callout instead of raw server text */
+.doc-validation-error{display:flex;align-items:flex-start;gap:8px;background:#f9efed;border:1px solid #e6cdc7;color:#8c3d31!important;font-weight:400!important;padding:9px 11px;margin:10px 0 12px;font-size:11px;line-height:1.5}

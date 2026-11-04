@@ -105,6 +105,8 @@ export default function VerificationsPage() {
   const [notice, setNotice] = useState('')
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [viewing, setViewing] = useState<{ row: VerificationSubmissionWithUser; url: string } | null>(null)
+  const [reviewModal, setReviewModal] = useState<{ row: VerificationSubmissionWithUser; decision: 'approved' | 'rejected'; note: string; noteError?: string } | null>(null)
 
   function load() {
     return fetchVerificationQueue()
@@ -125,32 +127,32 @@ export default function VerificationsPage() {
     setError('')
     try {
       const url = await fetchSignedDocUrl(row.file_path)
-      window.open(url, '_blank', 'noopener,noreferrer')
+      setViewing({ row, url })
     } catch (viewError) {
       setError(viewError instanceof Error ? viewError.message : 'Could not open the document.')
     }
   }
 
-  async function review(row: VerificationSubmissionWithUser, decision: 'approved' | 'rejected') {
-    let note: string | null = null
-    if (decision === 'approved') {
-      const confirmed = window.confirm(`Approve this ${DOC_LABELS[row.doc_type]} only? The related check is complete only when both required documents are approved.`)
-      if (!confirmed) return
-    } else {
-      const response = window.prompt('Reason for rejection (shown to the renter):')
-      if (response === null) return
-      note = response.trim()
-      if (!note) {
-        setError('Add a rejection reason so the renter knows what to replace.')
-        return
-      }
+  function openReviewModal(row: VerificationSubmissionWithUser, decision: 'approved' | 'rejected') {
+    setError('')
+    setReviewModal({ row, decision, note: '' })
+  }
+
+  async function confirmReview() {
+    if (!reviewModal) return
+    const { row, decision, note } = reviewModal
+    const trimmed = note.trim()
+    if (decision === 'rejected' && !trimmed) {
+      setReviewModal({ ...reviewModal, noteError: 'Add a rejection reason so the renter knows what to replace.' })
+      return
     }
 
     setBusyKey(`review:${row.id}`)
     setError('')
     setNotice('')
     try {
-      await reviewVerificationSubmission(row.id, decision, note)
+      await reviewVerificationSubmission(row.id, decision, decision === 'rejected' ? trimmed : null)
+      setReviewModal(null)
       await load()
       setNotice(`${DOC_LABELS[row.doc_type]} ${decision}. The aggregate status was recalculated from both required documents.`)
     } catch (reviewError) {
@@ -225,8 +227,8 @@ export default function VerificationsPage() {
               {row && <ReviewBadge status={row.status} />}
               {row && <button className="owner-button" type="button" onClick={() => viewDoc(row)}><Eye size={13} /> View</button>}
               {row?.status === 'pending' && <>
-                <button className="owner-button dark" type="button" disabled={busyKey === reviewKey} onClick={() => review(row, 'approved')}>Approve document</button>
-                <button className="owner-button danger" type="button" disabled={busyKey === reviewKey} onClick={() => review(row, 'rejected')}>Reject</button>
+                <button className="owner-button dark" type="button" disabled={busyKey === reviewKey} onClick={() => openReviewModal(row, 'approved')}>Approve document</button>
+                <button className="owner-button danger" type="button" disabled={busyKey === reviewKey} onClick={() => openReviewModal(row, 'rejected')}>Reject</button>
               </>}
             </div>
           </div>
@@ -264,5 +266,63 @@ export default function VerificationsPage() {
         <button className="owner-button" type="button" onClick={() => viewDoc(row)}><Eye size={13} /> View document</button>
       </div>)}</div> : <EmptyState title="No decisions yet" hint="Reviewed documents will appear here." />}
     </PageCard>
+    {viewing && <div className="admin-doc-modal" role="dialog" aria-modal="true" aria-label={`${DOC_LABELS[viewing.row.doc_type]} document`} onClick={() => setViewing(null)}>
+      <div className="admin-doc-modal-panel" onClick={(clickEvent) => clickEvent.stopPropagation()}>
+        <header className="admin-doc-modal-head">
+          <div>
+            <h3>{DOC_LABELS[viewing.row.doc_type]}</h3>
+            <p>{viewing.row.user?.full_name || 'Unknown user'} · uploaded {dateLabel(viewing.row.created_at)}</p>
+          </div>
+          <div className="admin-doc-modal-actions">
+            <a className="owner-button" href={viewing.url} target="_blank" rel="noopener,noreferrer">Open in new tab</a>
+            <button className="owner-button dark" type="button" onClick={() => setViewing(null)}>Close</button>
+          </div>
+        </header>
+        <div className="admin-doc-modal-body">
+          {viewing.row.file_path.toLowerCase().endsWith('.pdf')
+            ? <iframe src={viewing.url} title={`${DOC_LABELS[viewing.row.doc_type]} document`} />
+            : <img src={viewing.url} alt={`${DOC_LABELS[viewing.row.doc_type]} from ${viewing.row.user?.full_name || 'user'}`} />}
+        </div>
+      </div>
+    </div>}
+    {reviewModal && <div className="admin-doc-modal" role="dialog" aria-modal="true" aria-label="Confirm document decision" onClick={() => setReviewModal(null)}>
+      <div className="admin-doc-modal-panel admin-review-modal-panel" onClick={(clickEvent) => clickEvent.stopPropagation()}>
+        <header className="admin-doc-modal-head">
+          <div>
+            <h3>{reviewModal.decision === 'approved' ? 'Approve document' : 'Reject document'}</h3>
+            <p>{DOC_LABELS[reviewModal.row.doc_type]} · {reviewModal.row.user?.full_name || 'Unknown user'}</p>
+          </div>
+        </header>
+        <div className="admin-review-modal-body">
+          {reviewModal.decision === 'approved'
+            ? <p>Approve this {DOC_LABELS[reviewModal.row.doc_type]} only? The related check is complete only when both required documents are approved.</p>
+            : <p>The renter will replace this document. Explain below what is wrong so they know what to upload.</p>}
+          {reviewModal.decision === 'rejected' && <>
+            <label className="admin-review-note-label" htmlFor="review-note">Reason for rejection (shown to the renter)</label>
+            <textarea
+              id="review-note"
+              className="admin-review-note"
+              rows={3}
+              value={reviewModal.note}
+              autoFocus
+              placeholder="e.g. The ID photo is blurry — retake it in good light."
+              onChange={(noteEvent) => setReviewModal({ ...reviewModal, note: noteEvent.target.value, noteError: undefined })}
+            />
+            {reviewModal.noteError && <p className="auth-error admin-review-note-error" role="alert">{reviewModal.noteError}</p>}
+          </>}
+        </div>
+        <footer className="admin-review-modal-foot">
+          <button className="owner-button" type="button" disabled={busyKey === `review:${reviewModal.row.id}`} onClick={() => setReviewModal(null)}>Cancel</button>
+          <button
+            className={`owner-button ${reviewModal.decision === 'approved' ? 'dark' : 'danger'}`}
+            type="button"
+            disabled={busyKey === `review:${reviewModal.row.id}`}
+            onClick={() => void confirmReview()}
+          >
+            {busyKey === `review:${reviewModal.row.id}` ? 'Saving…' : reviewModal.decision === 'approved' ? 'Approve document' : 'Reject document'}
+          </button>
+        </footer>
+      </div>
+    </div>}
   </AdminShell>
 }

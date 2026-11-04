@@ -18,7 +18,7 @@
 .admin-profile b{font-size:11px;color:#17201d}
 .admin-profile small{font-size:9px;color:#7d8a84}
 .admin-main{flex:1;min-width:0}
-.admin-topbar{height:60px;border-bottom:1px solid #e3e6e2;display:flex;align-items:center;gap:16px;padding:0 28px;background:#fff}
+.admin-topbar{position:sticky;top:0;z-index:40;height:60px;border-bottom:1px solid #e3e6e2;display:flex;align-items:center;gap:16px;padding:0 28px;background:#fff}
 .admin-tag{font:9px 'DM Mono',monospace;letter-spacing:.14em;color:#53605b;background:#e9efe9;border-radius:14px;padding:7px 10px;margin-left:auto}
 .admin-avatar{background:#07100e;color:#fff;border-radius:50%;display:grid;place-items:center;width:27px;height:27px;font-size:9px}
 .admin-menu{display:none;border:0;background:transparent}
@@ -353,3 +353,22 @@
   color: #8d9892; padding: 4px; display: flex; align-items: center;
 }
 .admin-search-clear:hover { color: #17201d; }
+
+/* Document viewer modal (verification queue) */
+.admin-doc-modal { position: fixed; inset: 0; z-index: 100; background: rgba(7, 16, 14, 0.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.admin-doc-modal-panel { background: #fbfbf9; border: 1px solid #e3e6e2; max-width: 860px; width: 100%; max-height: calc(100vh - 48px); display: flex; flex-direction: column; }
+.admin-doc-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px 18px; border-bottom: 1px solid #e3e6e2; }
+.admin-doc-modal-head h3 { font: 18px Georgia, serif; margin: 0 0 2px; color: #17201d; }
+.admin-doc-modal-head p { font-size: 11px; color: #69716e; margin: 0; }
+.admin-doc-modal-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.admin-doc-modal-body { overflow: auto; display: flex; justify-content: center; background: #07100e; padding: 12px; min-height: 200px; }
+.admin-doc-modal-body img { max-width: 100%; max-height: calc(100vh - 190px); object-fit: contain; }
+.admin-doc-modal-body iframe { width: 100%; height: calc(100vh - 190px); border: 0; background: #fff; }
+.admin-review-modal-panel { max-width: 480px; }
+.admin-review-modal-body { padding: 16px 18px; overflow: auto; }
+.admin-review-modal-body p { margin: 0 0 12px; font-size: 13px; color: #17201d; line-height: 1.5; }
+.admin-review-note-label { display: block; font: 9px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .08em; color: #7d8a84; margin-bottom: 6px; }
+.admin-review-note { width: 100%; box-sizing: border-box; border: 1px solid #cfd6d1; background: #fff; padding: 9px 10px; font: 13px/1.5 Arial, sans-serif; color: #17201d; resize: vertical; }
+.admin-review-note:focus { outline: 2px solid #2f6b5e; outline-offset: -1px; border-color: #2f6b5e; }
+.admin-review-note-error { margin: 8px 0 0; font-size: 12px; }
+.admin-review-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px; border-top: 1px solid #e3e6e2; }

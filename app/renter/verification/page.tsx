@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BadgeCheck, Camera, Check, CircleAlert, FileUp, GraduationCap, IdCard } from 'lucide-react'
 import { RenterHeadbar, Status } from '@/components/renter-headbar'
-import { fetchMySubmissions, replaceVerificationSubmission, validateVerificationDocument } from '@/lib/data'
+import { fetchMySubmissions, friendlyVerificationError, replaceVerificationSubmission, validateVerificationDocument } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import type { VerificationDocType, VerificationSubmission } from '@/lib/types'
 import '../renter.css'
@@ -168,7 +168,7 @@ export default function VerificationPage() {
     } catch (uploadError) {
       setFieldErrors((current) => ({
         ...current,
-        [docType]: uploadError instanceof Error ? uploadError.message : 'Upload failed. Please try again.',
+        [docType]: friendlyVerificationError(uploadError),
       }))
     } finally {
       setUploading(null)
@@ -225,9 +225,11 @@ export default function VerificationPage() {
         </div>
       </section>
     </div>
-    <p className="demo-note verification-file-rules"><FileUp size={12} /> Accepted files: JPG, PNG, WEBP, or PDF, up to 10 MB each.</p>
-    <p className="demo-note"><Camera size={12} /> Documents are stored privately and reviewed only by authorized LensShare admins. Replacing a document makes the new upload the latest version under review.</p>
-    <p className="demo-note"><BadgeCheck size={12} /> Approval is manual and per document. A check becomes complete only after both of its required documents are approved.</p>
-    {loaded && !submissions.length && <p className="demo-note">No submissions yet — start with your government ID and selfie.</p>}
+    <ul className="verification-footnotes" aria-label="How verification works">
+      <li><FileUp size={13} /> <span><b>Accepted files:</b> JPG, PNG, WEBP, or PDF, up to 10 MB each.</span></li>
+      <li><Camera size={13} /> <span>Documents are stored privately and reviewed only by authorized LensShare admins. Replacing a document makes the new upload the latest version under review.</span></li>
+      <li><BadgeCheck size={13} /> <span>Approval is manual and per document. A check becomes complete only after both of its required documents are approved.</span></li>
+      {loaded && !submissions.length && <li><CircleAlert size={13} /> <span>No submissions yet — start with your government ID and selfie.</span></li>}
+    </ul>
   </RenterHeadbar>
 }

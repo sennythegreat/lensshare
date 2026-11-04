@@ -109,3 +109,5 @@
 .browse-pass-note.applied{color:#315f57!important}
 .browse-pass-note.error{color:#945139!important}
 .browse-pass-note a{color:#315f57;font-weight:700;text-underline-offset:2px}
+/* Sticky top bars: nav + breadcrumb subnav stay pinned while scrolling */
+.site-headbar-stack{position:sticky;top:0;z-index:30}

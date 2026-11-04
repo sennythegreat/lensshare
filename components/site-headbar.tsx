@@ -67,7 +67,7 @@ export function SiteHeadbar({
 
   const showSubnav = Boolean(breadcrumb || subnavRight)
 
-  return <>
+  return <div className="site-headbar-stack">
     <header className={onSearchChange ? 'browse-nav' : 'browse-nav browse-nav-compact'}>
       <Link href="/" className="browse-brand"><span className="logo-mark"><img src="/lensshare-logo.png" alt="" /></span><strong>LensShare</strong></Link>
       <nav aria-label="Primary navigation">
@@ -87,5 +87,5 @@ export function SiteHeadbar({
           : <div className="account"><span>{initials}</span><div>Guest<small>{subtitle}</small></div></div>}
     </header>
     {showSubnav && <div className="browse-subnav"><span>Home / Bicol Hub Network / Naga City Region / <b>{breadcrumb ?? 'LensShare'}</b></span>{subnavRight && <span>{subnavRight}</span>}</div>}
-  </>
+  </div>
 }

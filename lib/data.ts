@@ -429,7 +429,16 @@ function unwrapRpcRows(value: unknown, key?: string): unknown[] {
 async function callRpc(name: string, args: UnknownRow = {}): Promise<unknown> {
   const supabase = createClient()
   const { data, error } = await supabase.rpc(name, args)
-  if (error) throw error
+  if (error) {
+    // PostgREST errors are plain objects, not Error instances — rethrow as a
+    // real Error so `instanceof Error` checks in pages surface the message
+    // instead of a generic fallback.
+    const detail = error as { message?: string; code?: string; details?: string }
+    const parts = [detail.message || `Could not call ${name}.`]
+    if (detail.code) parts.unshift(`${detail.code}:`)
+    if (detail.details) parts.push(`(${detail.details})`)
+    throw new Error(parts.join(' '))
+  }
   return data
 }
 
@@ -1642,6 +1651,25 @@ export function validateVerificationDocument(file: File): void {
   if (!VERIFICATION_DOCUMENT_TYPES.has(file.type)) throw new Error(`${file.name} is not a JPG, PNG, WebP, or PDF file.`)
   if (!file.size) throw new Error(`${file.name} is empty.`)
   if (file.size > VERIFICATION_DOCUMENT_MAX_BYTES) throw new Error(`${file.name} is larger than 10 MB.`)
+}
+
+// Raw PostgREST/storage errors (RLS denials, missing RPCs) read like server
+// log lines; translate the known ones into guidance a renter can act on.
+export function friendlyVerificationError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  if (/row-level security/i.test(message)) {
+    return 'The upload was blocked by the server. Double-check that you are signed in, then try again — if it keeps failing, the verification storage rules need an admin to update them.'
+  }
+  if (/could not find the function|PGRST202/i.test(message)) {
+    return 'The submission service is not set up yet. Your file did not go through — please let the LensShare team know so they can finish the backend setup.'
+  }
+  if (/was not found/i.test(message)) {
+    return 'The uploaded file could not be confirmed on the server. Please try uploading again.'
+  }
+  if (/already has a latest submission|23505/i.test(message)) {
+    return 'This document already has a version under review. Replace the latest file instead.'
+  }
+  return message || 'Upload failed. Please try again.'
 }
 
 export async function replaceVerificationSubmission(
