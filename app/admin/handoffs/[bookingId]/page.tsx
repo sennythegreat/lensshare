@@ -1,0 +1,389 @@
+'use client'
+
+import Link from 'next/link'
+import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Camera,
+  Check,
+  CheckCircle2,
+  CircleAlert,
+  Clock3,
+  ExternalLink,
+  FileSignature,
+  LockKeyhole,
+  PackageCheck,
+  RefreshCw,
+  ShieldAlert,
+  Upload,
+  X,
+} from 'lucide-react'
+import { AdminShell } from '@/components/admin-shell'
+import { ErrorState } from '@/components/states'
+import {
+  fetchAdminHubHandoffDetail,
+  fetchSignedAdminHubFileUrl,
+  reviewAdminHubDepositProof,
+  saveAdminHubInspection,
+  setAdminHubIssueHold,
+  subscribeToAdminHubHandoffs,
+  transitionAdminHubCustody,
+} from '@/lib/data'
+import {
+  pesos,
+  type HubHandoffDetail,
+  type HubInspection,
+  type HubInspectionStage,
+  type HubPhysicalAction,
+} from '@/lib/types'
+
+const CUSTODY_STEPS: { value: HubHandoffDetail['custody_state']; label: string }[] = [
+  { value: 'awaiting_owner_dropoff', label: 'Owner drop-off' },
+  { value: 'at_hub_for_pickup', label: 'Hub intake' },
+  { value: 'with_renter', label: 'With renter' },
+  { value: 'at_hub_for_return', label: 'Return intake' },
+  { value: 'completed', label: 'Owner release' },
+]
+
+const ACTIONS: Record<HubPhysicalAction, { label: string; detail: string; confirm: string }> = {
+  receive_from_owner: {
+    label: 'Receive gear from owner',
+    detail: 'Record that staff physically took this unit into Naga Hub custody.',
+    confirm: 'Is the gear physically in front of you and now in Naga Hub custody?',
+  },
+  release_to_renter: {
+    label: 'Release gear to renter',
+    detail: 'Record that staff physically handed this unit to the named renter.',
+    confirm: 'Is the named renter physically receiving this gear now?',
+  },
+  receive_from_renter: {
+    label: 'Receive return from renter',
+    detail: 'Record that the renter physically returned this unit to Naga Hub.',
+    confirm: 'Is the returned gear physically in front of you and now back in Naga Hub custody?',
+  },
+  release_to_owner: {
+    label: 'Release gear to owner',
+    detail: 'Record that staff physically returned this unit to the named owner.',
+    confirm: 'Is the named owner physically receiving this gear now?',
+  },
+}
+
+const INSPECTION_CHECKS: Record<HubInspectionStage, { key: string; label: string }[]> = {
+  pre_release: [
+    { key: 'identity_match', label: 'Body, model, and mount match the booking' },
+    { key: 'power_on', label: 'Power-on and core controls tested' },
+    { key: 'optical_condition', label: 'Sensor, glass, and mount condition inspected' },
+    { key: 'accessories_counted', label: 'Battery, charger, and listed accessories counted' },
+  ],
+  post_return: [
+    { key: 'serial_match', label: 'Serial matches the pre-release record' },
+    { key: 'power_on', label: 'Power-on and core controls tested after return' },
+    { key: 'no_new_damage', label: 'New damage or wear is fully recorded in notes' },
+    { key: 'accessories_returned', label: 'All listed accessories accounted for' },
+  ],
+}
+
+const DEPOSIT_LABELS: Record<HubHandoffDetail['deposit_status'], string> = {
+  not_submitted: 'Not submitted',
+  pending_review: 'Pending manual proof review',
+  accepted: 'Proof accepted by staff',
+  rejected: 'Proof rejected',
+  waived: 'Waived for this booking',
+}
+
+function shortId(id: string) {
+  return `#${id.slice(0, 8).toUpperCase()}`
+}
+
+function dateTimeLabel(value: string | null | undefined) {
+  if (!value) return 'Not recorded'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Not recorded'
+  return `${date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })} · ${date.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}`
+}
+
+function dateLabel(value: string) {
+  const date = new Date(`${value}T00:00:00`)
+  return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+export default function AdminHubHandoffDetailPage() {
+  const params = useParams<{ bookingId: string }>()
+  const bookingId = params.bookingId
+  const [detail, setDetail] = useState<HubHandoffDetail | null>(null)
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [busy, setBusy] = useState<string | null>(null)
+  const [proofViewed, setProofViewed] = useState(false)
+  const [proofNote, setProofNote] = useState('')
+  const [holdReason, setHoldReason] = useState('')
+
+  const load = useCallback(async (quiet = false) => {
+    if (!bookingId) return
+    if (!quiet) setState('loading')
+    setError('')
+    try {
+      const next = await fetchAdminHubHandoffDetail(bookingId)
+      setDetail(next)
+      setHoldReason(next.issue_hold_reason ?? '')
+      setState('ready')
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Could not load this hand-off desk.')
+      if (!quiet) setState('error')
+    }
+  }, [bookingId])
+
+  useEffect(() => { void load() }, [bookingId])
+  useEffect(() => subscribeToAdminHubHandoffs(() => void load(true)), [load])
+
+  const booking = detail?.booking
+  const currentCustodyIndex = detail ? CUSTODY_STEPS.findIndex((step) => step.value === detail.custody_state) : -1
+  const preInspection = detail?.inspections.find((inspection) => inspection.stage === 'pre_release')
+  const postInspection = detail?.inspections.find((inspection) => inspection.stage === 'post_return')
+
+  async function openPrivateFile(path: string, label: string, markViewed = false) {
+    setError('')
+    const fileWindow = window.open('', '_blank')
+    if (!fileWindow) {
+      setError(`The ${label.toLowerCase()} could not open. Allow pop-ups for LensShare, then try again.`)
+      return
+    }
+    fileWindow.opener = null
+    try {
+      fileWindow.location.href = await fetchSignedAdminHubFileUrl(path)
+      if (markViewed) setProofViewed(true)
+    } catch (fileError) {
+      fileWindow.close()
+      setError(fileError instanceof Error ? fileError.message : `Could not open the ${label.toLowerCase()}.`)
+    }
+  }
+
+  async function reviewDeposit(decision: 'accepted' | 'rejected') {
+    if (!detail) return
+    if (!detail.deposit?.proof_path) {
+      setError('No deposit proof is attached to this booking.')
+      return
+    }
+    if (!proofViewed) {
+      setError('Open the receipt before recording a manual proof-review decision.')
+      return
+    }
+    if (decision === 'rejected' && !proofNote.trim()) {
+      setError('Enter a rejection reason that staff can use to resolve the proof issue.')
+      return
+    }
+    if (decision === 'accepted' && !window.confirm('Record that this receipt image passed the manual visual check? This does not confirm the GCash provider transaction and is not escrow.')) return
+
+    setBusy(`deposit-${decision}`)
+    setError('')
+    setNotice('')
+    try {
+      await reviewAdminHubDepositProof(detail.booking_id, decision, proofNote.trim() || null)
+      setNotice(decision === 'accepted' ? 'Manual proof review recorded.' : 'Proof rejection and review note recorded.')
+      setProofNote('')
+      await load(true)
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : 'Could not save the proof review.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function saveHold() {
+    if (!detail) return
+    const reason = holdReason.trim()
+    if (!reason) {
+      setError('Describe the issue before placing this exchange on hold.')
+      return
+    }
+    setBusy('hold')
+    setError('')
+    setNotice('')
+    try {
+      await setAdminHubIssueHold(detail.booking_id, reason)
+      setNotice('Issue hold placed. Physical transitions remain blocked until it is cleared.')
+      await load(true)
+    } catch (holdError) {
+      setError(holdError instanceof Error ? holdError.message : 'Could not place the issue hold.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function clearHold() {
+    if (!detail || !window.confirm('Clear this issue hold? Only continue if the recorded issue is resolved.')) return
+    setBusy('hold')
+    setError('')
+    setNotice('')
+    try {
+      await setAdminHubIssueHold(detail.booking_id, null)
+      setHoldReason('')
+      setNotice('Issue hold cleared.')
+      await load(true)
+    } catch (holdError) {
+      setError(holdError instanceof Error ? holdError.message : 'Could not clear the issue hold.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function transition(action: HubPhysicalAction) {
+    if (!detail || !window.confirm(ACTIONS[action].confirm)) return
+    setBusy(action)
+    setError('')
+    setNotice('')
+    try {
+      await transitionAdminHubCustody(detail.booking_id, action)
+      setNotice(`${ACTIONS[action].label} recorded in the custody timeline.`)
+      await load(true)
+    } catch (transitionError) {
+      setError(transitionError instanceof Error ? transitionError.message : 'Could not record the physical custody transition.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function inspectionSaved() {
+    setNotice('Inspection saved to the hand-off record.')
+    await load(true)
+  }
+
+  if (state === 'loading') return <AdminShell title="Hand-off desk" subtitle="Loading the physical custody record for this booking."><DetailSkeleton /></AdminShell>
+  if (state === 'error' || !detail || !booking) return <AdminShell title="Hand-off desk" subtitle="Review a Naga Hub booking exchange."><div className="admin-handoff-state"><ErrorState title="Hand-off record unavailable" hint={error || 'This booking does not have a hub exchange record, or it could not be loaded.'} retry={() => void load()} /></div></AdminShell>
+
+  return <AdminShell title={booking.listing?.name || 'Hub hand-off'} subtitle={`${shortId(booking.id)} · ${booking.owner?.full_name || 'Owner'} to ${booking.renter?.full_name || 'Renter'}`}>
+    <div className="admin-handoff-detail-nav"><Link href="/admin/handoffs"><ArrowLeft size={13} /> Back to live queue</Link><button className="owner-button" type="button" onClick={() => void load()}><RefreshCw size={13} /> Refresh record</button></div>
+    {error && <div className="admin-handoff-alert error" role="alert">{error}</div>}
+    {notice && <div className="admin-handoff-alert success" role="status">{notice}</div>}
+
+    <section className="admin-handoff-hero">
+      <img src={booking.listing?.image_url || '/lensshare-camera.png'} alt="" />
+      <div className="admin-handoff-hero-copy"><div><span className={`admin-handoff-badge ${detail.queue_bucket}`}>{detail.queue_bucket.replaceAll('_', ' ')}</span><span className="admin-handoff-ref">{shortId(booking.id)}</span></div><h2>{booking.listing?.name || 'Removed listing'}</h2><p>{booking.listing?.brand || 'Gear'} · {dateLabel(booking.start_date)} to {dateLabel(booking.end_date)} · {booking.days} {booking.days === 1 ? 'day' : 'days'}</p></div>
+      <dl><div><dt>Owner</dt><dd>{booking.owner?.full_name || 'Not available'}</dd></div><div><dt>Renter</dt><dd>{booking.renter?.full_name || 'Not available'}</dd></div><div><dt>Renter total</dt><dd>{pesos(Number(booking.total))}</dd></div><div><dt>Assigned admin</dt><dd>{detail.assigned_admin?.full_name || 'Unassigned'}</dd></div></dl>
+    </section>
+
+    <section className="admin-handoff-custody" aria-labelledby="custody-heading">
+      <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">PHYSICAL CUSTODY</span><h2 id="custody-heading">Where the gear is now</h2></div><span className="admin-handoff-live"><span aria-hidden="true" /> Live record</span></div>
+      <ol>{CUSTODY_STEPS.map((step, index) => <li className={`${index < currentCustodyIndex ? 'done' : ''} ${index === currentCustodyIndex ? 'current' : ''}`} key={step.value}><span>{index < currentCustodyIndex ? <Check size={13} /> : index + 1}</span><b>{step.label}</b></li>)}</ol>
+    </section>
+
+    <div className="admin-handoff-detail-grid">
+      <div className="admin-handoff-detail-primary">
+        <section className="admin-handoff-panel" aria-labelledby="deposit-heading">
+          <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">₱2,000 HUB DEPOSIT</span><h2 id="deposit-heading">Deposit proof review</h2></div><span className={`admin-handoff-badge deposit-${detail.deposit_status}`}>{DEPOSIT_LABELS[detail.deposit_status]}</span></div>
+          <div className="admin-handoff-proof-warning" role="note"><ShieldAlert size={18} /><p><strong>Manual visual review only.</strong> Accepting a receipt checks the submitted image against the configured LensShare GCash details. It does not confirm the GCash provider transaction, place funds in LensShare custody, or create escrow.</p></div>
+          {detail.deposit_status === 'waived' ? <div className="admin-handoff-inline-state"><CheckCircle2 size={18} /><div><b>Deposit waived for this booking</b><p>No receipt review is required. Continue only when all other hand-off blockers are clear.</p></div></div>
+            : detail.deposit ? <>
+              <dl className="admin-handoff-facts"><div><dt>Required amount</dt><dd>{pesos(Number(detail.deposit.amount || 2000))}</dd></div><div><dt>GCash reference</dt><dd>{detail.deposit.reference || 'Not supplied'}</dd></div><div><dt>Submitted</dt><dd>{dateTimeLabel(detail.deposit.submitted_at)}</dd></div><div><dt>Reviewed</dt><dd>{dateTimeLabel(detail.deposit.reviewed_at)}</dd></div></dl>
+              {detail.deposit.review_note && <p className="admin-handoff-review-note"><b>Review note:</b> {detail.deposit.review_note}</p>}
+              {detail.deposit.proof_path ? <div className="admin-handoff-proof-actions"><button className="owner-button" type="button" onClick={() => void openPrivateFile(detail.deposit!.proof_path!, 'Deposit receipt', true)}>View private receipt <ExternalLink size={12} /></button><span>{proofViewed ? 'Opened in this session' : 'Open before deciding'}</span></div> : <div className="admin-handoff-inline-state muted"><CircleAlert size={18} /><div><b>No receipt attached</b><p>A proof-review decision cannot be recorded until a receipt is submitted.</p></div></div>}
+              {detail.deposit.status === 'pending_review' && <div className="admin-handoff-review-form"><label htmlFor="deposit-review-note">Reviewer note <span>{proofNote.length}/500</span></label><textarea id="deposit-review-note" maxLength={500} value={proofNote} onChange={(event) => setProofNote(event.target.value)} placeholder="Required for rejection; optional internal context for acceptance." /><div><button className="owner-button dark" type="button" disabled={!proofViewed || Boolean(busy)} onClick={() => void reviewDeposit('accepted')}>{busy === 'deposit-accepted' ? 'Saving…' : 'Accept proof check'}</button><button className="owner-button" type="button" disabled={!proofViewed || Boolean(busy)} onClick={() => void reviewDeposit('rejected')}>{busy === 'deposit-rejected' ? 'Saving…' : 'Reject proof'}</button></div></div>}
+            </> : <div className="admin-handoff-inline-state muted"><CircleAlert size={18} /><div><b>Deposit not submitted</b><p>The renter’s proof and GCash reference will appear here after submission.</p></div></div>}
+        </section>
+
+        <section className="admin-handoff-panel" aria-labelledby="agreement-heading">
+          <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">PARTICIPANT AGREEMENT</span><h2 id="agreement-heading">Rental agreement</h2></div><Link className="owner-button" href={`/agreement?id=${booking.id}`} target="_blank">Open agreement <ExternalLink size={12} /></Link></div>
+          <div className="admin-handoff-signatures"><Signature name={booking.owner?.full_name || 'Owner'} party="Owner" signedAt={detail.agreement.owner_signed_at} /><Signature name={booking.renter?.full_name || 'Renter'} party="Renter" signedAt={detail.agreement.renter_signed_at} /></div>
+        </section>
+
+        <InspectionForm bookingId={booking.id} stage="pre_release" inspection={preInspection} onOpenPhoto={openPrivateFile} onSaved={inspectionSaved} />
+        <InspectionForm bookingId={booking.id} stage="post_return" inspection={postInspection} onOpenPhoto={openPrivateFile} onSaved={inspectionSaved} />
+      </div>
+
+      <aside className="admin-handoff-detail-side">
+        <section className="admin-handoff-panel" aria-labelledby="confirmation-heading">
+          <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">PARTICIPANTS</span><h2 id="confirmation-heading">Confirmations</h2></div></div>
+          <div className="admin-handoff-confirmations">{(['pickup', 'return'] as const).map((stage) => <div key={stage}><h3>{stage === 'pickup' ? 'Pickup' : 'Return'}</h3>{(['owner', 'renter'] as const).map((party) => {
+            const confirmation = detail.participant_confirmations.find((row) => row.stage === stage && row.party === party)
+            return <div className={`admin-handoff-confirmation ${confirmation?.blocker_reason ? 'blocked' : confirmation?.confirmed_at ? 'confirmed' : ''}`} key={party}><span>{confirmation?.blocker_reason ? <CircleAlert size={14} /> : confirmation?.confirmed_at ? <CheckCircle2 size={14} /> : <Clock3 size={14} />}</span><div><b>{party}</b><p>{confirmation?.blocker_reason || (confirmation?.confirmed_at ? `Confirmed ${dateTimeLabel(confirmation.confirmed_at)}` : 'Waiting for participant')}</p></div></div>
+          })}</div>)}</div>
+        </section>
+
+        <section className="admin-handoff-panel" aria-labelledby="blocker-heading">
+          <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">SAFETY GATE</span><h2 id="blocker-heading">Blockers & issue hold</h2></div></div>
+          {detail.blockers.length ? <ul className="admin-handoff-blockers">{detail.blockers.map((blocker) => <li key={blocker}><X size={13} /> {blocker}</li>)}</ul> : <div className="admin-handoff-clear"><CheckCircle2 size={17} /> No system blockers</div>}
+          <label className="admin-handoff-hold-field" htmlFor="issue-hold-reason"><span>Hub issue note</span><textarea id="issue-hold-reason" value={holdReason} maxLength={800} onChange={(event) => setHoldReason(event.target.value)} placeholder="Describe damage, identity mismatch, missing accessories, or another reason to stop the exchange." /></label>
+          {detail.issue_hold_reason ? <button className="owner-button" type="button" disabled={Boolean(busy)} onClick={() => void clearHold()}>{busy === 'hold' ? 'Clearing…' : 'Clear resolved hold'}</button> : <button className="owner-button" type="button" disabled={Boolean(busy) || !holdReason.trim()} onClick={() => void saveHold()}>{busy === 'hold' ? 'Placing hold…' : 'Place issue hold'}</button>}
+        </section>
+
+        <section className="admin-handoff-panel admin-handoff-transition-panel" aria-labelledby="transition-heading">
+          <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">STAFF WITNESS</span><h2 id="transition-heading">Physical transition</h2></div><LockKeyhole size={17} /></div>
+          <p className="admin-handoff-panel-intro">Use these controls only while witnessing the physical exchange. They record custody; they do not confirm payment or escrow.</p>
+          {detail.allowed_transitions.length ? detail.allowed_transitions.map((action) => <div className="admin-handoff-transition" key={action}><PackageCheck size={18} /><div><b>{ACTIONS[action].label}</b><p>{ACTIONS[action].detail}</p><button className="owner-button dark" type="button" disabled={Boolean(busy) || detail.blockers.length > 0} onClick={() => void transition(action)}>{busy === action ? 'Recording…' : ACTIONS[action].label} <ArrowRight size={12} /></button></div></div>) : <div className="admin-handoff-inline-state muted"><Clock3 size={18} /><div><b>No transition available</b><p>Complete the required records or wait for the next physical exchange.</p></div></div>}
+        </section>
+
+        <section className="admin-handoff-panel" aria-labelledby="timeline-heading">
+          <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">AUDIT TRAIL</span><h2 id="timeline-heading">Custody timeline</h2></div></div>
+          {detail.timeline.length ? <ol className="admin-handoff-timeline">{detail.timeline.map((event) => <li key={event.id}><span /><div><b>{event.label}</b><p>{event.detail}</p><small>{dateTimeLabel(event.occurred_at)}{event.actor ? ` · ${event.actor.full_name}` : ''}</small></div></li>)}</ol> : <div className="admin-handoff-inline-state muted"><Clock3 size={18} /><div><b>No custody events yet</b><p>The first witnessed physical transition will start this timeline.</p></div></div>}
+        </section>
+      </aside>
+    </div>
+  </AdminShell>
+}
+
+function Signature({ name, party, signedAt }: { name: string; party: string; signedAt: string | null }) {
+  return <div className={signedAt ? 'signed' : ''}><span>{signedAt ? <CheckCircle2 size={16} /> : <FileSignature size={16} />}</span><div><small>{party}</small><b>{name}</b><p>{signedAt ? `Signed ${dateTimeLabel(signedAt)}` : 'Signature still required'}</p></div></div>
+}
+
+function InspectionForm({ bookingId, stage, inspection, onOpenPhoto, onSaved }: {
+  bookingId: string
+  stage: HubInspectionStage
+  inspection?: HubInspection
+  onOpenPhoto: (path: string, label: string) => Promise<void>
+  onSaved: () => Promise<void>
+}) {
+  const [serial, setSerial] = useState(inspection?.serial_number ?? '')
+  const [notes, setNotes] = useState(inspection?.notes ?? '')
+  const [checks, setChecks] = useState<Record<string, boolean>>(inspection?.checks ?? {})
+  const [files, setFiles] = useState<File[]>([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const checksForStage = INSPECTION_CHECKS[stage]
+  const title = stage === 'pre_release' ? 'Pre-release inspection' : 'Post-return inspection'
+  const eyebrow = stage === 'pre_release' ? 'BEFORE RENTER RELEASE' : 'AFTER RENTER RETURN'
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const missingCheck = checksForStage.some((check) => !checks[check.key])
+    if (!serial.trim() || !notes.trim() || missingCheck || (!inspection?.photo_paths.length && !files.length)) {
+      setError('Serial, condition notes, every check, and at least one inspection photo are required.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await saveAdminHubInspection(bookingId, {
+        stage,
+        serial_number: serial.trim(),
+        notes: notes.trim(),
+        checks,
+      }, files)
+      setFiles([])
+      await onSaved()
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Could not save this inspection.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <section className="admin-handoff-panel" aria-labelledby={`${stage}-heading`}>
+    <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">{eyebrow}</span><h2 id={`${stage}-heading`}>{title}</h2></div>{inspection && <span className="admin-handoff-badge complete">Saved {dateTimeLabel(inspection.submitted_at)}</span>}</div>
+    <form className="admin-handoff-inspection" onSubmit={submit}>
+      <label><span>Equipment serial number <b>Required</b></span><input required value={serial} maxLength={120} onChange={(event) => setSerial(event.target.value)} placeholder="Enter the serial printed on the unit" /></label>
+      <fieldset><legend>Required physical checks</legend>{checksForStage.map((check) => <label className="admin-handoff-check" key={check.key}><input type="checkbox" checked={Boolean(checks[check.key])} onChange={(event) => setChecks((current) => ({ ...current, [check.key]: event.target.checked }))} /><span><Check size={12} />{check.label}</span></label>)}</fieldset>
+      <label><span>Condition notes <b>Required</b></span><textarea required maxLength={1500} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder={stage === 'pre_release' ? 'Record existing marks, optical condition, battery count, and accessories.' : 'Compare against pre-release condition; record wear, damage, missing items, or “no change.”'} /></label>
+      {inspection?.photo_paths.length ? <div className="admin-handoff-existing-photos"><span>Saved inspection photos</span><div>{inspection.photo_paths.map((path, index) => <button className="owner-button" type="button" key={path} onClick={() => void onOpenPhoto(path, `Inspection photo ${index + 1}`)}><Camera size={12} /> Photo {index + 1} <ExternalLink size={11} /></button>)}</div></div> : null}
+      <label className="admin-handoff-upload"><Upload size={18} /><span>{files.length ? `${files.length} new photo${files.length === 1 ? '' : 's'} selected` : inspection?.photo_paths.length ? 'Add more inspection photos' : 'Upload at least one inspection photo'}<small>JPG, PNG, HEIC, or WEBP · clear serial and condition evidence</small></span><input type="file" accept="image/jpeg,image/png,image/heic,image/webp" multiple required={!inspection?.photo_paths.length} onChange={(event) => setFiles(Array.from(event.target.files ?? []))} /></label>
+      {error && <p className="admin-handoff-form-error" role="alert">{error}</p>}
+      <button className="owner-button dark" type="submit" disabled={busy}>{busy ? 'Saving inspection…' : inspection ? 'Update inspection' : 'Save inspection'}</button>
+    </form>
+  </section>
+}
+
+function DetailSkeleton() {
+  return <div className="admin-handoff-detail-skeleton" aria-label="Loading hand-off record" aria-busy="true"><div className="skeleton" /><div><i className="skeleton" /><i className="skeleton" /><i className="skeleton" /></div></div>
+}

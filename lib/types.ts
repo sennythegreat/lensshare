@@ -149,6 +149,366 @@ export type BookingWithRelations = Booking & {
   owner: Pick<Profile, 'id' | 'full_name'> | null
 }
 
+// ---------- Versioned Naga Hub rental workflow ----------
+
+/**
+ * Version 1 bookings keep the original direct hand-off flow. Version 2 bookings
+ * use the guarded Naga Hub custody workflow and immutable approval snapshot.
+ */
+export type RentalWorkflowVersion = 1 | 2
+export type RentalHubParty = 'owner' | 'renter'
+export type RentalInspectionKind = 'pre_rental' | 'post_rental'
+export type HubInspectionStage = 'pre_release' | 'post_return'
+
+export type RentalCustodyState =
+  | 'with_owner'
+  | 'at_hub_pre_rental'
+  | 'with_renter'
+  | 'at_hub_post_rental'
+  | 'issue_hold'
+  | 'returned_to_owner'
+
+/** Admin-facing names for the same five non-hold custody milestones. */
+export type HubCustodyState =
+  | 'awaiting_owner_dropoff'
+  | 'at_hub_for_pickup'
+  | 'with_renter'
+  | 'at_hub_for_return'
+  | 'completed'
+
+export type RentalDepositStatus =
+  | 'proof_required'
+  | 'pending_review'
+  | 'accepted'
+  | 'rejected'
+  | 'waived'
+  | 'refund_pending'
+  | 'refunded'
+  | 'retained'
+
+export type HubDepositStatus = 'not_submitted' | 'pending_review' | 'accepted' | 'rejected' | 'waived'
+export type RentalAgreementStatus = 'awaiting_signatures' | 'partially_signed' | 'signed'
+export type RentalInspectionStatus = 'draft' | 'finalized'
+export type RentalInspectionResult = 'pass' | 'issue'
+export type RentalConfirmationKind =
+  | 'owner_dropoff'
+  | 'pre_inspection'
+  | 'renter_pickup'
+  | 'renter_return'
+  | 'post_inspection'
+  | 'owner_collection'
+
+export type HubPhysicalAction = 'receive_from_owner' | 'release_to_renter' | 'receive_from_renter' | 'release_to_owner'
+export type HubQueueBucket = 'pickup_due' | 'return_due' | 'issue_hold' | 'completed'
+
+export type HubSettingsInput = {
+  exact_address: string
+  location_notes: string
+  operating_hours: string
+  gcash_account_name: string
+  gcash_mobile_number: string
+  deposit_amount: number
+  deposit_policy: string
+}
+
+export type HubSettings = HubSettingsInput & {
+  id: string
+  name: string
+  contact_phone: string | null
+  active: boolean
+  created_at: string
+  updated_at: string
+  updated_by: string | null
+}
+
+/** The participant-safe, approved-booking view of centralized hub settings. */
+export type RentalHubConfig = {
+  id: string
+  version: number
+  name: string
+  address: string | null
+  location_notes: string | null
+  hours: string | null
+  contact_phone: string | null
+  gcash_recipient_name: string | null
+  gcash_recipient_number: string | null
+  deposit_amount: number
+  deposit_policy: string | null
+  active: boolean
+  updated_at: string | null
+}
+
+/** Private owner/admin listing metadata. It must never be selected in public listing queries. */
+export type ListingAsset = {
+  listing_id: string
+  owner_id: string
+  serial_number: string
+  created_at: string
+  updated_at: string
+}
+
+export type RentalOperation = {
+  booking_id: string
+  workflow_version: RentalWorkflowVersion
+  hub_config_id: string | null
+  custody_state: RentalCustodyState
+  assigned_operator_id: string | null
+  assigned_operator_name: string | null
+  issue_hold_reason: string | null
+  owner_dropoff_at: string | null
+  renter_pickup_at: string | null
+  renter_return_at: string | null
+  owner_collection_at: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+/** Saver Pass is rental-price support only; it never pays or waives a deposit. */
+export type RentalSaverPassDisplay = {
+  applied: boolean
+  pass_id: string | null
+  label: string
+  discount_amount: number
+  funded_by: 'lensshare' | null
+}
+
+/** Waiver display is independent of Saver Pass and is frozen per approved booking. */
+export type RentalDepositWaiverDisplay = {
+  waived: boolean
+  reason: string | null
+  basis: 'verified_student' | 'admin_override' | null
+  determined_at: string | null
+}
+
+export type RentalDeposit = {
+  id: string
+  booking_id: string
+  amount: number
+  currency: 'PHP'
+  status: RentalDepositStatus
+  waived: boolean
+  waiver_reason: string | null
+  waiver_basis: RentalDepositWaiverDisplay['basis']
+  gcash_reference: string | null
+  proof_path: string | null
+  submitted_at: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  review_note: string | null
+  refund_reference: string | null
+  refunded_at: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export type RentalAgreementEquipmentSnapshot = {
+  listing_id: string
+  name: string
+  brand: string | null
+  category: string | null
+  serial_number: string | null
+  included: string | null
+}
+
+export type RentalAgreementSnapshot = {
+  schema_version: number
+  equipment: RentalAgreementEquipmentSnapshot
+  hub: {
+    config_id: string | null
+    name: string
+    address: string | null
+    hours: string | null
+  }
+  pricing: {
+    daily_rate: number
+    days: number
+    subtotal: number
+    discount_amount: number
+    total: number
+    currency: 'PHP'
+    saver_pass: RentalSaverPassDisplay
+  }
+  deposit: {
+    amount: number
+    currency: 'PHP'
+    waived: boolean
+    waiver_reason: string | null
+    waiver_basis: RentalDepositWaiverDisplay['basis']
+  }
+  start_date: string
+  end_date: string
+  approved_at: string | null
+}
+
+export type RentalAgreement = {
+  id: string
+  booking_id: string
+  version: number
+  status: RentalAgreementStatus
+  snapshot: RentalAgreementSnapshot
+  terms_hash: string
+  owner_signed_at: string | null
+  renter_signed_at: string | null
+  owner_signature_hash: string | null
+  renter_signature_hash: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type RentalInspectionPhotoKind = 'overall' | 'serial' | 'accessories' | 'damage' | 'other'
+export type RentalInspectionPhoto = {
+  id: string
+  inspection_id: string
+  path: string
+  kind: RentalInspectionPhotoKind
+  caption: string | null
+  sort_order: number
+  created_at: string
+}
+
+export type RentalInspection = {
+  id: string
+  booking_id: string
+  kind: RentalInspectionKind
+  status: RentalInspectionStatus
+  result: RentalInspectionResult | null
+  serial_number: string | null
+  checklist: Record<string, boolean>
+  condition_notes: string | null
+  issue_notes: string | null
+  photos: RentalInspectionPhoto[]
+  performed_by: string | null
+  finalized_by: string | null
+  finalized_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type RentalConfirmation = {
+  id: string
+  booking_id: string
+  party: RentalHubParty
+  kind: RentalConfirmationKind
+  confirmed_by: string
+  confirmed_at: string
+  created_at: string
+}
+
+export type RentalHubEvent = {
+  id: string
+  booking_id: string
+  event_type: string
+  summary: string | null
+  details: string | null
+  metadata: Record<string, unknown>
+  actor_id: string | null
+  actor_name: string | null
+  created_at: string
+}
+
+export type RentalWorkflowBlocker = {
+  code: string
+  action: RentalConfirmationKind | HubPhysicalAction | string
+  message: string
+  party: RentalHubParty | 'operator' | null
+}
+
+export type RentalHubData = {
+  booking: BookingWithRelations
+  hub: RentalHubConfig | null
+  operation: RentalOperation | null
+  saver_pass: RentalSaverPassDisplay
+  deposit_waiver: RentalDepositWaiverDisplay
+  deposit: RentalDeposit | null
+  agreement: RentalAgreement | null
+  inspections: RentalInspection[]
+  confirmations: RentalConfirmation[]
+  blockers: RentalWorkflowBlocker[]
+  events: RentalHubEvent[]
+  allowed_confirmation_kinds: RentalConfirmationKind[]
+}
+
+export type DerivedRentalWorkflow = {
+  version: RentalWorkflowVersion
+  party: RentalHubParty | null
+  custody_state: RentalCustodyState | null
+  next_confirmation: RentalConfirmationKind | null
+  complete: boolean
+  blockers: RentalWorkflowBlocker[]
+}
+
+export type HubHandoffQueueItem = {
+  booking_id: string
+  booking: BookingWithRelations
+  custody_state: HubCustodyState
+  deposit_status: HubDepositStatus
+  queue_bucket: HubQueueBucket
+  assigned_admin_id: string | null
+  assigned_admin: Pick<Profile, 'id' | 'full_name'> | null
+  pickup_due_at: string | null
+  return_due_at: string | null
+  issue_hold_reason: string | null
+  blocker_count: number
+  updated_at: string | null
+}
+
+export type HubInspection = {
+  id: string
+  booking_id: string
+  stage: HubInspectionStage
+  serial_number: string
+  notes: string
+  checks: Record<string, boolean>
+  photo_paths: string[]
+  submitted_by: string | null
+  submitted_at: string
+  finalized_at: string | null
+}
+
+export type HubParticipantConfirmation = {
+  party: RentalHubParty
+  stage: 'pickup' | 'return'
+  confirmed_at: string | null
+  blocker_reason: string | null
+}
+
+export type HubCustodyTimelineEvent = {
+  id: string
+  label: string
+  detail: string | null
+  occurred_at: string
+  actor: Pick<Profile, 'id' | 'full_name'> | null
+}
+
+export type HubHandoffDetail = {
+  booking_id: string
+  booking: BookingWithRelations
+  custody_state: HubCustodyState
+  deposit_status: HubDepositStatus
+  queue_bucket: HubQueueBucket
+  assigned_admin_id: string | null
+  assigned_admin: Pick<Profile, 'id' | 'full_name'> | null
+  pickup_due_at: string | null
+  return_due_at: string | null
+  issue_hold_reason: string | null
+  deposit: {
+    amount: number
+    status: HubDepositStatus
+    reference: string | null
+    proof_path: string | null
+    submitted_at: string | null
+    reviewed_at: string | null
+    review_note: string | null
+  } | null
+  agreement: Pick<RentalAgreement, 'id' | 'version' | 'terms_hash' | 'owner_signed_at' | 'renter_signed_at'>
+  inspections: HubInspection[]
+  participant_confirmations: HubParticipantConfirmation[]
+  blockers: string[]
+  allowed_transitions: HubPhysicalAction[]
+  timeline: HubCustodyTimelineEvent[]
+  updated_at: string | null
+}
+
 export type PayoutStatus = 'pending' | 'paid'
 
 export type Payout = {
@@ -218,6 +578,33 @@ export type PlatformStats = {
   verifiedMembers: number
   completedBookings: number
 }
+
+export const HUB_INSPECTION_CHECKLISTS = {
+  pre_rental: [
+    { key: 'identity_match', label: 'Body, model, and mount match the booking', required: true },
+    { key: 'power_on', label: 'Power-on and core controls tested', required: true },
+    { key: 'optical_condition', label: 'Sensor, glass, and mount condition inspected', required: true },
+    { key: 'accessories_counted', label: 'Battery, charger, and listed accessories counted', required: true },
+  ],
+  post_rental: [
+    { key: 'serial_match', label: 'Serial matches the pre-rental record', required: true },
+    { key: 'power_on', label: 'Power-on and core controls tested after return', required: true },
+    { key: 'no_new_damage', label: 'New damage or wear is fully recorded', required: true },
+    { key: 'accessories_returned', label: 'All listed accessories accounted for', required: true },
+  ],
+} as const
+
+export const HUB_INSPECTION_PHOTO_DEFINITIONS = [
+  { kind: 'overall', label: 'Overall kit', requiredFor: ['pre_rental', 'post_rental'] },
+  { kind: 'serial', label: 'Serial plate', requiredFor: ['pre_rental', 'post_rental'] },
+  { kind: 'accessories', label: 'Included accessories', requiredFor: ['pre_rental', 'post_rental'] },
+  { kind: 'damage', label: 'Damage or issue detail', requiredFor: [] },
+  { kind: 'other', label: 'Other condition evidence', requiredFor: [] },
+] as const satisfies readonly {
+  kind: RentalInspectionPhotoKind
+  label: string
+  requiredFor: readonly RentalInspectionKind[]
+}[]
 
 export function listingPhotos(listing: Pick<Listing, 'image_url' | 'image_urls'> | null | undefined): string[] {
   if (!listing) return []

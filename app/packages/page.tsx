@@ -1,22 +1,22 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, BadgeCheck, BadgePercent, Camera, ShieldCheck, Sparkles, WalletCards } from 'lucide-react'
+import { ArrowRight, BadgePercent, Camera, CheckCircle2, ShieldCheck, Sparkles, WalletCards } from 'lucide-react'
 import { SiteHeadbar } from '@/components/site-headbar'
 import { useProfile } from '@/lib/use-profile'
 import './packages.css'
 
 const creatorGuides = [
-  { tag: 'Student productions', title: 'Student Filmmakers & Video Outputs', kit: 'Sony ZV-E10 / Fujifilm X-T30 II · 1–3 day rentals from ₱450/day', copy: 'Lightweight cameras, quick access, and performance tools for student shoots. Verified students rent with the deposit waived.' },
-  { tag: 'Fast turnaround', title: 'Campus Journalists & Digital Creators', kit: 'Rode Wireless GO II · Godox SL60W · same-day hub handoffs', copy: 'Reliable cameras and audio for campus events and stories, with hand-offs coordinated at Centro, Magsaysay, and Pili.' },
-  { tag: 'Commercial grade', title: 'Freelance Photographers & UGCs', kit: 'Full-frame bodies, fast primes, and lighting for client work', copy: 'Production-ready bodies, lenses, and lighting for client work — every unit is inspected and sensor-clean before pick-up.' },
-  { tag: 'Pure passion', title: 'Travelers & Analog Hobbyists', kit: 'DJI RS3 Mini · Sigma 16mm f/1.4 · compact travel kits', copy: 'Compact, travel-ready equipment for slow, intentional photography, backed by the same LensCare coverage available across LensShare bookings.' },
+  { tag: 'Student productions', title: 'Student Filmmakers & Video Outputs', kit: 'Sony ZV-E10 / Fujifilm X-T30 II · 1–3 day rentals from ₱450/day', copy: 'Lightweight cameras, quick access, and performance tools for student shoots. Approved student status makes each booking eligible for a deposit waiver.' },
+  { tag: 'Fast turnaround', title: 'Campus Journalists & Digital Creators', kit: 'Rode Wireless GO II · Godox SL60W · scheduled hub handoffs', copy: 'Reliable cameras and audio for campus events and stories, with approved rentals handed off and returned at the configured Naga City Hub.' },
+  { tag: 'Commercial grade', title: 'Freelance Photographers & UGCs', kit: 'Full-frame bodies, fast primes, and lighting for client work', copy: 'Owner-listed bodies, lenses, and lighting for client work. Review each listing’s specifications, inclusions, and availability before requesting.' },
+  { tag: 'Pure passion', title: 'Travelers & Analog Hobbyists', kit: 'DJI RS3 Mini · Sigma 16mm f/1.4 · compact travel kits', copy: 'Compact equipment suggestions for slow, intentional photography, booked through the same verified request and hub handoff workflow.' },
 ]
 
 const rates = [
   { label: 'Daily rate', value: 'From ₱300/day', copy: 'Every listing shows its own owner-set daily rate up front — no hidden booking fees.' },
   { label: 'Booking total', value: 'Daily rate × days', copy: 'Your total is based on the listing rate and selected rental dates, and is shown before you request a booking.' },
-  { label: 'Student benefit', value: '₱0 deposit', copy: 'Verified students rent with the cash deposit waived — LensCare coverage stays switched on.' },
+  { label: 'Student benefit', value: 'Waiver eligible', copy: 'Approved student status is assessed at the booking level for the cash deposit waiver.' },
 ]
 
 export default function PackagesPage() {
@@ -43,7 +43,7 @@ export default function PackagesPage() {
         <div className="packages-pass-heading">
           <span className="packages-pass-kicker"><BadgePercent size={14} aria-hidden="true" /> RENT MORE, SAVE SIMPLY</span>
           <h2 id="packages-pass-title">30-Day Saver Pass</h2>
-          <p>A compact savings pass for renters with eligible bookings planned in the next month.</p>
+          <p>A compact savings pass for renters with eligible bookings planned in the next month. Its rental discount can be used alongside an eligible student deposit waiver because they apply to different amounts.</p>
           <p className="packages-pass-price"><strong>₱99</strong><span>once</span></p>
         </div>
         <dl className="packages-pass-details">
@@ -52,7 +52,7 @@ export default function PackagesPage() {
           <div><dt>Savings limit</dt><dd>₱500</dd><small>Total discount cap</small></div>
         </dl>
         <div className="packages-pass-action">
-          <p><WalletCards size={17} aria-hidden="true" /><span><b>GCash, manually verified</b>Payment is checked by an admin before the 30-day pass activates.</span></p>
+          <p><WalletCards size={17} aria-hidden="true" /><span><b>GCash, manually verified</b>The ₱99 pass fee is checked by an admin before the 30-day pass activates; it is separate from the ₱2,000 booking deposit.</span></p>
           <div className="packages-pass-access" aria-live="polite">
             {loading
               ? <span className="packages-pass-checking">Checking account access…</span>
@@ -78,12 +78,12 @@ export default function PackagesPage() {
       </section>
       <section className="packages-coverage">
         <div>
-          <p className="eyebrow">LENSCARE COVERAGE</p>
-          <h2>Every booking rents protected.</h2>
-          <p>Coverage activates automatically on every booking — no opt-in, no paperwork at the hand-off.</p>
+          <p className="eyebrow">BOOKING DEPOSIT</p>
+          <h2>Manual proof, clearly tracked.</h2>
+          <p>For bookings without a waiver, the renter sends the ₱2,000 deposit by GCash and submits proof for manual review. This is not an escrow account or a provider-authorized card hold.</p>
         </div>
-        <div className="packages-coverage-item"><ShieldCheck size={18} /><b>₱100,000 replacement guarantee</b><span>Accidental damage on covered units is handled by the co-op, not out of pocket.</span></div>
-        <div className="packages-coverage-item"><BadgeCheck size={18} /><b>₱0 deductible · verified people</b><span>Every renter and owner passes identity review before a hand-off is confirmed.</span></div>
+        <div className="packages-coverage-item"><ShieldCheck size={18} /><b>Booking-level student waiver</b><span>Approved student status makes a booking eligible for the deposit waiver; the booking record confirms whether it applies.</span></div>
+        <div className="packages-coverage-item"><CheckCircle2 size={18} /><b>Configured hub exchange</b><span>Approved rentals are handed off and returned at the configured Naga City Hub, with booking checklists recorded in the app.</span></div>
       </section>
       <section className="packages-cta">
         <Link className="packages-button dark" href="/browse"><Camera size={15} /> Browse verified gear</Link>

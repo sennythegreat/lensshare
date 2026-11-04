@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { BadgePercent, LayoutDashboard, Menu, Package, ShieldCheck, Users, X } from 'lucide-react'
+import { ArrowLeftRight, BadgePercent, LayoutDashboard, Menu, Package, ShieldCheck, Users, X } from 'lucide-react'
 import { useProfile } from '@/lib/use-profile'
 import { initialsOf } from '@/lib/types'
 import { UserMenu } from '@/components/user-menu'
@@ -13,6 +13,7 @@ const navLinks = [
   ['/admin', LayoutDashboard, 'Dashboard'],
   ['/admin/verifications', ShieldCheck, 'Verification'],
   ['/admin/promo-passes', BadgePercent, 'Saver Passes'],
+  ['/admin/handoffs', ArrowLeftRight, 'Hub Hand-offs'],
   ['/admin/users', Users, 'Owners & Renters'],
   ['/admin/equipment', Package, 'Equipment'],
 ] as const
@@ -24,6 +25,8 @@ export function AdminShell({ children, title, subtitle }: { children: React.Reac
   const name = profile?.full_name || 'Admin'
   const initials = profile ? initialsOf(name) : '…'
 
+  const isActive = (href: string) => href === '/admin' ? pathname === href : pathname.startsWith(href)
+
   if (!loading && profile?.role !== 'admin') {
     return <main className="admin-page"><section className="admin-main"><div className="admin-content"><div className="admin-empty"><h3>Not authorized</h3><p>Your account does not have platform admin access. An existing admin can enable it on your profile.</p></div></div></section></main>
   }
@@ -31,7 +34,7 @@ export function AdminShell({ children, title, subtitle }: { children: React.Reac
   return <main className="admin-page">
     <aside className={`admin-sidebar ${open ? 'open' : ''}`}>
       <div className="admin-logo"><span className="admin-logo-mark"><img src="/lensshare-logo.png" alt="" /></span><div><b>LensShare</b><small>ADMIN<br />CONSOLE</small></div></div>
-      <nav>{navLinks.map(([href, Icon, label]) => <Link key={href} href={href} className={pathname === href ? 'active' : ''} onClick={() => setOpen(false)}><Icon size={15} /> {label}</Link>)}</nav>
+      <nav>{navLinks.map(([href, Icon, label]) => <Link key={href} href={href} className={isActive(href) ? 'active' : ''} onClick={() => setOpen(false)}><Icon size={15} /> {label}</Link>)}</nav>
       <div className="admin-profile"><span className="admin-initials">{initials}</span><div><b>{name}</b><small>Platform admin</small></div></div>
     </aside>
     <section className="admin-main">
