@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AdminShell } from '@/components/admin-shell'
 import { EmptyState, SectionSkeleton } from '@/components/states'
+import { Search, X } from 'lucide-react'
 import { fetchAdminUsers } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import type { AdminUserRow } from '@/lib/types'
@@ -40,7 +41,12 @@ export default function AdminUsersPage() {
   return <AdminShell title="Owners & Renters" subtitle="Every account on the platform, with their verification standing and activity.">
     <div className="admin-tabs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 18px' }}>
       {TABS.map((item) => <button key={item} className="owner-button" style={tab === item ? { background: '#dcebe7', borderColor: '#bcd6cf', color: '#244b43' } : undefined} onClick={() => setTab(item)}>{item}</button>)}
-      <input className="owner-button" style={{ marginLeft: 'auto', width: 240, background: '#fff' }} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name or email..." />
+      <label className="admin-search" style={{ marginLeft: 'auto', width: 260 }}>
+        <Search size={14} aria-hidden />
+        <span className="sr-only">Search name or email</span>
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name or email..." />
+        {query && <button type="button" className="admin-search-clear" onClick={() => setQuery('')} aria-label="Clear search"><X size={13} /></button>}
+      </label>
     </div>
     {error && <div className="admin-table"><div className="admin-row"><p className="auth-error">{error}</p></div></div>}
     <div className="admin-table">

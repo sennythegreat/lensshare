@@ -176,3 +176,18 @@
 .report-incident-thumbs figure { margin: 0; position: relative; }
 .report-incident-thumbs img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(7, 16, 14, 0.14); display: block; }
 .report-incident-thumbs button { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(7, 16, 14, 0.3); background: #fff; cursor: pointer; font-size: 12px; line-height: 1; }
+
+/* ---------- Unread messages badge (shared by shells + headbar) ---------- */
+
+.nav-badge {
+  margin-left: auto;
+  background: #b5483a;
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font: 700 9px 'DM Mono', monospace;
+  letter-spacing: .02em;
+  line-height: 1.4;
+}
+.browse-nav nav a { position: relative; }
+.browse-nav nav a .nav-badge { position: absolute; top: 10px; right: 2px; margin-left: 0; padding: 1px 5px; font-size: 8px; }

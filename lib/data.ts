@@ -1043,16 +1043,17 @@ export async function saveListingAsset(listingId: string, serialNumber: string):
 
 function normalizeHubSettings(value: unknown): HubSettings {
   const row = asObject(value)
+  const instructions = hubInstructionFields(row.instructions)
   return {
     id: asString(row.id),
     name: asString(row.name, 'Naga City Hub'),
     exact_address: asString(row.exact_address ?? row.address ?? row.address_text),
-    location_notes: asString(row.location_notes ?? row.instructions),
-    operating_hours: asString(row.operating_hours ?? row.hours),
-    gcash_account_name: asString(row.gcash_account_name ?? row.gcash_recipient_name),
-    gcash_mobile_number: asString(row.gcash_mobile_number ?? row.gcash_recipient_number),
+    location_notes: asString(row.location_notes ?? instructions.location_notes ?? row.instructions),
+    operating_hours: asString(row.operating_hours ?? row.hours ?? instructions.operating_hours),
+    gcash_account_name: asString(row.gcash_account_name ?? row.gcash_recipient_name ?? instructions.gcash_account_name),
+    gcash_mobile_number: asString(row.gcash_mobile_number ?? row.gcash_recipient_number ?? instructions.gcash_mobile_number),
     deposit_amount: asNumber(row.deposit_amount ?? row.standard_deposit, 2000),
-    deposit_policy: asString(row.deposit_policy ?? row.instructions),
+    deposit_policy: asString(row.deposit_policy ?? instructions.deposit_policy ?? row.instructions),
     hub_latitude: row.hub_latitude === null || row.hub_latitude === undefined ? 13.6218 : asNumber(row.hub_latitude, 13.6218),
     hub_longitude: row.hub_longitude === null || row.hub_longitude === undefined ? 123.1948 : asNumber(row.hub_longitude, 123.1948),
     service_radius_km: asNumber(row.service_radius_km, 15),
@@ -1081,13 +1082,20 @@ export async function saveAdminHubSettings(input: HubSettingsInput): Promise<Hub
     throw new Error('Enter valid hub coordinates and a service radius from 0 to 200 km.')
   }
   const current = await fetchAdminHubSettings()
-  const instructions = [input.operating_hours.trim(), input.location_notes.trim(), input.deposit_policy.trim()].filter(Boolean).join('\n\n')
+  const instructions = JSON.stringify({
+    schema_version: 1,
+    operating_hours: input.operating_hours.trim(),
+    location_notes: input.location_notes.trim(),
+    gcash_account_name: input.gcash_account_name.trim(),
+    gcash_mobile_number: input.gcash_mobile_number.trim(),
+    deposit_policy: input.deposit_policy.trim(),
+  })
   const value = await callRpc('update_hub_settings', {
     p_hub_id: current.id,
     p_name: current.name,
     p_address_text: input.exact_address.trim(),
     p_contact_phone: current.contact_phone,
-    p_instructions: instructions || null,
+    p_instructions: instructions,
     p_standard_deposit: 2000,
     p_is_active: current.active,
     p_hub_latitude: hubLatitude,
@@ -1113,6 +1121,15 @@ function queueBucket(value: unknown, custody: HubCustodyState, issueReason: stri
   return 'pickup_due'
 }
 
+function allowedAdminPhysicalActions(custody: HubCustodyState, issueReason: string | null): HubPhysicalAction[] {
+  if (issueReason) return []
+  if (custody === 'awaiting_owner_dropoff') return ['receive_from_owner']
+  if (custody === 'at_hub_for_pickup') return ['release_to_renter']
+  if (custody === 'with_renter') return ['receive_from_renter']
+  if (custody === 'at_hub_for_return') return ['release_to_owner']
+  return []
+}
+
 function normalizeQueueItem(value: unknown): HubHandoffQueueItem | null {
   const row = asObject(value)
   const booking = normalizeBookingWithRelations(row.booking ?? row.booking_detail)
@@ -1121,7 +1138,7 @@ function normalizeQueueItem(value: unknown): HubHandoffQueueItem | null {
   const operation = asObject(row.operation)
   const source = { ...operation, ...row }
   const custody = adminCustodyState(source.custody_state, source)
-  const issueReason = asNullableString(source.issue_hold_reason)
+  const issueReason = asNullableString(source.issue_hold_reason ?? source.issue_note)
   const assigned = asObject(row.assigned_admin ?? row.assigned_operator ?? operation.assigned_operator)
   return {
     booking_id: bookingId,
@@ -1141,23 +1158,48 @@ function normalizeQueueItem(value: unknown): HubHandoffQueueItem | null {
 
 export async function fetchAdminHubHandoffQueue(): Promise<HubHandoffQueueItem[]> {
   const value = await callRpc('fetch_hub_admin_queue')
-  return unwrapRpcRows(value, 'fetch_hub_admin_queue').map(normalizeQueueItem).filter((item): item is HubHandoffQueueItem => Boolean(item))
+  const rows = unwrapRpcRows(value, 'fetch_hub_admin_queue')
+  return Promise.all(rows.map(async (value) => {
+    const raw = asObject(value)
+    const bookingId = asString(raw.booking_id)
+    if (!bookingId) return null
+    const [booking, operator] = await Promise.all([
+      fetchBookingById(bookingId),
+      fetchOperatorRow(asNullableString(raw.operator_id ?? raw.assigned_operator_id)),
+    ])
+    return normalizeQueueItem({
+      ...raw,
+      booking,
+      assigned_operator_id: raw.operator_id ?? raw.assigned_operator_id,
+      assigned_operator: operator,
+      issue_hold_reason: asBoolean(raw.issue_hold) ? 'Issue hold' : null,
+    })
+  })).then((items) => items.filter((item): item is HubHandoffQueueItem => Boolean(item)))
 }
 
 export const fetchHubAdminQueue = fetchAdminHubHandoffQueue
 
-function normalizeHubInspection(value: unknown, bookingId: string): HubInspection | null {
+function normalizeHubInspection(value: unknown, bookingId: string, photosValue: unknown = []): HubInspection | null {
   const row = asObject(value)
   if (!Object.keys(row).length) return null
+  const id = asString(row.id, `${bookingId}:${asString(row.stage ?? row.kind ?? row.inspection_kind)}`)
+  const relatedPhotos = asArray(photosValue)
+    .filter((photo) => asString(asObject(photo).inspection_id) === id)
+    .map((photo) => asString(asObject(photo).path ?? asObject(photo).object_path))
+    .filter(Boolean)
   return {
-    id: asString(row.id, `${bookingId}:${asString(row.stage ?? row.kind)}`),
+    id,
     booking_id: asString(row.booking_id, bookingId),
-    stage: inspectionKind(row.stage ?? row.kind) === 'post_rental' ? 'post_return' : 'pre_release',
-    serial_number: asString(row.serial_number),
-    notes: asString(row.notes ?? row.condition_notes),
+    stage: inspectionKind(row.stage ?? row.kind ?? row.inspection_kind) === 'post_rental' ? 'post_return' : 'pre_release',
+    serial_number: asString(row.serial_number ?? row.meter_reading),
+    notes: asString(row.notes ?? row.condition_notes ?? row.condition_summary),
     checks: asObject(row.checks ?? row.checklist) as Record<string, boolean>,
-    photo_paths: (asArray(row.photo_paths).length ? asArray(row.photo_paths) : asArray(row.photos).map((photo) => asObject(photo).path)).map((path) => asString(path)).filter(Boolean),
-    submitted_by: asNullableString(row.submitted_by ?? row.performed_by),
+    photo_paths: (asArray(row.photo_paths).length
+      ? asArray(row.photo_paths)
+      : asArray(row.photos).length
+        ? asArray(row.photos).map((photo) => asObject(photo).path ?? asObject(photo).object_path)
+        : relatedPhotos).map((path) => asString(path)).filter(Boolean),
+    submitted_by: asNullableString(row.submitted_by ?? row.performed_by ?? row.created_by),
     submitted_at: asString(row.submitted_at ?? row.updated_at ?? row.created_at),
     finalized_at: asNullableString(row.finalized_at),
   }
@@ -1170,20 +1212,24 @@ function normalizeHandoffDetail(value: unknown): HubHandoffDetail | null {
   const operation = asObject(row.operation)
   const source = { ...operation, ...row }
   const custody = adminCustodyState(source.custody_state, source)
-  const issueReason = asNullableString(source.issue_hold_reason)
+  const issueReason = asNullableString(source.issue_hold_reason ?? source.issue_note)
   const assigned = asObject(row.assigned_admin ?? row.assigned_operator ?? operation.assigned_operator)
   const depositRow = asObject(row.deposit)
   const agreementRow = asObject(row.agreement)
-  const confirmations = asArray(row.participant_confirmations ?? row.confirmations).map((value) => {
-    const item = asObject(value)
-    const rawParty = asString(item.party)
-    return {
-      party: rawParty === 'owner' ? 'owner' as const : 'renter' as const,
-      stage: asString(item.stage).includes('return') || ['renter_return', 'post_inspection', 'owner_collection'].includes(asString(item.kind)) ? 'return' as const : 'pickup' as const,
-      confirmed_at: asNullableString(item.confirmed_at ?? item.created_at),
-      blocker_reason: asNullableString(item.blocker_reason),
-    }
-  })
+  const acceptances = asArray(row.acceptances)
+  const agreementId = asString(agreementRow.id)
+  const ownerAcceptance = acceptances.map(asObject).find((item) => asString(item.agreement_id) === agreementId && asString(item.party) === 'owner')
+  const renterAcceptance = acceptances.map(asObject).find((item) => asString(item.agreement_id) === agreementId && asString(item.party) === 'renter')
+  const confirmations = [
+    ...transferConfirmationRows(row),
+    ...inspectionConfirmationRows(row),
+    ...asArray(row.participant_confirmations ?? row.confirmations),
+  ].map((value) => normalizeConfirmation(value, booking.id)).filter((value): value is RentalConfirmation => Boolean(value)).map((value) => ({
+    party: value.party,
+    stage: (['renter_return', 'post_inspection', 'owner_collection'].includes(value.kind) ? 'return' : 'pickup') as 'pickup' | 'return',
+    confirmed_at: value.confirmed_at,
+    blocker_reason: null,
+  }))
   const events = asArray(row.timeline ?? row.events)
   const depositStatus = adminDepositStatus(row.deposit_status ?? depositRow.status)
   const detail: HubHandoffDetail = {
@@ -1210,13 +1256,15 @@ function normalizeHandoffDetail(value: unknown): HubHandoffDetail | null {
       id: asString(agreementRow.id),
       version: asNumber(agreementRow.version, 1),
       terms_hash: asString(agreementRow.terms_hash),
-      owner_signed_at: asNullableString(agreementRow.owner_signed_at),
-      renter_signed_at: asNullableString(agreementRow.renter_signed_at),
+      owner_signed_at: asNullableString(agreementRow.owner_signed_at ?? ownerAcceptance?.accepted_at),
+      renter_signed_at: asNullableString(agreementRow.renter_signed_at ?? renterAcceptance?.accepted_at),
     },
-    inspections: asArray(row.inspections).map((item) => normalizeHubInspection(item, booking.id)).filter((item): item is HubInspection => Boolean(item)),
+    inspections: asArray(row.inspections).map((item) => normalizeHubInspection(item, booking.id, row.inspection_photos)).filter((item): item is HubInspection => Boolean(item)),
     participant_confirmations: confirmations,
     blockers: asArray(row.blockers).map((blocker) => typeof blocker === 'string' ? blocker : asString(asObject(blocker).message ?? asObject(blocker).reason)).filter(Boolean),
-    allowed_transitions: asArray(row.allowed_transitions).map((action) => asString(action)).filter((action): action is HubPhysicalAction => ['receive_from_owner', 'release_to_renter', 'receive_from_renter', 'release_to_owner'].includes(action)),
+    allowed_transitions: asArray(row.allowed_transitions).length
+      ? asArray(row.allowed_transitions).map((action) => asString(action)).filter((action): action is HubPhysicalAction => ['receive_from_owner', 'release_to_renter', 'receive_from_renter', 'release_to_owner'].includes(action))
+      : allowedAdminPhysicalActions(custody, issueReason),
     timeline: events.map((value, index) => {
       const event = asObject(value)
       const actor = asObject(event.actor)
@@ -1234,7 +1282,9 @@ function normalizeHandoffDetail(value: unknown): HubHandoffDetail | null {
 }
 
 export async function fetchAdminHubHandoffDetail(bookingId: string): Promise<HubHandoffDetail> {
-  const detail = normalizeHandoffDetail(await callRpc('fetch_hub_booking_detail', { p_booking_id: bookingId }))
+  const value = await callRpc('fetch_hub_booking_detail', { p_booking_id: bookingId })
+  const enriched = await enrichHubRpcValue(value)
+  const detail = normalizeHandoffDetail(enriched.row)
   if (!detail) throw new Error('This booking does not have a Naga Hub hand-off record.')
   return detail
 }
@@ -1247,12 +1297,6 @@ export async function assignAdminHubHandoff(bookingId: string, adminId: string |
 }
 
 export const assignBookingOperator = assignAdminHubHandoff
-
-function privateHubFileBucket(path: string): string {
-  return path.startsWith('deposit-proofs/') ? HUB_DEPOSIT_BUCKET
-    : path.startsWith('inspection-photos/') ? HUB_INSPECTION_BUCKET
-      : /(^|\/)deposit|receipt|proof/i.test(path) ? HUB_DEPOSIT_BUCKET : HUB_INSPECTION_BUCKET
-}
 
 function stripBucketPrefix(bucket: string, path: string): string {
   return path.startsWith(`${bucket}/`) ? path.slice(bucket.length + 1) : path
@@ -1267,7 +1311,13 @@ async function fetchSignedPrivateFileUrl(bucket: string, path: string): Promise<
 }
 
 export async function fetchSignedAdminHubFileUrl(path: string): Promise<string> {
-  return fetchSignedPrivateFileUrl(privateHubFileBucket(path), path)
+  if (path.startsWith(`${HUB_DEPOSIT_BUCKET}/`)) return fetchSignedPrivateFileUrl(HUB_DEPOSIT_BUCKET, path)
+  if (path.startsWith(`${HUB_INSPECTION_BUCKET}/`)) return fetchSignedPrivateFileUrl(HUB_INSPECTION_BUCKET, path)
+  try {
+    return await fetchSignedPrivateFileUrl(HUB_DEPOSIT_BUCKET, path)
+  } catch {
+    return fetchSignedPrivateFileUrl(HUB_INSPECTION_BUCKET, path)
+  }
 }
 
 export async function reviewAdminHubDepositProof(bookingId: string, decision: 'accepted' | 'rejected', note: string | null): Promise<void> {
@@ -1565,7 +1615,9 @@ export async function uploadVerificationDoc(userId: string, docType: Verificatio
   validateVerificationDocument(file)
   const supabase = createClient()
   const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
-  const path = `${userId}/${docType}/${crypto.randomUUID()}.${extension}`
+  // Storage policy requires {user_id}/{filename} (one folder deep); the doc
+  // type is kept in the filename and recorded on the submission row itself.
+  const path = `${userId}/${docType}-${crypto.randomUUID()}.${extension}`
   const { error } = await supabase.storage.from('verification-docs').upload(path, file, {
     cacheControl: '3600',
     contentType: file.type,
@@ -1899,6 +1951,19 @@ export async function markMessagesRead(bookingId: string, readerId: string): Pro
     .neq('sender_id', readerId)
     .is('read_at', null)
   if (error) throw error
+}
+
+// Unread count for the nav badge: other people's messages on bookings I'm a
+// participant in that I haven't read yet (RLS restricts to participants).
+export async function fetchUnreadMessageCount(userId: string): Promise<number> {
+  const supabase = createClient()
+  const { count, error } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .neq('sender_id', userId)
+    .is('read_at', null)
+  if (error) throw error
+  return count ?? 0
 }
 
 // All messages visible to this user, across their bookings (for thread

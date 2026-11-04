@@ -328,3 +328,28 @@
 .admin-incident-resolution b { font-family: Arial, sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; display: block; }
 .admin-incident-resolution p { margin: 4px 0; font-size: 13px; white-space: pre-wrap; }
 .admin-incident-resolution small { font-size: 11px; color: #8a948f; }
+
+/* ---------- Shared admin search field ---------- */
+
+.admin-search {
+  display: flex; align-items: center; gap: 8px;
+  background: #fff; border: 1px solid #dce1dd;
+  padding: 0 11px; color: #6e7a75;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.admin-search:focus-within {
+  border-color: #7fa89e;
+  box-shadow: 0 0 0 3px rgba(127, 168, 158, .15);
+  color: #244b43;
+}
+.admin-search input {
+  border: 0; outline: 0; width: 100%; min-width: 0;
+  padding: 10px 0; background: transparent;
+  color: #17201d; font-size: 12px;
+}
+.admin-search input::placeholder { color: #8d9892; font-size: 11px; letter-spacing: .02em; }
+.admin-search-clear {
+  border: 0; background: transparent; cursor: pointer;
+  color: #8d9892; padding: 4px; display: flex; align-items: center;
+}
+.admin-search-clear:hover { color: #17201d; }

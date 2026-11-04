@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BadgeCheck, BadgePercent, Search, ShieldCheck, UserRound } from 'lucide-react'
 import { useProfile } from '@/lib/use-profile'
+import { useUnreadMessages } from '@/lib/use-unread-messages'
 import { initialsOf } from '@/lib/types'
 import { UserMenu } from '@/components/user-menu'
 import '@/app/browse/browse.css'
@@ -22,6 +23,7 @@ export function SiteHeadbar({
 }) {
   const pathname = usePathname()
   const { user, profile, loading } = useProfile()
+  const unreadMessages = useUnreadMessages()
   const isRenter = profile?.role === 'renter'
   const isAdmin = profile?.role === 'admin'
   const isOwner = profile?.role === 'owner'
@@ -73,7 +75,7 @@ export function SiteHeadbar({
         <Link className={pathname === '/packages' ? 'active' : ''} href="/packages">Creator Guides</Link>
         {isRenter && <Link className={pathname === '/renter/saver-pass' ? 'active' : ''} href="/renter/saver-pass">Saver Pass</Link>}
         {showRenterLinks && <Link className={pathname === '/renter/bookings' ? 'active' : ''} href="/renter/bookings">My Bookings</Link>}
-        {showRenterLinks && <Link className={pathname === '/renter/messages' ? 'active' : ''} href="/renter/messages">Messages</Link>}
+        {showRenterLinks && <Link className={pathname === '/renter/messages' ? 'active' : ''} href="/renter/messages">Messages{unreadMessages > 0 && <span className="nav-badge">{unreadMessages > 9 ? '9+' : unreadMessages}</span>}</Link>}
       </nav>
       {onSearchChange && <div className="browse-search"><Search size={14} /><input value={searchValue ?? ''} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search equipment or brand..." /></div>}
       {isOwner && <Link className="earn-button" href="/dashboard/listings">+ List Gear / Earn</Link>}

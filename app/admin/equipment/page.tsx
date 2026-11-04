@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { Search, X } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
 import { EmptyState, SectionSkeleton } from '@/components/states'
 import { fetchAdminListings, setListingStatus } from '@/lib/data'
@@ -42,7 +43,12 @@ export default function AdminEquipmentPage() {
 
   return <AdminShell title="Equipment" subtitle="Every listing on the marketplace. Pause a listing if it breaks the hub rules; the owner can re-activate it.">
     <div className="admin-tabs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 18px' }}>
-      <input className="owner-button" style={{ width: 280, background: '#fff' }} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search gear, brand, or owner..." />
+      <label className="admin-search" style={{ width: 300 }}>
+        <Search size={14} aria-hidden />
+        <span className="sr-only">Search gear, brand, or owner</span>
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search gear, brand, or owner..." />
+        {query && <button type="button" className="admin-search-clear" onClick={() => setQuery('')} aria-label="Clear search"><X size={13} /></button>}
+      </label>
       <span className="admin-tag" style={{ marginLeft: 'auto' }}>{visible.length} of {listings.length} listings</span>
     </div>
     {error && <div className="admin-table"><div className="admin-row"><p className="auth-error">{error}</p></div></div>}
