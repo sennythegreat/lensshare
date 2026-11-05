@@ -785,6 +785,20 @@ function inspectionKind(value: unknown): RentalInspectionKind {
   return asString(value) === 'post_return' || asString(value) === 'post_rental' ? 'post_rental' : 'pre_rental'
 }
 
+function inspectionChecklist(row: UnknownRow): Record<string, boolean> {
+  const storedChecklist = asObject(row.checklist ?? row.checks)
+  const checklistSource = Object.keys(storedChecklist).length ? storedChecklist : asObject(row.notes)
+  return Object.fromEntries(
+    Object.entries(checklistSource).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean'),
+  )
+}
+
+function inspectionConditionNotes(row: UnknownRow): string | null {
+  const conditionNotes = asNullableString(row.condition_notes ?? row.condition_summary)
+  if (conditionNotes) return conditionNotes
+  return Object.keys(inspectionChecklist(row)).length ? null : asNullableString(row.notes)
+}
+
 function normalizeInspectionPhoto(value: unknown, inspectionId: string, index: number): RentalInspectionPhoto {
   const row = typeof value === 'string' ? { path: value } : asObject(value)
   const rawKind = asString(row.kind)
@@ -818,8 +832,8 @@ function normalizeInspection(value: unknown, bookingId: string, photosValue: unk
     status: asString(row.status) === 'draft' && !finalizedAt ? 'draft' : finalizedAt ? 'finalized' : 'draft',
     result: rawResult === 'pass' || rawResult === 'issue' ? rawResult : finalizedAt ? issueNotes ? 'issue' : 'pass' : null,
     serial_number: asNullableString(row.serial_number ?? row.meter_reading),
-    checklist: asObject(row.checklist ?? row.checks) as Record<string, boolean>,
-    condition_notes: asNullableString(row.condition_notes ?? row.condition_summary ?? row.notes),
+    checklist: inspectionChecklist(row),
+    condition_notes: inspectionConditionNotes(row),
     issue_notes: issueNotes,
     photos: photoValues.map((photo, index) => normalizeInspectionPhoto(photo, id, index)).filter((photo) => Boolean(photo.path)),
     performed_by: asNullableString(row.performed_by ?? row.submitted_by),
@@ -1240,8 +1254,8 @@ function normalizeHubInspection(value: unknown, bookingId: string, photosValue: 
     booking_id: asString(row.booking_id, bookingId),
     stage: inspectionKind(row.stage ?? row.kind ?? row.inspection_kind) === 'post_rental' ? 'post_return' : 'pre_release',
     serial_number: asString(row.serial_number ?? row.meter_reading),
-    notes: asString(row.notes ?? row.condition_notes ?? row.condition_summary),
-    checks: asObject(row.checks ?? row.checklist) as Record<string, boolean>,
+    notes: inspectionConditionNotes(row) ?? '',
+    checks: inspectionChecklist(row),
     photo_paths: (asArray(row.photo_paths).length
       ? asArray(row.photo_paths)
       : asArray(row.photos).length
