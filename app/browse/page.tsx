@@ -87,6 +87,35 @@ export default function BrowsePage() {
   function load() {
     setLoading(true)
     setLoadError('')
+    if (new URLSearchParams(window.location.search).has('dialog-preview')) {
+      const preview: ListingWithOwner = {
+        id: 'dialog-preview',
+        owner_id: 'preview-owner',
+        name: 'RØDE Wireless PRO',
+        brand: 'RØDE',
+        category: 'Audio',
+        meta: 'DUAL-CHANNEL WIRELESS MICROPHONE',
+        specs: '32-bit float onboard recording, timecode sync, intelligent GainAssist, and up to 260 m line-of-sight range.',
+        included: '2 transmitters, receiver, charging case, lavalier microphones, windscreens, cables, and carry pouch.',
+        description: 'A complete wireless audio kit for interviews, documentaries, events, and two-person creator shoots.',
+        daily_rate: 350,
+        security_deposit: null,
+        image_url: '/lensshare-camera.png',
+        image_urls: ['/lensshare-camera.png'],
+        pickup_address: 'Naga City, Camarines Sur',
+        pickup_latitude: null,
+        pickup_longitude: null,
+        status: 'available',
+        rating: 5,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        owner: { id: 'preview-owner', full_name: 'Mark Anthony Cruz', verification_status: 'unverified' },
+      }
+      setListings([preview])
+      setSelected(preview)
+      setLoading(false)
+      return
+    }
     fetchListings()
       .then((rows) => { setListings(rows); setLoading(false) })
       .catch((error) => { setLoadError(error instanceof Error ? error.message : 'Could not load listings.'); setLoading(false) })
@@ -145,7 +174,21 @@ export default function BrowsePage() {
       })
       .finally(() => { if (!cancelled) setQuoteLoading(false) })
     return () => { cancelled = true }
-  }, [selected, startDate, endDate, datesInvalid, user, profile])
+  }, [selected, startDate, endDate, datesInvalid, user, profile, quoteAttempt])
+
+  useEffect(() => {
+    if (!selected) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelected(null)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [selected])
 
   const rateBounds = useMemo(() => {
     if (!listings.length) return { min: 0, max: 1500 }
@@ -257,6 +300,8 @@ export default function BrowsePage() {
   function openDetails(item: ListingWithOwner) {
     setSelected(item)
     setSelectedPhoto(0)
+    setDetailStep('details')
+    setQuoteAttempt(0)
     setBooked(false)
     setBookingError('')
     setBookingQuote(null)
@@ -313,6 +358,8 @@ export default function BrowsePage() {
   const quotedTotal = bookingQuote ? Number(bookingQuote.total) : fallbackSubtotal
   const quotedDeposit = selected ? Number(selected.security_deposit ?? hubDeposit) : null
   const quoteReason = bookingQuote?.eligibility_reason
+  const quoteRequired = Boolean(user) && profile?.role === 'renter' && profile.verification_status === 'verified' && !datesInvalid
+  const quoteUnavailable = quoteRequired && !quoteLoading && !bookingQuote
 
   return <main className="browse-page">
     <SiteHeadbar />
@@ -380,7 +427,75 @@ export default function BrowsePage() {
     </div>
     <section className="browse-benefits"><span><b>Configured Naga City Hub</b><small>Approved rentals use the designated hub for handoff and return.</small></span><span><b>Student Deposit Waiver Eligibility</b><small>Approved student status is checked for each booking.</small></span><span><b>Clear Booking Totals</b><small>See the rental total and any Saver Pass discount before requesting.</small></span></section>
     <footer className="browse-footer"><div><span className="browse-brand"><span className="logo-mark"><img src="/lensshare-logo.png" alt="" /></span><strong>LensShare</strong></span><p>A peer-to-peer optical cooperative connecting creators across Naga City.</p></div><div><b>MARKETPLACE</b><span>Mirrorless bodies</span><span>Fast primes & zooms</span><span>Production lighting</span></div><div><b>TRUST & PROTOCOL</b><span>Identity verification</span><span>Booking checklists</span><span>Configured hub handoffs</span></div><div><b>PAYMENT PROCESS</b><span>Manual GCash deposit proof</span><span>Booking status tracked in-app</span></div></footer>
-    {selected && <div className="detail-backdrop" role="presentation" onClick={() => setSelected(null)}><section className="detail-modal" role="dialog" aria-modal="true" aria-label="Equipment details" onClick={(event) => event.stopPropagation()}><div className="browse-detail-gallery"><img src={activeSelectedPhoto} alt={`${selected.name} photo ${selectedPhoto + 1}`} />{selectedPhotos.length > 1 && <div className="browse-detail-thumbs">{selectedPhotos.map((photo, index) => <button className={selectedPhoto === index ? 'selected' : ''} type="button" key={photo} onClick={() => setSelectedPhoto(index)} aria-label={`View photo ${index + 1}`}><img src={photo} alt="" /></button>)}</div>}</div><div className="detail-content"><button className="close-modal" onClick={() => setSelected(null)} aria-label="Close"><X size={18} /></button><p className="eyebrow">{selected.meta || selected.brand}</p><h2>{selected.name}</h2><p className="detail-price">₱{Number(selected.daily_rate).toLocaleString()}<small>/ day</small></p>{(selected.specs || selected.description) && <p>{selected.specs || selected.description}</p>}{selected.included && <p>{selected.included}</p>}{selected.owner && <div className="detail-owner"><span>{initialsOf(selected.owner.full_name)}</span><div><b>{selected.owner.full_name}</b><small>{ownerVerificationLabel(selected.owner)} · ★ {selected.rating}</small></div></div>}<div className="browse-detail-pickup"><MapPin size={17} aria-hidden="true" /><div><b>Availability area</b><span>{selected.pickup_address?.trim() || 'Availability area not added'}</span>{distances.has(selected.id) && <small>Approx. {formatDistance(distances.get(selected.id)!)} away · based on a rounded area point</small>}<small>Approved rentals are handed off and returned at the configured Naga City Hub.</small></div></div><div className="detail-form-head"><b>Booking request</b><span>Pick your dates and tell the owner what you are filming — every request is reviewed before approval.</span></div><label>Shoot description<textarea value={shootDescription} onChange={(event) => setShootDescription(event.target.value)} placeholder="Tell the owner what you are filming..." /></label><div className="detail-dates"><label>Pick-up date<input type="date" value={startDate} required disabled={bookingBusy} onChange={(event) => changeDate('start', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label><label>Return date<input type="date" value={endDate} required min={returnMin} disabled={bookingBusy} onChange={(event) => changeDate('end', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label></div>{dateError && <p className="browse-date-feedback" id="browse-detail-date-error" role="status">{dateError}</p>}{user && profile?.role === 'renter' && profile.verification_status === 'verified' && !datesInvalid && <div className="browse-price-breakdown" aria-live="polite">{quoteLoading ? <p className="browse-quote-state">Calculating your booking total…</p> : <><div><span>Rental subtotal</span><b>{pesos(quotedSubtotal)}</b></div>{quotedDiscount > 0 && <div className="discount"><span>30-Day Saver Pass · 5%</span><b>− {pesos(quotedDiscount)}</b></div>}<div className="total"><span>Booking total</span><b>{pesos(quotedTotal)}</b></div>{quotedDeposit !== null && <div className="deposit"><span>Security deposit · {selected?.security_deposit == null ? 'hub default' : 'this item'}</span><b>{pesos(quotedDeposit)}</b></div>}{quotedDeposit !== null && <p className="browse-pass-note">Refundable after return — paid separately via GCash once the owner approves. Waived for verified students; not covered by Saver Pass.</p>}{quoteReason === 'applied' && <p className="browse-pass-note applied">Saver Pass applied to the rental total and can combine with an eligible student deposit waiver. {pesos(Number(bookingQuote?.remaining_cap ?? 0))} remains before this reservation.</p>}{quoteReason === 'outside_pass_window' && <p className="browse-pass-note">Your active pass does not cover this complete rental period. <Link href="/renter/saver-pass">View pass dates</Link></p>}{quoteReason === 'discount_cap_reached' && <p className="browse-pass-note">Your Saver Pass discount cap has been reached. <Link href="/renter/saver-pass">View pass</Link></p>}{quoteReason === 'no_active_pass' && <p className="browse-pass-note">No active Saver Pass. <Link href="/renter/saver-pass">Save 5% with a ₱99 pass</Link></p>}{quoteError && <p className="browse-pass-note error">{quoteError}</p>}</>}</div>}{booked ? <div className="booking-success"><Check size={16} /> Booking request sent. The displayed amount is a booking value, not money held in escrow. If approved, follow the manual deposit and configured hub instructions in My Bookings. <Link href="/renter/bookings">Track it in My Bookings →</Link></div> : needsVerification ? <div className="booking-verify"><ShieldCheck size={15} /><div><b>Identity verification required</b><span>Verify your government ID before your first rental — approvals usually take less than a day.</span><Link href="/renter/verification">Complete verification →</Link></div></div> : <button className="primary-booking" disabled={bookingBusy || datesInvalid || (Boolean(user) && profile?.role === 'renter' && profile.verification_status === 'verified' && (quoteLoading || !bookingQuote))} onClick={handleBooking}>{bookingBusy ? 'Sending request…' : quoteLoading ? 'Calculating total…' : datesInvalid ? 'Choose valid rental dates' : user ? `Request booking · ${pesos(quotedTotal)} (${days} day${days === 1 ? '' : 's'})` : 'Log in to request booking'}</button>}{bookingError && <p className="demo-note">{bookingError}</p>}</div></section></div>}
+    {selected && <div className="detail-backdrop" role="presentation" onClick={() => setSelected(null)}>
+      <section className={`detail-modal detail-step-${detailStep}`} role="dialog" aria-modal="true" aria-label={`${selected.name} equipment details`} onClick={(event) => event.stopPropagation()}>
+        <button className="close-modal" type="button" onClick={() => setSelected(null)} aria-label="Close equipment details"><X size={18} /></button>
+
+        <div className="browse-detail-gallery">
+          <div className="browse-detail-photo">
+            <img src={activeSelectedPhoto} alt={`${selected.name} photo ${selectedPhoto + 1}`} />
+            <span>{selected.category} · {selectedPhotos.length || 1} photo{selectedPhotos.length === 1 ? '' : 's'}</span>
+          </div>
+          {selectedPhotos.length > 1 && <div className="browse-detail-thumbs">{selectedPhotos.map((photo, index) => <button className={selectedPhoto === index ? 'selected' : ''} type="button" key={photo} onClick={() => setSelectedPhoto(index)} aria-label={`View photo ${index + 1}`}><img src={photo} alt="" /></button>)}</div>}
+        </div>
+
+        <div className="detail-information">
+          <header className="detail-heading">
+            <p className="eyebrow">{selected.meta || `${selected.brand} · ${tierOf(Number(selected.daily_rate))}`}</p>
+            <h2>{selected.name}</h2>
+            <p className="detail-price">{pesos(Number(selected.daily_rate))}<small>/ day</small></p>
+          </header>
+
+          <dl className="detail-facts">
+            <div><dt>Brand</dt><dd>{selected.brand}</dd></div>
+            <div><dt>Category</dt><dd>{selected.category}</dd></div>
+          </dl>
+
+          {(selected.description || selected.specs || selected.included) && <div className="detail-copy-grid">
+            {selected.description && <section><b>Overview</b><p>{selected.description}</p></section>}
+            {selected.specs && <section><b>Specifications</b><p>{selected.specs}</p></section>}
+            {selected.included && <section><b>Included in the kit</b><p>{selected.included}</p></section>}
+          </div>}
+
+          <div className="detail-owner">
+            <span>{initialsOf(selected.owner?.full_name || 'LensShare owner')}</span>
+            <div><b>{selected.owner?.full_name || 'LensShare owner'}</b><small>{selected.owner ? ownerVerificationLabel(selected.owner) : 'Owner profile'} · ★ {selected.rating}</small></div>
+          </div>
+
+          <div className="browse-detail-pickup"><MapPin size={17} aria-hidden="true" /><div><b>Availability area</b><span>{availabilityArea(selected)}</span>{distances.has(selected.id) && <small>Approx. {formatDistance(distances.get(selected.id)!)} away · based on a rounded area point</small>}<small>Handoff and return take place at the configured Naga City Hub after approval.</small></div></div>
+
+          <button className="detail-continue" type="button" onClick={() => setDetailStep('booking')}>Continue to booking <ArrowRight size={15} /></button>
+        </div>
+
+        <div className="detail-booking-panel">
+          <div className="detail-stepbar"><button type="button" onClick={() => setDetailStep('details')}><ArrowLeft size={14} /> Back to details</button><span>{selected.name}</span></div>
+          <div className="detail-booking-summary"><img src={activeSelectedPhoto} alt="" /><div><small>{selected.brand} · {selected.category}</small><b>{selected.name}</b><span>{pesos(Number(selected.daily_rate))} / day · {days} day{days === 1 ? '' : 's'}</span></div></div>
+          <div className="detail-form-head"><p className="eyebrow">REQUEST THIS EQUIPMENT</p><b>Booking request</b><span>Choose your dates and tell the owner what you are filming. Every request is reviewed before approval.</span></div>
+
+          <label className="detail-shoot-label">Shoot description<textarea value={shootDescription} onChange={(event) => setShootDescription(event.target.value)} placeholder="Tell the owner what you are filming..." /></label>
+          <div className="detail-dates"><label>Pick-up date<input type="date" value={startDate} required disabled={bookingBusy} onChange={(event) => changeDate('start', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label><label>Return date<input type="date" value={endDate} required min={returnMin} disabled={bookingBusy} onChange={(event) => changeDate('end', event.target.value)} aria-invalid={datesInvalid} aria-describedby={dateError ? 'browse-detail-date-error' : undefined} /></label></div>
+          {dateError && <p className="browse-date-feedback" id="browse-detail-date-error" role="status">{dateError}</p>}
+
+          {user && profile?.role === 'renter' && profile.verification_status === 'verified' && !datesInvalid && <div className={`browse-price-breakdown ${quoteUnavailable ? 'unconfirmed' : ''}`} aria-live="polite">
+            {quoteLoading ? <p className="browse-quote-state">Calculating and confirming your booking total…</p> : <>
+              <div><span>{bookingQuote ? 'Rental subtotal' : 'Estimated rental subtotal'}</span><b>{pesos(quotedSubtotal)}</b></div>
+              {quotedDiscount > 0 && <div className="discount"><span>30-Day Saver Pass · 5%</span><b>− {pesos(quotedDiscount)}</b></div>}
+              <div className="total"><span>{bookingQuote ? 'Booking total' : 'Estimated rental total'}</span><b>{pesos(quotedTotal)}</b></div>
+              {quotedDeposit !== null && <div className="deposit"><span>Refundable security deposit <small>{selected.security_deposit == null ? 'Hub default' : 'Set for this item'}</small></span><b>{pesos(quotedDeposit)}</b></div>}
+              {quotedDeposit !== null && <p className="browse-pass-note">Paid separately via GCash after owner approval and refundable after return. Waived for verified students; Saver Pass does not cover it.</p>}
+              {quoteReason === 'applied' && <p className="browse-pass-note applied">Saver Pass applied to the rental total. {pesos(Number(bookingQuote?.remaining_cap ?? 0))} remains before this reservation.</p>}
+              {quoteReason === 'outside_pass_window' && <p className="browse-pass-note">Your active pass does not cover this complete rental period. <Link href="/renter/saver-pass">View pass dates</Link></p>}
+              {quoteReason === 'discount_cap_reached' && <p className="browse-pass-note">Your Saver Pass discount cap has been reached. <Link href="/renter/saver-pass">View pass</Link></p>}
+              {quoteReason === 'no_active_pass' && <p className="browse-pass-note">No active Saver Pass. <Link href="/renter/saver-pass">Save 5% with a ₱99 pass</Link></p>}
+              {quoteError && <div className="browse-quote-error" role="alert"><AlertCircle size={16} /><div><b>Total not confirmed</b><span>{quoteError}</span></div><button type="button" onClick={() => setQuoteAttempt((attempt) => attempt + 1)}><RefreshCw size={13} /> Retry</button></div>}
+            </>}
+          </div>}
+
+          {booked ? <div className="booking-success"><Check size={16} /> Booking request sent. The displayed amount is a booking value, not money held in escrow. If approved, follow the manual deposit and configured hub instructions in My Bookings. <Link href="/renter/bookings">Track it in My Bookings →</Link></div> : needsVerification ? <div className="booking-verify"><ShieldCheck size={15} /><div><b>Identity verification required</b><span>Verify your government ID before your first rental — approvals usually take less than a day.</span><Link href="/renter/verification">Complete verification →</Link></div></div> : <button className="primary-booking" disabled={bookingBusy || datesInvalid || (Boolean(user) && profile?.role === 'renter' && profile.verification_status === 'verified' && (quoteLoading || !bookingQuote))} onClick={handleBooking}>{bookingBusy ? 'Sending request…' : quoteLoading ? 'Calculating total…' : datesInvalid ? 'Choose valid rental dates' : quoteUnavailable ? 'Total unavailable — retry quote' : user ? `Request booking · ${pesos(quotedTotal)} (${days} day${days === 1 ? '' : 's'})` : 'Log in to request booking'}</button>}
+          {bookingError && <p className="demo-note detail-booking-error" role="alert">{bookingError}</p>}
+        </div>
+      </section>
+    </div>}
   </main>
 }
 

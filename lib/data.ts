@@ -377,7 +377,7 @@ export async function updateBookingStatus(id: string, status: BookingStatus): Pr
   const { data, error } = await supabase
     .rpc('transition_booking_status', { p_booking_id: id, p_new_status: status })
     .single()
-  if (error) throw error
+  if (error) rethrowPostgrest('transition_booking_status', error)
   return data as Booking
 }
 
@@ -462,6 +462,9 @@ function unwrapRpcRows(value: unknown, key?: string): unknown[] {
 // instead of a generic fallback.
 function rethrowPostgrest(name: string, error: unknown): never {
   const detail = (error ?? {}) as { message?: string; code?: string; details?: string }
+  if (detail.code === '23514' && /admin operator must be assigned before approval/i.test(detail.message ?? '')) {
+    throw new Error('A Naga Hub operator must be assigned before this request can be approved. Ask a platform admin to assign one in Hub Hand-offs, then try again.')
+  }
   const parts = [detail.message || `Could not call ${name}.`]
   if (detail.code) parts.unshift(`${detail.code}:`)
   if (detail.details) parts.push(`(${detail.details})`)

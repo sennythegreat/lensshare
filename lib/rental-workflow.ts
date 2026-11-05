@@ -95,7 +95,12 @@ export function deriveRentalBlockers(data: RentalHubData): RentalWorkflowBlocker
   if (operation?.workflow_version !== 2) return blockers
 
   if (booking.status === 'pending') {
-    addBlocker(blockers, 'owner_decision_required', 'approve_request', 'The owner must approve this request before hub operations begin.', 'owner')
+    if (!operation.assigned_operator_id) {
+      addBlocker(blockers, 'operator_required', 'assign_operator', 'A platform admin must assign a Naga Hub operator before the owner can approve this request.', 'operator')
+    }
+    addBlocker(blockers, 'owner_decision_required', 'approve_request', operation.assigned_operator_id
+      ? 'The owner must approve this request before hub operations begin.'
+      : 'The owner can approve this request after a Naga Hub operator is assigned.', 'owner')
     return blockers
   }
   if (booking.status === 'declined') return blockers

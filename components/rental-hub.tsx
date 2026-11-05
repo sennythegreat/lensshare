@@ -122,6 +122,7 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
   const renterSigned = Boolean(hubData.agreement?.renter_signed_at)
   const ownSigned = party === 'owner' ? ownerSigned : renterSigned
   const canSign = Boolean(hubData.agreement && !ownSigned && !isPending && !isDeclined)
+  const operatorAssigned = Boolean(hubData.operation?.assigned_operator_id)
   const allowedConfirmations = hubData.allowed_confirmation_kinds ?? []
   const confirmationSet = new Set((hubData.confirmations ?? []).map((confirmation) => `${confirmation.party}:${confirmation.kind}`))
   const depositRequired = Boolean(hubData.deposit && hubData.deposit.status !== 'waived')
@@ -148,8 +149,8 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
     </header>
 
     {isPending && party === 'owner' && <section className="hub-decision-panel">
-      <div><p className="hub-kicker">OWNER DECISION</p><h2>Review this rental request</h2><p>Approval creates the immutable version-2 equipment, hub, pricing, deposit, and agreement snapshot. Hub safeguards then control every physical hand-off.</p></div>
-      <div><button type="button" className="hub-button primary" disabled={Boolean(busyAction)} onClick={() => perform('approve', () => decideRentalRequest(booking.id, 'approved'), 'Request approved. The hub workflow is ready.')}>{busyAction === 'approve' ? 'Approving…' : 'Approve request'}</button><button type="button" className="hub-button danger" disabled={Boolean(busyAction)} onClick={() => setConfirmAction('decline')}>{busyAction === 'decline' ? 'Declining…' : 'Decline request'}</button></div>
+      <div><p className="hub-kicker">OWNER DECISION</p><h2>Review this rental request</h2><p>{operatorAssigned ? 'Approval creates the immutable version-2 equipment, hub, pricing, deposit, and agreement snapshot. Hub safeguards then control every physical hand-off.' : 'A platform admin must assign a Naga Hub operator before you can approve this request. You can still decline it now.'}</p></div>
+      <div><button type="button" className="hub-button primary" disabled={!operatorAssigned || Boolean(busyAction)} title={!operatorAssigned ? 'Waiting for a platform admin to assign a Naga Hub operator.' : undefined} onClick={() => perform('approve', () => decideRentalRequest(booking.id, 'approved'), 'Request approved. The hub workflow is ready.')}>{busyAction === 'approve' ? 'Approving…' : operatorAssigned ? 'Approve request' : 'Waiting for operator'}</button><button type="button" className="hub-button danger" disabled={Boolean(busyAction)} onClick={() => setConfirmAction('decline')}>{busyAction === 'decline' ? 'Declining…' : 'Decline request'}</button></div>
     </section>}
 
     {isPending && party === 'renter' && <section className="hub-waiting"><Clock3 size={17} /><div><strong>Waiting for owner approval</strong><span>Your price request is recorded. Hub operations, the deposit receipt, and agreement signatures open only after approval creates an immutable booking snapshot.</span></div></section>}
