@@ -1579,6 +1579,10 @@ export async function transitionAdminHubCustody(bookingId: string, action: HubPh
 
 export const transitionHubCustody = transitionAdminHubCustody
 
+export async function completeHubBooking(bookingId: string): Promise<void> {
+  await callRpc('complete_hub_booking', { p_booking_id: bookingId })
+}
+
 const HUB_REALTIME_TABLES = [
   'bookings',
   'booking_operations',

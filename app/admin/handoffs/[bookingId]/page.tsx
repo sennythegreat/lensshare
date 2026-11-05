@@ -25,12 +25,13 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ErrorState } from '@/components/states'
 import { useToast } from '@/components/toast'
 import {
+  completeHubBooking,
   fetchAdminHubHandoffDetail,
   fetchSignedAdminHubFileUrl,
   reviewAdminHubDepositProof,
   saveAdminHubInspection,
   setAdminHubIssueHold,
-  subscribeToAdminHubHandoffs,
+  subscribeToRentalHub,
   transitionAdminHubCustody,
 } from '@/lib/data'
 import {
@@ -146,7 +147,11 @@ export default function AdminHubHandoffDetailPage() {
   }, [bookingId])
 
   useEffect(() => { void load() }, [bookingId])
-  useEffect(() => subscribeToAdminHubHandoffs(() => void load(true)), [load])
+  useEffect(() => {
+    if (!bookingId) return
+    const unsubscribe = subscribeToRentalHub(bookingId, () => void load(true))
+    return unsubscribe
+  }, [bookingId, load])
 
   const booking = detail?.booking
   const currentCustodyIndex = detail ? CUSTODY_STEPS.findIndex((step) => step.value === detail.custody_state) : -1
@@ -273,7 +278,17 @@ export default function AdminHubHandoffDetailPage() {
       setNotice(`${ACTIONS[action].label} recorded in the custody timeline.`)
       toast.success(`${ACTIONS[action].label} recorded in the custody timeline.`)
       setConfirmAction(null)
+      // If this is the final transition, complete the booking
+      if (action === 'release_to_owner') {
+        await completeHubBooking(detail.booking_id)
+        setNotice('Booking completed successfully.')
+        toast.success('Booking completed successfully.')
+      }
+      // Longer delay to allow backend to process the state change
+      await new Promise(resolve => setTimeout(resolve, 1500))
       await load(true)
+      // Force another refresh after the delay
+      setTimeout(() => void load(true), 2000)
     } catch (transitionError) {
       const message = transitionError instanceof Error ? transitionError.message : 'Could not record the physical custody transition.'
       setError(message)
@@ -293,7 +308,7 @@ export default function AdminHubHandoffDetailPage() {
   if (state === 'error' || !detail || !booking) return <AdminShell title="Hand-off desk" subtitle="Review a Naga Hub booking exchange."><div className="admin-handoff-state"><ErrorState title="Hand-off record unavailable" hint={error || 'This booking does not have a hub exchange record, or it could not be loaded.'} retry={() => void load()} /></div></AdminShell>
 
   return <AdminShell title={booking.listing?.name || 'Hub hand-off'} subtitle={`${shortId(booking.id)} · ${booking.owner?.full_name || 'Owner'} to ${booking.renter?.full_name || 'Renter'}`}>
-    <div className="admin-handoff-detail-nav"><Link href="/admin/handoffs"><ArrowLeft size={13} /> Back to live queue</Link><button className="owner-button" type="button" onClick={() => void load()}><RefreshCw size={13} /> Refresh record</button></div>
+    <div className="admin-handoff-detail-nav"><Link href="/admin/handoffs"><ArrowLeft size={13} /> Back to live queue</Link><button className="owner-button" type="button" onClick={() => { void load(); toast.success('Record refreshed.') }}><RefreshCw size={13} /> Refresh record</button></div>
     {error && <div className="admin-handoff-alert error" role="alert">{error}</div>}
     {notice && <div className="admin-handoff-alert success" role="status">{notice}</div>}
 
