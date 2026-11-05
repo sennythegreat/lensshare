@@ -8,7 +8,9 @@ import { ArrowLeft, MailCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fetchRole } from '@/lib/data'
 
-const CODE_LENGTH = 6
+// Supabase email OTP codes are 8 digits; keep this in sync with the code
+// length shown in the copy below.
+const CODE_LENGTH = 8
 // Supabase rate-limits resend to one email per minute; 90s (1:30) keeps the
 // request safely inside that window and paces re-sends.
 const RESEND_COOLDOWN_SECONDS = 90
@@ -113,7 +115,7 @@ function VerifyForm() {
         <Link href="/" className="back-link"><ArrowLeft size={14} /> Back to LensShare</Link>
         <div className="auth-form-wrap">
           <span className="eyebrow">Confirm your email</span>
-          <h2>Enter your 6-digit code</h2>
+          <h2>Enter your 8-digit code</h2>
           {email ? (
             <p className="auth-subtitle">We sent a code to <b>{email}</b>. Enter it below to activate your account.</p>
           ) : (
