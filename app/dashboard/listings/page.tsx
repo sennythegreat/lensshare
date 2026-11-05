@@ -31,6 +31,13 @@ const MAX_PHOTO_BYTES = 8 * 1024 * 1024
 
 type PhotoDraft = { id: string; url: string; file?: File }
 
+function parseAmount(value: string): number | null {
+  const cleaned = value.replace(/[₱,\s]/g, '')
+  if (!cleaned) return null
+  const parsed = Number(cleaned)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function brandModelOf(listing: Listing) {
   const prefix = `${listing.category.toUpperCase()} · `
   return listing.meta?.startsWith(prefix) ? listing.meta.slice(prefix.length) : listing.brand
@@ -246,12 +253,24 @@ export default function ListingsPage() {
       setError(loading ? 'Preparing your owner account. Please wait a moment.' : 'Sign in with an owner account before publishing gear.')
       return
     }
-    const dailyRate = Number(rate)
-    if (!name.trim() || !brandModel.trim() || !Number.isFinite(dailyRate) || dailyRate <= 0) {
-      setError('Fill in the equipment name, brand and model, and a daily rate above zero.')
+    const dailyRate = parseAmount(rate)
+    if (!name.trim()) {
+      setError('Fill in the equipment name.')
       return
     }
-    const depositAmount = deposit.trim() === '' ? null : Number(deposit)
+    if (!brandModel.trim()) {
+      setError('Fill in the brand and model.')
+      return
+    }
+    if (dailyRate === null || dailyRate <= 0) {
+      setError('Enter a daily rate above zero, e.g. 750 or 1,500.')
+      return
+    }
+    if (!pickupAddress.trim()) {
+      setError('Enter the city or municipality where this gear is available.')
+      return
+    }
+    const depositAmount = deposit.trim() === '' ? null : parseAmount(deposit)
     if (depositAmount !== null && (!Number.isFinite(depositAmount) || depositAmount < 0)) {
       setError('Enter a security deposit of zero or more, or leave it blank to use the hub default.')
       return
@@ -416,7 +435,7 @@ export default function ListingsPage() {
           {photos.length ? <div className="gear-photo-grid">{photos.map((photo, index) => <article className="gear-photo-item" key={photo.id}><img src={photo.url} alt={`Listing photo ${index + 1}`}/>{index === 0 && <span className="gear-photo-cover">Cover</span>}<div className="gear-photo-actions"><button type="button" disabled={index === 0} onClick={() => movePhoto(index, -1)} aria-label={`Move photo ${index + 1} left`}><ArrowLeft size={14}/></button><button type="button" disabled={index === photos.length - 1} onClick={() => movePhoto(index, 1)} aria-label={`Move photo ${index + 1} right`}><ArrowRight size={14}/></button><button type="button" onClick={() => removePhoto(index)} aria-label={`Remove photo ${index + 1}`}><Trash2 size={14}/></button></div></article>)}</div> : <button className="gear-photo-empty" type="button" onClick={() => photoInput.current?.click()}><ImagePlus size={22}/><span>Add up to five clear photos</span><small>JPG, PNG or another browser-supported image · 8 MB each</small></button>}
         </div>
         <div className="form-grid"><label>Equipment name<input value={name} required autoFocus onChange={(event) => setName(event.target.value)} placeholder="Sony FX30 Cinema Body"/></label><label>Brand &amp; model<input value={brandModel} required onChange={(event) => setBrandModel(event.target.value)} placeholder="Sony · FX30"/></label><label>Category<select value={category} onChange={(event) => setCategory(event.target.value as ListingCategory)}>{CATEGORIES.map((item) => <option key={item}>{item}</option>)}</select></label><label>Listing status<select value={status} onChange={(event) => setStatus(event.target.value as ListingStatus)}><option value="available">Available</option><option value="paused">Paused</option></select></label><label>Daily rate PHP<input value={rate} required onChange={(event) => setRate(event.target.value)} placeholder="750" inputMode="decimal"/></label><label>Security deposit PHP (optional)<input value={deposit} onChange={(event) => setDeposit(event.target.value)} placeholder="Hub default" inputMode="decimal"/><small>Leave blank to use the hub default. Refundable after return.</small></label><div className="owner-serial-field"><label htmlFor="gear-serial-number">Equipment serial number</label><input id="gear-serial-number" value={serialNumber} required maxLength={160} autoComplete="off" spellCheck={false} disabled={serialLoading || Boolean(serialLoadError)} onChange={(event) => { setSerialNumber(event.target.value); setError('') }} placeholder={serialLoading ? 'Loading private serial…' : 'Enter the manufacturer serial'}/><p>This inventory identifier is stored in a private owner/admin record. It is never shown on the public listing.</p>{editing && !serialLoading && !serialLoadError && !serialNumber.trim() && <p className="owner-serial-warning" role="status"><CircleAlert size={14}/> Legacy listing: add a serial number before you can save changes.</p>}{serialLoadError && <p className="owner-serial-warning" role="alert"><CircleAlert size={14}/> {serialLoadError}</p>}</div><label className="wide">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the condition and anything renters should know."/></label><label className="wide">Specifications<textarea value={specs} onChange={(event) => setSpecs(event.target.value)} placeholder="Sensor, mount, resolution, dimensions, or other key specifications."/></label><label className="wide">Included accessories<textarea value={included} onChange={(event) => setIncluded(event.target.value)} placeholder="Batteries, charger, case, cables, stands, or other included items."/></label>
-          <div className="wide owner-location-field"><label htmlFor="gear-pickup-address">Availability area <span>Optional</span></label><input id="gear-pickup-address" value={pickupAddress} onChange={(event) => changePickupAddress(event.target.value)} placeholder="City or municipality, e.g. Naga City" maxLength={120} aria-describedby="gear-pickup-privacy"/><p id="gear-pickup-privacy">Share only the broad city or municipality where this gear is available. Arrange the exact handoff place privately with the renter in Messages.</p></div>
+          <div className="wide owner-location-field"><label htmlFor="gear-pickup-address">Availability area</label><input id="gear-pickup-address" value={pickupAddress} required onChange={(event) => changePickupAddress(event.target.value)} placeholder="City or municipality, e.g. Naga City" maxLength={120} aria-describedby="gear-pickup-privacy"/><p id="gear-pickup-privacy">Share only the broad city or municipality where this gear is available. Arrange the exact handoff place privately with the renter in Messages.</p></div>
         </div>
         <div className="owner-pickup-location"><div className="owner-pickup-heading"><MapPin size={18} aria-hidden="true"/><div><b>Help renters find nearby gear</b><p>Optional GPS is rounded to an approximate area before saving. Your raw coordinates are not displayed.</p></div></div>
           <div className="owner-location-actions"><button className="owner-button" type="button" disabled={!pickupAddress.trim() || locationBusy} onClick={capturePickupPoint}><LocateFixed size={15} aria-hidden="true"/>{locationBusy ? 'Locating…' : 'Use my current area'}</button>{(pickupPoint || locationCandidate || locationBusy) && <button className="owner-button" type="button" onClick={clearPickupPoint}>{locationBusy ? 'Cancel location' : 'Remove nearby sorting'}</button>}</div>
