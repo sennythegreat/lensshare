@@ -1333,3 +1333,61 @@
   .owner-blackout-weekday { font-size: 10px; }
   .report-incident-thumbs img { width: 78px; height: 78px; }
 }
+
+/* Rental completion feedback and separate rental-payment ledger. */
+.owner-decision-error {
+  display: block;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #d9aaa2;
+  background: #fff0ed;
+  color: #7c2f27;
+  font: 13px/1.55 Arial, sans-serif;
+  overflow-wrap: anywhere;
+}
+.finance-notice {
+  margin-bottom: 22px;
+  padding: 16px 18px;
+  border: 1px solid #d8cba2;
+  background: #faf6e9;
+  color: #65542c;
+  line-height: 1.55;
+}
+.finance-notice p { margin: 6px 0 0; overflow-wrap: anywhere; }
+.finance-notice.finance-error { border-color: #d9aaa2; background: #fff0ed; color: #7c2f27; }
+.finance-payment-ledger { min-width: 0; }
+.finance-payment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, .9fr);
+  gap: 24px;
+  padding: 24px 0;
+  border-bottom: 1px solid #dde3df;
+  align-items: start;
+}
+.finance-payment-row:last-child { border-bottom: 0; }
+.finance-payment-row > div { min-width: 0; overflow-wrap: anywhere; }
+.finance-payment-row h3 { margin: 8px 0 6px; color: var(--owner-ink); font: 19px/1.3 Georgia, serif; }
+.finance-payment-row h3 a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.finance-payment-row p { margin: 7px 0 0; color: var(--owner-muted); font-size: 13px; line-height: 1.55; }
+.finance-field-label { display: block; margin: 14px 0 6px; color: #53645d; font: 10px/1.4 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
+.finance-field-label:first-child { margin-top: 0; }
+.finance-amount { display: block; font: 24px/1.2 Georgia, serif; color: var(--owner-ink); }
+.finance-reference { display: block; font: 12px/1.5 'DM Mono', monospace; overflow-wrap: anywhere; }
+.finance-proof { display: inline-block; padding: 6px 9px; border: 1px solid #cbd4cf; background: #eef2ef; color: #53615b; font: 10px/1.4 'DM Mono', monospace; }
+.finance-proof[data-status='proof_accepted'] { border-color: #b7d2ca; background: #dcebe7; color: #244b43; }
+.finance-proof[data-status='pending_review'], .finance-proof[data-status='awaiting_payment'] { border-color: #d8cba2; background: #faf6e9; color: #65542c; }
+.finance-proof[data-status='rejected'] { border-color: #d9aaa2; background: #fff0ed; color: #7c2f27; }
+.finance-settlement { display: block; font-size: 14px; line-height: 1.5; }
+.finance-payout-action { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.finance-payout-row p, .finance-payout-row h3 { overflow-wrap: anywhere; }
+@media (max-width: 1100px) {
+  .finance-payment-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .finance-payment-row > div:last-child { grid-column: 1 / -1; }
+  .finance-payout-action { align-items: flex-start; }
+}
+@media (max-width: 700px) {
+  .finance-payment-row { grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 20px 0; }
+  .finance-payment-row > div:last-child { grid-column: auto; }
+  .finance-payout-row { grid-template-columns: minmax(0, 1fr); }
+  .finance-payout-action, .finance-payout-action .owner-button { width: 100%; }
+}

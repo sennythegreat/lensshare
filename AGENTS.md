@@ -33,14 +33,15 @@ finishing any change.
   `admin.sql` → `listing-locations.sql` → `listing-media.sql` → `features.sql` →
   `community.sql` → `message-actions.sql` → `emails.sql` → `promo-pass.sql` →
   `storage.sql` → `hub-operations.sql` → `service-area-and-incidents.sql` →
-  **`rental-payments.sql` LAST**. `seed.sql` is optional/demo-only
+  `rental-payments.sql` → **`rental-settlement.sql` LAST**. `seed.sql` is optional/demo-only
   and destructive for the resolved demo owner; never use it as a migration.
   `hub-operations.sql` owns the overlapping booking/verification RPCs,
   v2 transition guards, aggregate verification, and private hub storage policies.
   If an earlier canonical file is rerun, rerun `hub-operations.sql`, then
-  `service-area-and-incidents.sql`, then `rental-payments.sql` afterwards.
+  `service-area-and-incidents.sql`, `rental-payments.sql`, then `rental-settlement.sql` afterwards.
   On an existing installation with hub and incident operations installed,
-  `rental-payments.sql` alone installs the rental-payment upgrade.
+  `rental-payments.sql` installs the rental-payment upgrade; after that,
+  `rental-settlement.sql` adds guarded owner completion and admin deposit settlement.
 - `supabase/schema.sql` creates the base schema (tables, RLS, signup trigger,
   realtime, gear storage); `supabase/verification.sql` adds the verification
   layer (`verification_submissions` table, private `verification-docs` bucket,
@@ -88,6 +89,13 @@ finishing any change.
   is not provider-confirmed payment or escrow and does not mark owner payouts paid.
   Pending/approved v2 bookings require rental proof before pickup; historical
   released/closed bookings are explicitly unrecorded, never automatically paid.
+- Completion/finance: `rental-settlement.sql` permits only the booking owner or
+  assigned admin operator to call `complete_hub_booking`; all v2 inspection,
+  confirmation, custody, issue-hold and deposit gates remain authoritative.
+  `resolve_booking_deposit` exposes admin-only returned-booking refund processing,
+  refund-reference confirmation, and full-deposit forfeiture. Accepted rent is
+  shown separately from owner payouts in Finance. Payouts remain completion-only,
+  based on subtotal less 15% commission; receipt acceptance never marks a payout paid.
 - Row Level Security is the security core — the browser queries Supabase
   directly with the publishable key. Never replace RLS with client-side
   checks.

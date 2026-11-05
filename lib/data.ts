@@ -32,6 +32,7 @@ import type {
   Message,
   MessageAttachment,
   NewIncidentInput,
+  OwnerFinanceData,
   Payout,
   PlatformStats,
   PromoPass,
@@ -1329,12 +1330,12 @@ export async function fetchHubOperators(): Promise<Pick<Profile, 'id' | 'full_na
   return (data ?? []) as Pick<Profile, 'id' | 'full_name' | 'email'>[]
 }
 
-function queueBucket(value: unknown, custody: HubCustodyState, issueReason: string | null): HubQueueBucket {
-  const bucket = asString(value)
-  if (['pickup_due', 'return_due', 'issue_hold', 'completed'].includes(bucket)) return bucket as HubQueueBucket
+function queueBucket(value: unknown, custody: HubCustodyState, issueReason: string | null, bookingStatus: BookingStatus): HubQueueBucket {
+  if (bookingStatus === 'completed') return 'completed'
   if (issueReason) return 'issue_hold'
-  if (custody === 'with_renter' || custody === 'at_hub_for_return') return 'return_due'
-  if (custody === 'completed') return 'completed'
+  if (custody === 'with_renter' || custody === 'at_hub_for_return' || custody === 'completed') return 'return_due'
+  const bucket = asString(value)
+  if (['pickup_due', 'return_due', 'issue_hold'].includes(bucket)) return bucket as HubQueueBucket
   return 'pickup_due'
 }
 
@@ -1363,8 +1364,8 @@ function normalizeQueueItem(value: unknown): HubHandoffQueueItem | null {
     custody_state: custody,
     rental_payment_status: row.rental_payment ? rentalPaymentStatus(asObject(row.rental_payment).status) : null,
     deposit_status: adminDepositStatus(row.deposit_status ?? asObject(row.deposit).status),
-    queue_bucket: queueBucket(row.queue_bucket, custody, issueReason),
-    assigned_admin_id: asNullableString(row.assigned_admin_id ?? row.assigned_operator_id ?? operation.assigned_operator_id),
+    queue_bucket: queueBucket(row.queue_bucket, custody, issueReason, booking.status),
+    assigned_admin_id: asNullableString(row.assigned_admin_id ?? row.assigned_operator_id ?? operation.assigned_operator_id ?? operation.operator_id ?? assigned.id),
     assigned_admin: Object.keys(assigned).length ? { id: asString(assigned.id), full_name: asString(assigned.full_name) } : null,
     pickup_due_at: asNullableString(row.pickup_due_at ?? booking.start_date),
     return_due_at: asNullableString(row.return_due_at ?? booking.end_date),
@@ -1460,8 +1461,8 @@ function normalizeHandoffDetail(value: unknown): HubHandoffDetail | null {
     rental_payment_status: rentalPayment?.status ?? null,
     rental_payment: rentalPayment,
     deposit_status: depositStatus,
-    queue_bucket: queueBucket(row.queue_bucket, custody, issueReason),
-    assigned_admin_id: asNullableString(row.assigned_admin_id ?? row.assigned_operator_id ?? operation.assigned_operator_id),
+    queue_bucket: queueBucket(row.queue_bucket, custody, issueReason, booking.status),
+    assigned_admin_id: asNullableString(row.assigned_admin_id ?? row.assigned_operator_id ?? operation.assigned_operator_id ?? operation.operator_id ?? assigned.id),
     assigned_admin: Object.keys(assigned).length ? { id: asString(assigned.id), full_name: asString(assigned.full_name) } : null,
     pickup_due_at: asNullableString(row.pickup_due_at ?? booking.start_date),
     return_due_at: asNullableString(row.return_due_at ?? booking.end_date),
@@ -1469,6 +1470,10 @@ function normalizeHandoffDetail(value: unknown): HubHandoffDetail | null {
     deposit: Object.keys(depositRow).length ? {
       amount: asNumber(depositRow.amount, 2000),
       status: adminDepositStatus(depositRow.status),
+      raw_status: canonicalDepositStatus(depositRow.status),
+      refund_reference: asNullableString(depositRow.refund_reference),
+      refunded_at: asNullableString(depositRow.refunded_at),
+      forfeited_amount: asNumber(depositRow.forfeited_amount),
       reference: asNullableString(depositRow.reference ?? depositRow.gcash_reference),
       proof_path: asNullableString(depositRow.proof_path),
       submitted_at: asNullableString(depositRow.submitted_at),
@@ -1485,6 +1490,7 @@ function normalizeHandoffDetail(value: unknown): HubHandoffDetail | null {
     inspections: asArray(row.inspections).map((item) => normalizeHubInspection(item, booking.id, row.inspection_photos)).filter((item): item is HubInspection => Boolean(item)),
     participant_confirmations: confirmations,
     blockers: asArray(row.blockers).map((blocker) => typeof blocker === 'string' ? blocker : asString(asObject(blocker).message ?? asObject(blocker).reason)).filter(Boolean),
+    completion_blockers: [],
     allowed_transitions: asArray(row.allowed_transitions).length
       ? asArray(row.allowed_transitions).map((action) => asString(action)).filter((action): action is HubPhysicalAction => ['receive_from_owner', 'release_to_renter', 'receive_from_renter', 'release_to_owner'].includes(action))
       : allowedAdminPhysicalActions(custody, issueReason),
@@ -1506,6 +1512,25 @@ function normalizeHandoffDetail(value: unknown): HubHandoffDetail | null {
       ? 'The rental-payment proof must be accepted before releasing gear to the renter.'
       : 'Rental-payment setup is pending. Apply rental-payments.sql before renter pickup.')
     detail.allowed_transitions = detail.allowed_transitions.filter((action) => action !== 'release_to_renter')
+  }
+  if (booking.status !== 'completed') {
+    if (booking.status !== 'returned') detail.completion_blockers.push('The renter return must be recorded before completion.')
+    if (custody !== 'completed') detail.completion_blockers.push('The owner and assigned operator must confirm the gear was returned to the owner.')
+    if (issueReason || asBoolean(operation.issue_hold)) detail.completion_blockers.push('Resolve the booking issue hold before completion.')
+    const postInspection = detail.inspections.find((inspection) => inspection.stage === 'post_return' && inspection.finalized_at)
+    if (!postInspection) {
+      detail.completion_blockers.push('Finalize the post-return inspection before completion.')
+    } else {
+      const confirmedParties = new Set(asArray(row.inspection_confirmations).map(asObject)
+        .filter((confirmation) => asString(confirmation.inspection_id) === postInspection.id)
+        .map((confirmation) => asString(confirmation.party)))
+      for (const party of ['owner', 'renter']) {
+        if (!confirmedParties.has(party)) detail.completion_blockers.push(`The ${party} must confirm the finalized post-return inspection.`)
+      }
+    }
+    if (!detail.deposit || !['waived_student', 'refunded', 'forfeited'].includes(detail.deposit.raw_status)) {
+      detail.completion_blockers.push('Resolve the security deposit by refund or forfeiture before completion.')
+    }
   }
   return detail
 }
@@ -1575,6 +1600,18 @@ export async function reviewAdminHubDepositProof(bookingId: string, decision: 'a
     p_decision: decision === 'accepted' ? 'approve' : 'reject',
     p_review_note: note?.trim() || null,
     p_amount: null,
+  })
+}
+
+export async function resolveAdminHubDeposit(bookingId: string, decision: 'refund' | 'confirm_refund' | 'forfeit', note: string, amount?: number): Promise<void> {
+  const reviewNote = note.trim()
+  if (!reviewNote || reviewNote.length > 1000) throw new Error('Enter a reason or refund reference of 1 to 1000 characters.')
+  if (decision === 'forfeit' && (!Number.isFinite(amount) || Number(amount) <= 0)) throw new Error('Enter the full deposit amount for forfeiture.')
+  await callRpc('resolve_booking_deposit', {
+    p_booking_id: bookingId,
+    p_decision: decision,
+    p_review_note: reviewNote,
+    p_amount: decision === 'forfeit' ? amount : null,
   })
 }
 
@@ -1733,17 +1770,57 @@ export async function fetchOwnerPayouts(ownerId: string): Promise<(Payout & { bo
     .select(`*, booking:bookings(${BOOKING_SELECT})`)
     .eq('owner_id', ownerId)
     .order('created_at', { ascending: false })
-  if (error) throw error
+  if (error) rethrowPostgrest('fetchOwnerPayouts', error)
   return (data ?? []) as (Payout & { booking: BookingWithRelations })[]
+}
+
+export async function fetchOwnerFinance(ownerId: string): Promise<OwnerFinanceData> {
+  const [bookings, payouts] = await Promise.all([fetchOwnerBookings(ownerId), fetchOwnerPayouts(ownerId)])
+  const payments: RentalPayment[] = []
+  let paymentSetupPending = false
+  const bookingIds = bookings.filter((booking) => booking.workflow_version === 2).map((booking) => booking.id)
+  // Keep PostgREST URLs bounded for owners with a long rental history.
+  for (let index = 0; index < bookingIds.length; index += 100) {
+    const { data, error } = await createClient().from('booking_rental_payments').select('*').in('booking_id', bookingIds.slice(index, index + 100))
+    if (error) {
+      if (isRentalPaymentSetupMissing(error)) { paymentSetupPending = true; break }
+      rethrowPostgrest('fetchOwnerFinance', error)
+    }
+    for (const row of data ?? []) {
+      const payment = normalizeRentalPayment(row, asString(row.booking_id))
+      if (payment) payments.push(payment)
+    }
+  }
+  if (payments.length < bookingIds.length) paymentSetupPending = true
+  return { bookings, payments, payouts, payment_setup_pending: paymentSetupPending }
+}
+
+export function subscribeToOwnerFinance(ownerId: string, bookingIds: string[], callback: () => void): () => void {
+  const supabase = createClient()
+  let channel = supabase.channel(`owner-finance:${ownerId}:${crypto.randomUUID()}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `owner_id=eq.${ownerId}` }, callback)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'payouts', filter: `owner_id=eq.${ownerId}` }, callback)
+  const uniqueIds = [...new Set(bookingIds)]
+  for (let index = 0; index < uniqueIds.length; index += 100) {
+    channel = channel.on('postgres_changes', {
+      event: '*', schema: 'public', table: 'booking_rental_payments',
+      filter: `booking_id=in.(${uniqueIds.slice(index, index + 100).join(',')})`,
+    }, callback)
+  }
+  channel.subscribe()
+  return () => { void supabase.removeChannel(channel) }
 }
 
 export async function markPayoutPaid(payoutId: string): Promise<void> {
   const supabase = createClient()
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('payouts')
     .update({ status: 'paid', paid_at: new Date().toISOString() })
     .eq('id', payoutId)
-  if (error) throw error
+    .select('id')
+    .maybeSingle()
+  if (error) rethrowPostgrest('markPayoutPaid', error)
+  if (!data) throw new Error('The payout was not found or could not be updated.')
 }
 
 // ---------- Hand-offs / agreement ----------

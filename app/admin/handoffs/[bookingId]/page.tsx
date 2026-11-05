@@ -29,6 +29,7 @@ import {
   fetchAdminHubHandoffDetail,
   fetchRentalPaymentProofUrl,
   fetchSignedAdminHubFileUrl,
+  resolveAdminHubDeposit,
   reviewAdminHubDepositProof,
   reviewAdminRentalPaymentProof,
   saveAdminHubInspection,
@@ -36,6 +37,7 @@ import {
   subscribeToRentalHub,
   transitionAdminHubCustody,
 } from '@/lib/data'
+import { useProfile } from '@/lib/use-profile'
 import {
   pesos,
   RENTAL_PAYMENT_STATUS_LABELS,
@@ -50,7 +52,7 @@ const CUSTODY_STEPS: { value: HubHandoffDetail['custody_state']; label: string }
   { value: 'at_hub_for_pickup', label: 'Hub intake' },
   { value: 'with_renter', label: 'With renter' },
   { value: 'at_hub_for_return', label: 'Return intake' },
-  { value: 'completed', label: 'Owner release' },
+  { value: 'completed', label: 'Returned to owner' },
 ]
 
 const ACTIONS: Record<HubPhysicalAction, { label: string; detail: string; confirm: string }> = {
@@ -124,13 +126,24 @@ type ProofReview = {
   reviewNote: string | null
 }
 
+type DepositResolution = {
+  bookingId: string
+  decision: 'refund' | 'confirm_refund' | 'forfeit'
+  note: string
+  rawStatus: NonNullable<HubHandoffDetail['deposit']>['raw_status']
+  amount: number
+}
+
 type ConfirmAction =
   | ({ type: 'deposit' | 'rental-payment' } & ProofReview)
+  | ({ type: 'deposit-resolution' } & DepositResolution)
+  | { type: 'complete'; bookingId: string }
   | { type: 'clear-hold' }
   | { type: 'transition'; action: HubPhysicalAction }
 
 export default function AdminHubHandoffDetailPage() {
   const params = useParams<{ bookingId: string }>()
+  const { user, profile } = useProfile()
   const toast = useToast()
   const bookingId = params.bookingId
   const [detail, setDetail] = useState<HubHandoffDetail | null>(null)
@@ -140,6 +153,8 @@ export default function AdminHubHandoffDetailPage() {
   const [busy, setBusy] = useState<string | null>(null)
   const [viewedDepositProof, setViewedDepositProof] = useState<ViewedProof | null>(null)
   const [proofNote, setProofNote] = useState('')
+  const [depositResolutionNote, setDepositResolutionNote] = useState('')
+  const [refundReference, setRefundReference] = useState('')
   const [viewedRentalProof, setViewedRentalProof] = useState<ViewedProof | null>(null)
   const [rentalProofNote, setRentalProofNote] = useState('')
   const [holdReason, setHoldReason] = useState('')
@@ -168,6 +183,11 @@ export default function AdminHubHandoffDetailPage() {
   }, [bookingId, load])
 
   const booking = detail?.booking
+  const bookingCompleted = booking?.status === 'completed'
+  const custodyComplete = detail?.custody_state === 'completed'
+  const completionBlockers = detail?.completion_blockers ?? []
+  const canComplete = Boolean(user && profile?.role === 'admin' && detail?.assigned_admin_id === user.id)
+  const depositSettlementAvailable = Boolean(profile?.role === 'admin' && detail?.booking_id === bookingId && booking?.status === 'returned' && (detail?.deposit?.raw_status === 'held' || detail?.deposit?.raw_status === 'refund_pending'))
   const rentalPayment = detail?.rental_payment ?? null
   const rentalPaymentStatus = detail?.rental_payment_status ?? rentalPayment?.status ?? null
   const depositProofPath = detail?.deposit?.proof_path ?? null
@@ -190,6 +210,12 @@ export default function AdminHubHandoffDetailPage() {
     setRentalProofNote('')
     setConfirmAction((current) => current?.type === 'rental-payment' ? null : current)
   }, [bookingId, rentalProofPath])
+
+  useEffect(() => {
+    setDepositResolutionNote('')
+    setRefundReference('')
+    setConfirmAction((current) => current?.type === 'deposit-resolution' || current?.type === 'complete' ? null : current)
+  }, [bookingId, detail?.deposit?.raw_status, booking?.status])
 
   useEffect(() => {
     if (!rentalReviewAvailable) setConfirmAction((current) => current?.type === 'rental-payment' ? null : current)
@@ -331,8 +357,84 @@ export default function AdminHubHandoffDetailPage() {
     }
   }
 
+  function resolveDeposit(decision: DepositResolution['decision']) {
+    if (busy || !depositSettlementAvailable || !detail?.deposit) return
+    if (((decision === 'refund' || decision === 'forfeit') && detail.deposit.raw_status !== 'held') || (decision === 'confirm_refund' && detail.deposit.raw_status !== 'refund_pending')) return
+    const note = (decision === 'confirm_refund' ? refundReference : depositResolutionNote).trim()
+    if (!note) {
+      setError(decision === 'confirm_refund' ? 'Enter the actual external refund transaction reference.' : 'Enter a reason for this deposit decision.')
+      return
+    }
+    setConfirmAction({ type: 'deposit-resolution', bookingId, decision, note, rawStatus: detail.deposit.raw_status, amount: Number(detail.deposit.amount) })
+  }
+
+  async function confirmDepositResolution(resolution: DepositResolution) {
+    if (busy) return
+    if (!depositSettlementAvailable || !detail?.deposit || resolution.bookingId !== bookingId || resolution.rawStatus !== detail.deposit.raw_status || resolution.amount !== Number(detail.deposit.amount) || !resolution.note.trim()) {
+      const message = 'The booking or deposit changed. Review the current deposit before recording a decision.'
+      setConfirmAction(null)
+      setError(message)
+      toast.error(message)
+      return
+    }
+    setBusy(`deposit-resolution-${resolution.decision}`)
+    setError('')
+    setNotice('')
+    try {
+      await resolveAdminHubDeposit(resolution.bookingId, resolution.decision, resolution.note, resolution.decision === 'forfeit' ? resolution.amount : undefined)
+      const message = resolution.decision === 'refund'
+        ? 'Refund pending recorded. No money was sent. Complete the refund externally, then record its transaction reference.'
+        : resolution.decision === 'confirm_refund'
+          ? 'External refund confirmation and reference recorded. LensShare did not transfer money.'
+          : 'Full-deposit forfeiture recorded. No money was transferred.'
+      setNotice(message)
+      toast.success(message)
+      setDepositResolutionNote('')
+      setRefundReference('')
+      setConfirmAction(null)
+      await load(true)
+    } catch (resolutionError) {
+      const message = resolutionError instanceof Error ? resolutionError.message : 'Could not record the deposit decision.'
+      setError(message)
+      toast.error(message)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function confirmCompletion(completionBookingId: string) {
+    if (busy) return
+    if (!detail || detail.booking_id !== completionBookingId || completionBookingId !== bookingId || booking?.status !== 'returned' || !canComplete || completionBlockers.length) {
+      const message = 'Completion is not available. The assigned admin must review the current booking and clear all completion blockers.'
+      setConfirmAction(null)
+      setError(message)
+      toast.error(message)
+      return
+    }
+    setBusy('complete')
+    setError('')
+    setNotice('')
+    try {
+      await completeHubBooking(completionBookingId)
+      const message = 'Booking marked as done. This action did not transfer money.'
+      setNotice(message)
+      toast.success(message)
+      setConfirmAction(null)
+      await load(true)
+    } catch (completionError) {
+      const message = completionError instanceof Error ? completionError.message : 'Could not mark this booking as done.'
+      setError(message)
+      toast.error(message)
+      setConfirmAction(null)
+      await load(true)
+      setError(message)
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function saveHold() {
-    if (!detail) return
+    if (!detail || busy || bookingCompleted) return
     const reason = holdReason.trim()
     if (!reason) {
       setError('Describe the issue before placing this exchange on hold.')
@@ -356,12 +458,12 @@ export default function AdminHubHandoffDetailPage() {
   }
 
   function clearHold() {
-    if (!detail) return
+    if (!detail || busy || bookingCompleted) return
     setConfirmAction({ type: 'clear-hold' })
   }
 
   async function confirmClearHold() {
-    if (!detail) return
+    if (!detail || busy || bookingCompleted) return
     setBusy('hold')
     setError('')
     setNotice('')
@@ -382,31 +484,24 @@ export default function AdminHubHandoffDetailPage() {
   }
 
   function transition(action: HubPhysicalAction) {
-    if (!detail) return
+    if (!detail || busy || bookingCompleted) return
     setConfirmAction({ type: 'transition', action })
   }
 
   async function confirmTransition(action: HubPhysicalAction) {
-    if (!detail) return
+    if (!detail || busy || bookingCompleted) return
     setBusy(action)
     setError('')
     setNotice('')
     try {
       await transitionAdminHubCustody(detail.booking_id, action)
-      setNotice(`${ACTIONS[action].label} recorded in the custody timeline.`)
-      toast.success(`${ACTIONS[action].label} recorded in the custody timeline.`)
+      const message = action === 'release_to_owner'
+        ? 'Returned to owner recorded. Wait for both return confirmations and resolve the deposit, then explicitly select Mark as done.'
+        : `${ACTIONS[action].label} recorded in the custody timeline.`
+      setNotice(message)
+      toast.success(message)
       setConfirmAction(null)
-      // If this is the final transition, complete the booking
-      if (action === 'release_to_owner') {
-        await completeHubBooking(detail.booking_id)
-        setNotice('Booking completed successfully.')
-        toast.success('Booking completed successfully.')
-      }
-      // Longer delay to allow backend to process the state change
-      await new Promise(resolve => setTimeout(resolve, 1500))
       await load(true)
-      // Force another refresh after the delay
-      setTimeout(() => void load(true), 2000)
     } catch (transitionError) {
       const message = transitionError instanceof Error ? transitionError.message : 'Could not record the physical custody transition.'
       setError(message)
@@ -432,7 +527,7 @@ export default function AdminHubHandoffDetailPage() {
 
     <section className="admin-handoff-hero">
       <img src={booking.listing?.image_url || '/lensshare-camera.png'} alt="" />
-      <div className="admin-handoff-hero-copy"><div><span className={`admin-handoff-badge ${detail.queue_bucket}`}>{detail.queue_bucket.replaceAll('_', ' ')}</span><span className="admin-handoff-ref">{shortId(booking.id)}</span></div><h2>{booking.listing?.name || 'Removed listing'}</h2><p>{booking.listing?.brand || 'Gear'} · {dateLabel(booking.start_date)} to {dateLabel(booking.end_date)} · {booking.days} {booking.days === 1 ? 'day' : 'days'}</p></div>
+      <div className="admin-handoff-hero-copy"><div><span className={`admin-handoff-badge ${detail.queue_bucket}`}>{detail.queue_bucket.replaceAll('_', ' ')}</span>{booking.status === 'returned' && <span className="admin-handoff-badge awaiting-completion">Awaiting completion</span>}<span className="admin-handoff-ref">{shortId(booking.id)}</span></div><h2>{booking.listing?.name || 'Removed listing'}</h2><p>{booking.listing?.brand || 'Gear'} · {dateLabel(booking.start_date)} to {dateLabel(booking.end_date)} · {booking.days} {booking.days === 1 ? 'day' : 'days'}</p></div>
       <dl><div><dt>Owner</dt><dd>{booking.owner?.full_name || 'Not available'}</dd></div><div><dt>Renter</dt><dd>{booking.renter?.full_name || 'Not available'}</dd></div><div><dt>Renter total</dt><dd>{pesos(Number(booking.total))}</dd></div><div><dt>Assigned admin</dt><dd>{detail.assigned_admin?.full_name || 'Unassigned'}</dd></div></dl>
     </section>
 
@@ -460,11 +555,33 @@ export default function AdminHubHandoffDetailPage() {
           <div className="admin-handoff-proof-warning" role="note"><ShieldAlert size={18} /><p><strong>Manual visual review only.</strong> Accepting a receipt checks the submitted image against the configured LensShare GCash details. It does not confirm the GCash provider transaction, place funds in LensShare custody, or create escrow.</p></div>
           {detail.deposit_status === 'waived' ? <div className="admin-handoff-inline-state"><CheckCircle2 size={18} /><div><b>Deposit waived for this booking</b><p>No receipt review is required. Continue only when all other hand-off blockers are clear.</p></div></div>
             : detail.deposit ? <>
-              <dl className="admin-handoff-facts"><div><dt>Required amount</dt><dd>{pesos(Number(detail.deposit.amount || 2000))}</dd></div><div><dt>GCash reference</dt><dd>{detail.deposit.reference || 'Not supplied'}</dd></div><div><dt>Submitted</dt><dd>{dateTimeLabel(detail.deposit.submitted_at)}</dd></div><div><dt>Reviewed</dt><dd>{dateTimeLabel(detail.deposit.reviewed_at)}</dd></div></dl>
+              <dl className="admin-handoff-facts"><div><dt>Required amount</dt><dd>{pesos(Number(detail.deposit.amount))}</dd></div><div><dt>GCash reference</dt><dd>{detail.deposit.reference || 'Not supplied'}</dd></div><div><dt>Submitted</dt><dd>{dateTimeLabel(detail.deposit.submitted_at)}</dd></div><div><dt>Reviewed</dt><dd>{dateTimeLabel(detail.deposit.reviewed_at)}</dd></div></dl>
               {detail.deposit.review_note && <p className="admin-handoff-review-note"><b>Review note:</b> {detail.deposit.review_note}</p>}
               {detail.deposit.proof_path ? <div className="admin-handoff-proof-actions"><button className="owner-button" type="button" onClick={() => void openPrivateFile(detail.deposit!.proof_path!, 'Deposit receipt', true)}>View private receipt <ExternalLink size={12} /></button><span>{proofViewed ? 'Opened in this session' : 'Open before deciding'}</span></div> : <div className="admin-handoff-inline-state muted"><CircleAlert size={18} /><div><b>No receipt attached</b><p>A proof-review decision cannot be recorded until a receipt is submitted.</p></div></div>}
               {detail.deposit.status === 'pending_review' && <div className="admin-handoff-review-form"><label htmlFor="deposit-review-note">Reviewer note <span>{proofNote.length}/500</span></label><textarea id="deposit-review-note" maxLength={500} value={proofNote} onChange={(event) => setProofNote(event.target.value)} placeholder="Required for rejection; optional internal context for acceptance." /><div><button className="owner-button dark" type="button" disabled={!proofViewed || Boolean(busy)} onClick={() => void reviewDeposit('accepted')}>{busy === 'deposit-accepted' ? 'Saving…' : 'Accept proof check'}</button><button className="owner-button" type="button" disabled={!proofViewed || Boolean(busy)} onClick={() => void reviewDeposit('rejected')}>{busy === 'deposit-rejected' ? 'Saving…' : 'Reject proof'}</button></div></div>}
             </> : <div className="admin-handoff-inline-state muted"><CircleAlert size={18} /><div><b>Deposit not submitted</b><p>The renter’s proof and GCash reference will appear here after submission.</p></div></div>}
+          {detail.deposit && detail.deposit_status !== 'waived' && <div className="admin-handoff-settlement">
+            <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">ADMIN · MANUAL SETTLEMENT</span><h3>Deposit resolution</h3></div><span className="admin-handoff-badge">{detail.deposit.raw_status.replaceAll('_', ' ')}</span></div>
+            <dl className="admin-handoff-facts"><div><dt>Refund reference</dt><dd>{detail.deposit.refund_reference || 'Not recorded'}</dd></div><div><dt>Refund recorded</dt><dd>{dateTimeLabel(detail.deposit.refunded_at)}</dd></div><div><dt>Forfeited amount</dt><dd>{pesos(Number(detail.deposit.forfeited_amount))}</dd></div><div><dt>Full deposit</dt><dd>{pesos(Number(detail.deposit.amount))}</dd></div></dl>
+            {depositSettlementAvailable ? <>
+              <div className="admin-handoff-proof-warning" role="note"><ShieldAlert size={18} /><p><strong>No automatic refund or money transfer.</strong> These controls record an admin decision only. Make any refund externally and use its actual transaction reference. Final refund confirmation and full forfeiture cannot be undone here.</p></div>
+              {detail.deposit.raw_status === 'refund_pending' && <div className="admin-handoff-settlement-form">
+                <label htmlFor="deposit-refund-reference">Actual external refund reference <span>Required</span></label>
+                <input id="deposit-refund-reference" value={refundReference} maxLength={500} disabled={Boolean(busy)} onChange={(event) => setRefundReference(event.target.value)} placeholder="Reference from the completed external refund" />
+                <button className="owner-button dark" type="button" disabled={Boolean(busy) || !refundReference.trim()} onClick={() => resolveDeposit('confirm_refund')}>{busy === 'deposit-resolution-confirm_refund' ? 'Recording…' : 'Confirm external refund'}</button>
+              </div>}
+              {detail.deposit.raw_status === 'held' && <div className="admin-handoff-settlement-form">
+                <label htmlFor="deposit-resolution-note">Refund or forfeiture reason <span>Required</span></label>
+                <textarea id="deposit-resolution-note" value={depositResolutionNote} maxLength={500} disabled={Boolean(busy)} onChange={(event) => setDepositResolutionNote(event.target.value)} placeholder="Record the reason and relevant supporting context." />
+                <p className="admin-handoff-permission-note">Forfeiture applies to the full deposit of {pesos(Number(detail.deposit.amount))} only. Do not forfeit a deposit that has already been refunded externally.</p>
+                <div className="admin-handoff-settlement-actions">
+                  <button className="owner-button dark" type="button" disabled={Boolean(busy) || !depositResolutionNote.trim()} onClick={() => resolveDeposit('refund')}>{busy === 'deposit-resolution-refund' ? 'Recording…' : 'Start refund record'}</button>
+                  <button className="owner-button danger" type="button" disabled={Boolean(busy) || !depositResolutionNote.trim()} onClick={() => resolveDeposit('forfeit')}>{busy === 'deposit-resolution-forfeit' ? 'Recording…' : `Forfeit full deposit · ${pesos(Number(detail.deposit.amount))}`}</button>
+                </div>
+              </div>}
+              <p className="admin-handoff-permission-note">Any admin may resolve the deposit. Only the owner or assigned hub admin may mark the booking as done.</p>
+            </> : <p className="admin-handoff-permission-note">Settlement controls are available to admins only while the booking is returned and the deposit is held or refund pending. Rental-payment proof review remains separate.</p>}
+          </div>}
       </section>
     </div>
 
@@ -490,15 +607,25 @@ export default function AdminHubHandoffDetailPage() {
 
         <section className="admin-handoff-panel" aria-labelledby="blocker-heading">
           <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">SAFETY GATE</span><h2 id="blocker-heading">Blockers & issue hold</h2></div></div>
-          {detail.custody_state === 'completed' ? <div className="admin-handoff-clear"><CheckCircle2 size={17} /> Booking completed. All custody steps finished successfully.</div> : detail.blockers.length ? <ul className="admin-handoff-blockers">{detail.blockers.map((blocker) => <li key={blocker}><X size={13} /> {blocker}</li>)}</ul> : <div className="admin-handoff-clear"><CheckCircle2 size={17} /> No system blockers. The assigned operator can perform the next guarded hub action.</div>}
-          {detail.custody_state !== 'completed' && <><label className="admin-handoff-hold-field" htmlFor="issue-hold-reason"><span>Hub issue note</span><textarea id="issue-hold-reason" value={holdReason} maxLength={800} onChange={(event) => setHoldReason(event.target.value)} placeholder="Describe damage, identity mismatch, missing accessories, or another reason to stop the exchange." /></label>
+          {bookingCompleted ? <div className="admin-handoff-clear"><CheckCircle2 size={17} /> Booking completed.</div> : detail.blockers.length ? <ul className="admin-handoff-blockers">{detail.blockers.map((blocker) => <li key={blocker}><X size={13} /> {blocker}</li>)}</ul> : <div className="admin-handoff-clear"><CheckCircle2 size={17} /> {custodyComplete ? 'Physical custody finished. Review the separate completion requirements below.' : 'No system blockers. The assigned operator can perform the next guarded hub action.'}</div>}
+          {!bookingCompleted && <><label className="admin-handoff-hold-field" htmlFor="issue-hold-reason"><span>Hub issue note</span><textarea id="issue-hold-reason" value={holdReason} maxLength={800} disabled={Boolean(busy)} onChange={(event) => setHoldReason(event.target.value)} placeholder="Describe damage, identity mismatch, missing accessories, or another reason to stop the exchange." /></label>
           {detail.issue_hold_reason ? <button className="owner-button" type="button" disabled={Boolean(busy)} onClick={() => void clearHold()}>{busy === 'hold' ? 'Clearing…' : 'Clear resolved hold'}</button> : <button className="owner-button" type="button" disabled={Boolean(busy) || !holdReason.trim()} onClick={() => void saveHold()}>{busy === 'hold' ? 'Placing hold…' : 'Place issue hold'}</button>}</>}
         </section>
 
         <section className="admin-handoff-panel admin-handoff-transition-panel" aria-labelledby="transition-heading">
           <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">STAFF WITNESS</span><h2 id="transition-heading">Physical transition</h2></div><LockKeyhole size={17} /></div>
-          {detail.custody_state === 'completed' ? <div className="admin-handoff-inline-state"><CheckCircle2 size={18} /><div><b>All custody transitions complete</b><p>This booking has finished the full hand-off cycle. The gear has been returned to the owner.</p></div></div> : <><p className="admin-handoff-panel-intro">Use these controls only while witnessing the physical exchange. They record custody; they do not confirm payment or escrow.</p>
+          {custodyComplete ? <div className="admin-handoff-inline-state"><CheckCircle2 size={18} /><div><b>Returned to owner</b><p>{bookingCompleted ? 'The gear has been returned to the owner and this booking is completed.' : 'Physical custody is finished, but the booking is not completed. Wait for both return confirmations and resolve the deposit, then select Mark as done.'}</p></div></div> : <><p className="admin-handoff-panel-intro">Use these controls only while witnessing the physical exchange. They record custody; they do not confirm payment or escrow.</p>
           {detail.allowed_transitions.length ? detail.allowed_transitions.map((action) => <div className="admin-handoff-transition" key={action}><PackageCheck size={18} /><div><b>{ACTIONS[action].label}</b><p>{ACTIONS[action].detail}</p><button className="owner-button dark" type="button" disabled={Boolean(busy) || detail.blockers.length > 0} onClick={() => void transition(action)}>{busy === action ? 'Recording…' : ACTIONS[action].label} <ArrowRight size={12} /></button></div></div>) : <div className="admin-handoff-inline-state muted"><Clock3 size={18} /><div><b>No transition available</b><p>Complete the required records or wait for the next physical exchange.</p></div></div>}</>}
+        </section>
+
+        <section className="admin-handoff-panel admin-handoff-completion-panel" aria-labelledby="completion-heading">
+          <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">SEPARATE FROM PHYSICAL CUSTODY</span><h2 id="completion-heading">Booking completion</h2></div><span className={`admin-handoff-badge ${bookingCompleted ? 'completed' : 'awaiting-completion'}`}>{bookingCompleted ? 'Completed' : booking.status === 'returned' ? 'Awaiting completion' : booking.status.replaceAll('_', ' ')}</span></div>
+          {bookingCompleted ? <div className="admin-handoff-inline-state"><CheckCircle2 size={18} /><div><b>Booking marked as done</b><p>The booking record is completed. This status does not mean LensShare automatically transferred money.</p></div></div> : <>
+            <p className="admin-handoff-panel-intro">Returning gear to the owner does not finish the booking. Both participants must confirm the return, the deposit must be resolved, and all completion blockers must be cleared.</p>
+            {completionBlockers.length ? <ul className="admin-handoff-blockers">{completionBlockers.map((blocker) => <li key={blocker}><X size={13} /> {blocker}</li>)}</ul> : booking.status === 'returned' && <div className="admin-handoff-clear"><CheckCircle2 size={17} /> No completion blockers recorded. The server rechecks all requirements when you mark this booking as done.</div>}
+            <p className="admin-handoff-permission-note">Only the owner or assigned hub admin may complete this booking. {canComplete ? 'You are the assigned hub admin.' : 'You are not the assigned hub admin; ask the assigned operator or owner to complete it.'} Other admins may still resolve the deposit.</p>
+            {booking.status === 'returned' ? <button className="owner-button dark" type="button" disabled={Boolean(busy) || !canComplete || completionBlockers.length > 0} onClick={() => setConfirmAction({ type: 'complete', bookingId: booking.id })}>{busy === 'complete' ? 'Marking as done…' : 'Mark as done'} <CheckCircle2 size={13} /></button> : <p className="admin-handoff-permission-note">Mark as done becomes available only when the booking status is returned.</p>}
+          </>}
         </section>
 
         <section className="admin-handoff-panel" aria-labelledby="timeline-heading">
@@ -533,6 +660,29 @@ export default function AdminHubHandoffDetailPage() {
         : 'The renter will be asked to submit a new proof, and your reviewer note is kept on the record.'}
       confirmLabel={confirmAction?.type === 'deposit' && confirmAction.decision === 'accepted' ? 'Accept proof check' : 'Reject proof'}
       onConfirm={() => { if (confirmAction?.type === 'deposit') void confirmDepositReview(confirmAction) }}
+      onClose={() => setConfirmAction(null)}
+    />
+    <ConfirmDialog
+      open={confirmAction?.type === 'deposit-resolution'}
+      busy={confirmAction?.type === 'deposit-resolution' ? busy === `deposit-resolution-${confirmAction.decision}` : false}
+      tone={confirmAction?.type === 'deposit-resolution' && confirmAction.decision === 'forfeit' ? 'danger' : 'default'}
+      title={confirmAction?.type === 'deposit-resolution' && confirmAction.decision === 'forfeit' ? 'Irrevocably forfeit the full deposit?' : confirmAction?.type === 'deposit-resolution' && confirmAction.decision === 'confirm_refund' ? 'Confirm the refund was completed externally?' : 'Start a manual refund record?'}
+      description={confirmAction?.type === 'deposit-resolution' ? <>
+        <p>{confirmAction.decision === 'refund' ? 'This records refund pending only. No money is sent or refunded automatically. Refund externally, then confirm using the actual transaction reference.' : confirmAction.decision === 'confirm_refund' ? 'Confirm only after the renter has actually received the full refund outside LensShare. This final record is irrevocable here. It does not send money or verify the payment provider.' : 'This irrevocably records forfeiture of the entire deposit, not a partial amount. Confirm only when the reason supports keeping the full deposit and no external refund has been made. No money is transferred automatically.'}</p>
+        <p><strong>Full deposit:</strong> {pesos(confirmAction.amount)}</p>
+        <p><strong>{confirmAction.decision === 'confirm_refund' ? 'Actual external refund reference:' : 'Reason:'}</strong> {confirmAction.note}</p>
+      </> : undefined}
+      confirmLabel={confirmAction?.type === 'deposit-resolution' && confirmAction.decision === 'forfeit' ? 'Forfeit full deposit' : confirmAction?.type === 'deposit-resolution' && confirmAction.decision === 'confirm_refund' ? 'Record completed external refund' : 'Record refund pending'}
+      onConfirm={() => { if (confirmAction?.type === 'deposit-resolution') void confirmDepositResolution(confirmAction) }}
+      onClose={() => setConfirmAction(null)}
+    />
+    <ConfirmDialog
+      open={confirmAction?.type === 'complete'}
+      busy={busy === 'complete'}
+      title="Mark this booking as done?"
+      description="This completes the booking only after the server verifies the physical return, both return confirmations, deposit resolution, and all other completion requirements. It does not send a payout, refund, or any other money transfer."
+      confirmLabel="Mark as done"
+      onConfirm={() => { if (confirmAction?.type === 'complete') void confirmCompletion(confirmAction.bookingId) }}
       onClose={() => setConfirmAction(null)}
     />
     <ConfirmDialog

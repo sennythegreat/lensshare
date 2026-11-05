@@ -31,7 +31,7 @@ const CUSTODY_LABELS: Record<HubHandoffQueueItem['custody_state'], string> = {
   at_hub_for_pickup: 'At hub · for renter pickup',
   with_renter: 'With renter',
   at_hub_for_return: 'At hub · for owner release',
-  completed: 'Custody completed',
+  completed: 'Returned to owner',
 }
 
 const DEPOSIT_LABELS: Record<HubHandoffQueueItem['deposit_status'], string> = {
@@ -100,6 +100,7 @@ export default function AdminHubHandoffsPage() {
   const counts = useMemo(() => Object.fromEntries(FILTERS.map(({ value }) => [value, rows.filter((row) => {
     if (value === 'mine') return Boolean(user && row.assigned_admin_id === user.id)
     if (value === 'unassigned') return !row.assigned_admin_id
+    if (value === 'completed') return row.booking.status === 'completed'
     return row.queue_bucket === value
   }).length])) as Record<QueueFilter, number>, [rows, user])
 
@@ -107,6 +108,7 @@ export default function AdminHubHandoffsPage() {
     .filter((row) => {
       if (filter === 'mine') return Boolean(user && row.assigned_admin_id === user.id)
       if (filter === 'unassigned') return !row.assigned_admin_id
+      if (filter === 'completed') return row.booking.status === 'completed'
       return row.queue_bucket === filter
     })
     .filter((row) => {
@@ -172,7 +174,7 @@ export default function AdminHubHandoffsPage() {
             <div className="admin-handoff-card-main">
               <img src={booking.listing?.image_url || '/lensshare-camera.png'} alt="" />
               <div className="admin-handoff-card-copy">
-                <div className="admin-handoff-card-meta"><span className={`admin-handoff-badge ${row.queue_bucket}`}>{row.queue_bucket.replaceAll('_', ' ')}</span><span>{shortId(row.booking_id)}</span></div>
+                <div className="admin-handoff-card-meta"><span className={`admin-handoff-badge ${row.queue_bucket}`}>{row.queue_bucket.replaceAll('_', ' ')}</span>{booking.status === 'returned' && <span className="admin-handoff-badge awaiting-completion">Awaiting completion</span>}<span>{shortId(row.booking_id)}</span></div>
                 <h2>{booking.listing?.name || 'Removed listing'}</h2>
                 <p>{booking.owner?.full_name || 'Owner'} <ArrowRight size={11} aria-label="to" /> {booking.renter?.full_name || 'Renter'}</p>
                 <div className="admin-handoff-card-facts">

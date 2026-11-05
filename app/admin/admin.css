@@ -190,10 +190,11 @@
 .admin-handoff-card-main{display:grid;grid-template-columns:112px minmax(0,1fr);gap:16px;min-width:0}
 .admin-handoff-card-main>img{width:112px;height:100%;min-height:116px;object-fit:cover;background:#eef1ee;border:1px solid #e4e7e4}
 .admin-handoff-card-copy{min-width:0}
-.admin-handoff-card-meta{display:flex;align-items:center;gap:9px;color:#7d8984;font:9px 'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase}
+.admin-handoff-card-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;color:#7d8984;font:9px 'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase}
 .admin-handoff-badge{display:inline-flex;align-items:center;border-radius:20px;padding:5px 8px;background:#edf0ed;color:#5b6762;text-transform:uppercase;font:8px 'DM Mono',monospace;letter-spacing:.06em;white-space:nowrap}
 .admin-handoff-badge.pickup_due,.admin-handoff-badge.deposit-pending_review{background:#f3e9c9;color:#725d24}
 .admin-handoff-badge.return_due{background:#dce9f0;color:#31596d}
+.admin-handoff-badge.awaiting-completion{background:#f3e9c9;color:#725d24}
 .admin-handoff-badge.issue_hold,.admin-handoff-badge.deposit-rejected{background:#f5dfda;color:#8a3f32}
 .admin-handoff-badge.completed,.admin-handoff-badge.complete,.admin-handoff-badge.deposit-accepted,.admin-handoff-badge.deposit-waived{background:#dcebe7;color:#244b43}
 .admin-handoff-card h2{font:20px Georgia,serif;margin:8px 0 4px;color:#17201d}
@@ -233,7 +234,7 @@
 .admin-handoff-detail-nav>span{font-size:9px;color:#7b8781}
 .admin-handoff-hero{display:grid;grid-template-columns:126px minmax(240px,1fr) minmax(360px,1.2fr);gap:20px;align-items:center;background:#fff;border:1px solid #e2e6e2;padding:18px;margin-bottom:14px}
 .admin-handoff-hero>img{width:126px;height:102px;object-fit:cover;background:#eef1ee}
-.admin-handoff-hero-copy>div{display:flex;align-items:center;gap:8px}
+.admin-handoff-hero-copy>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .admin-handoff-ref{font:9px 'DM Mono',monospace;color:#7b8781}
 .admin-handoff-hero h2{font:24px Georgia,serif;margin:8px 0 4px}
 .admin-handoff-hero p{font-size:11px;color:#65716c;margin:0;line-height:1.5}
@@ -276,6 +277,21 @@
 .admin-handoff-blockers{list-style:none;padding:0;margin:0 0 12px}.admin-handoff-blockers li{display:flex;gap:7px;align-items:flex-start;background:#faeae7;color:#8a3f32;padding:9px 10px;margin-top:5px;font-size:10px;line-height:1.4}.admin-handoff-blockers svg{flex:none;margin-top:1px}.admin-handoff-clear{display:flex;align-items:center;gap:7px;background:#e7f1ed;color:#315f57;padding:10px;margin-bottom:12px;font-size:10px}.admin-handoff-hold-field{display:block}.admin-handoff-panel-intro{font-size:10px;color:#68736e;line-height:1.55;margin:-4px 0 14px}.admin-handoff-transition{display:flex;gap:10px;border-top:1px solid #e6e9e6;padding-top:14px}.admin-handoff-transition>svg{flex:none;color:#315f57}.admin-handoff-transition b{font:15px Georgia,serif}.admin-handoff-transition p{font-size:10px;color:#68736e;line-height:1.5;margin:4px 0 10px}
 .admin-handoff-timeline{list-style:none;padding:0;margin:0}.admin-handoff-timeline li{display:grid;grid-template-columns:12px 1fr;gap:9px;position:relative;padding-bottom:17px}.admin-handoff-timeline li:before{content:"";position:absolute;left:4px;top:10px;bottom:-2px;width:1px;background:#dce2de}.admin-handoff-timeline li:last-child:before{display:none}.admin-handoff-timeline li>span{width:9px;height:9px;border-radius:50%;background:#315f57;margin-top:3px;z-index:1}.admin-handoff-timeline b{font:13px Georgia,serif}.admin-handoff-timeline p{font-size:9px;line-height:1.45;color:#65716c;margin:3px 0}.admin-handoff-timeline small{font-size:8px;color:#85908b}
 .admin-handoff-detail-skeleton{display:grid;grid-template-columns:160px 1fr;gap:20px;background:#fff;border:1px solid #e2e6e2;padding:20px;margin-top:22px}.admin-handoff-detail-skeleton>div,.admin-handoff-detail-skeleton>span{height:140px}.admin-handoff-detail-skeleton>div{display:flex;flex-direction:column;gap:13px;padding:15px}.admin-handoff-detail-skeleton i{height:13px}
+
+/* Manual deposit settlement and explicit booking completion */
+.admin-handoff-settlement{margin-top:18px;border-top:1px solid #e6e9e6;padding-top:16px}
+.admin-handoff-settlement h3{font:18px Georgia,serif;margin:6px 0 0;color:#17201d}
+.admin-handoff-settlement-form{display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-top:14px}
+.admin-handoff-settlement-form>label{display:flex;justify-content:space-between;gap:10px;font:8px 'DM Mono',monospace;letter-spacing:.07em;text-transform:uppercase;color:#71807a}
+.admin-handoff-settlement-form input,.admin-handoff-settlement-form textarea{width:100%;border:1px solid #dce1dd;background:#fafbf9;padding:10px;font:11px Arial;color:#17201d}
+.admin-handoff-settlement-form textarea{min-height:74px;resize:vertical}
+.admin-handoff-settlement-actions{display:flex;gap:8px;flex-wrap:wrap}
+.admin-handoff-settlement-actions .owner-button{white-space:normal;line-height:1.5}
+.admin-handoff-permission-note{font-size:10px;line-height:1.55;color:#68736e;margin:10px 0;overflow-wrap:anywhere}
+.admin-handoff-completion-panel .admin-handoff-section-head{flex-wrap:wrap}
+.admin-handoff-completion-panel .admin-handoff-badge{white-space:normal;line-height:1.5}
+@media(max-width:1120px){.admin-handoff-detail-side .admin-handoff-completion-panel{grid-column:1/-1}}
+@media(max-width:600px){.admin-handoff-settlement-actions{flex-direction:column;align-items:stretch}}
 
 /* Hub settings */
 .admin-hub-settings{display:flex;flex-direction:column;gap:14px}.admin-hub-settings-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}.admin-hub-settings-fields .wide{grid-column:1/-1}.admin-hub-settings-fields label>span{display:block;font:8px 'DM Mono',monospace;letter-spacing:.07em;text-transform:uppercase;color:#71807a;margin-bottom:7px}.admin-hub-settings-fields label>span b{font:7px Arial;color:#8a3f32}.admin-hub-settings-fields input,.admin-hub-settings-fields textarea{width:100%;border:1px solid #dce1dd;background:#fafbf9;padding:11px;font:11px Arial;color:#17201d}.admin-hub-settings-fields textarea{min-height:88px;resize:vertical;line-height:1.5}.admin-hub-deposit-lock{border:1px solid #c6d8d1;background:#edf5f2;padding:15px;margin-bottom:14px}.admin-hub-deposit-lock small,.admin-hub-deposit-lock span{display:block;color:#65716c;font-size:9px}.admin-hub-deposit-lock strong{display:block;font:30px Georgia,serif;color:#244b43;margin:5px 0}.admin-hub-settings-actions{background:#17201d;color:#fff;padding:15px 17px}.admin-hub-settings-actions p{font-size:10px;line-height:1.5;color:#b9c3bf;margin:0}.admin-hub-settings-actions .owner-button{background:#fff;color:#17201d;border-color:#fff;white-space:nowrap}.admin-hub-settings-skeleton{display:flex;flex-direction:column;gap:14px;margin-top:22px}.admin-hub-settings-skeleton>div{background:#fff;border:1px solid #e2e6e2;padding:22px;display:flex;flex-direction:column;gap:12px}.admin-hub-settings-skeleton i{height:13px}.admin-hub-settings-skeleton i:first-child{width:28%}.admin-hub-settings-skeleton i:nth-child(2){width:65%}

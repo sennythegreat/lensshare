@@ -22,7 +22,7 @@ Every private sample image is generated locally and visibly marked as synthetic 
 
 ## Requirements
 
-1. The canonical SQL layer must be installed first (`schema.sql` through `hub-operations.sql`, then `service-area-and-incidents.sql`, then `rental-payments.sql` last), as documented in `AGENTS.md`. See [Rental payment setup](RENTAL_PAYMENTS.md) for the one-file upgrade.
+1. The canonical SQL layer must be installed first (`schema.sql` through `hub-operations.sql`, then `service-area-and-incidents.sql`, then `rental-payments.sql`, then `rental-settlement.sql` last), as documented in `AGENTS.md`. See [Rental payment setup](RENTAL_PAYMENTS.md) for the one-file upgrade.
 2. Add the service-role key to `.env` (Supabase Dashboard → Settings → API → service_role). It is used only by this local script to create the sample auth users and seed base rows — never commit it and never use it in app code:
 
 ```

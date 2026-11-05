@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { fetchBookingHandoffs, fetchBookingReviews, fetchOwnerBookings, fetchOwnerListings, saveHandoff, submitReview, updateBookingStatus } from '@/lib/data'
+import { completeHubBooking, fetchBookingHandoffs, fetchBookingReviews, fetchOwnerBookings, fetchOwnerListings, saveHandoff, submitReview, updateBookingStatus } from '@/lib/data'
 import { isHubWorkflow } from '@/lib/rental-workflow'
 import { OwnerShell, PageCard, Status } from '@/components/owner-shell'
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -18,7 +18,7 @@ const filters = ['ALL', 'PENDING', 'APPROVED', 'ACTIVE', 'RETURNED', 'COMPLETED'
 const NEXT_ACTION: Partial<Record<BookingStatus, { label: string; next: BookingStatus }>> = {
   approved: { label: 'Confirm hand-off · start rental', next: 'active' },
   active: { label: 'Mark returned', next: 'returned' },
-  returned: { label: 'Complete & settle', next: 'completed' },
+  returned: { label: 'Mark as done', next: 'completed' },
 }
 
 const PICKUP_CHECKLIST = [
@@ -65,6 +65,8 @@ export default function RentalsPage() {
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [confirmDecision, setConfirmDecision] = useState<{ booking: BookingWithRelations; status: BookingStatus } | null>(null)
+  const [decisionBusy, setDecisionBusy] = useState(false)
+  const [decisionError, setDecisionError] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -92,8 +94,10 @@ export default function RentalsPage() {
   }
 
   function decide(booking: BookingWithRelations, status: BookingStatus) {
-    // Declining a request and settling a rental are irreversible — confirm first.
+    if (decisionBusy) return
+    // Declining a request and completing a rental are irreversible — confirm first.
     if (status === 'declined' || status === 'completed') {
+      setDecisionError('')
       setConfirmDecision({ booking, status })
       return
     }
@@ -101,21 +105,46 @@ export default function RentalsPage() {
   }
 
   async function applyDecision(booking: BookingWithRelations, status: BookingStatus) {
-    patchStatus(booking.id, status)
-    setSelected(null)
-    setConfirmDecision(null)
+    if (decisionBusy || !user) return
+    const completing = status === 'completed'
+    setDecisionBusy(true)
+    setDecisionError('')
+    setError('')
+    if (!completing) {
+      patchStatus(booking.id, status)
+      setSelected(null)
+    }
     try {
-      await updateBookingStatus(booking.id, status)
+      if (completing && isHubWorkflow(booking)) await completeHubBooking(booking.id)
+      else await updateBookingStatus(booking.id, status)
+      if (completing) patchStatus(booking.id, status)
+      setSelected(null)
+      setConfirmDecision(null)
       toast.success(status === 'approved'
         ? `Request approved — ${booking.renter?.full_name || 'the renter'} has been notified.`
-        : status === 'completed'
-          ? `Rental settled and completed for ${booking.listing?.name || 'the booking'}.`
+        : completing
+          ? `Rental completed for ${booking.listing?.name || 'the booking'}. Owner payout is pending, not paid.`
           : `Booking #${booking.id.slice(0, 8).toUpperCase()} is now ${status}.`)
+      if (completing) {
+        try {
+          const rows = await fetchOwnerBookings(user.id)
+          setBookings(rows)
+          setLoaded(true)
+        } catch (e) {
+          const detail = e && typeof e === 'object' && 'message' in e ? String(e.message) : 'Could not reload bookings.'
+          const message = `Rental completed, but the booking refresh failed: ${detail}`
+          setError(message)
+          toast.error(message)
+        }
+      }
     } catch (e) {
-      patchStatus(booking.id, booking.status)
-      const message = e instanceof Error ? e.message : 'Status update failed.'
+      if (!completing) patchStatus(booking.id, booking.status)
+      const message = e && typeof e === 'object' && 'message' in e ? String(e.message) : 'Status update failed.'
       setError(message)
+      setDecisionError(message)
       toast.error(message)
+    } finally {
+      setDecisionBusy(false)
     }
   }
 
@@ -198,7 +227,7 @@ export default function RentalsPage() {
     <div className="owner-toolbar rentals-toolbar"><span className="owner-toolbar-note">{visible.length} of {bookings.length} bookings shown · realtime updates on</span><div className="rental-tools"><input aria-label="Search rentals" placeholder="Search gear, renter, or booking..." value={query} onChange={(e) => setQuery(e.target.value)} /><select aria-label="Sort rentals" value={sort} onChange={(e) => setSort(e.target.value)}><option value="start">Sort: start date</option><option value="price">Sort: rental price</option><option value="name">Sort: equipment name</option><option value="recent">Sort: latest request</option></select></div></div>
     <div className="owner-filters rental-filters">{filters.map((item) => <button key={item} className={filter === item ? 'selected' : ''} onClick={() => { setFilter(item); if (item === 'PENDING') setSort('recent') }}>{item === 'ALL' ? 'All Rentals' : item[0] + item.slice(1).toLowerCase()}</button>)}</div>
     {error && <PageCard><p className="auth-error">{error}</p></PageCard>}
-    <PageCard>{profileLoading || !loaded ? <SectionSkeleton rows={4} /> : visible.length ? <div className="owner-table">{visible.map((row) => <div className="owner-row" key={row.id}><div className="rental-id"><img className="rental-thumb" src={row.listing?.image_url || '/lensshare-camera.png'} alt="" /><div><Status>{row.status.toUpperCase()}</Status><h3>{row.listing?.name || 'Removed listing'}</h3><p>{dateLabel(row)} · {row.renter?.full_name || 'Renter'} · {shortId(row.id)}</p>{row.renter && <span className={`renter-flag ${row.renter.verification_status}`}>{renterVerificationLabel(row.renter)}</span>}</div></div><strong>{pesos(Number(row.subtotal))}</strong><div className="rental-actions">{isHubWorkflow(row) ? <Link className="owner-button dark" href={`/dashboard/rentals/${row.id}`}>Open rental hub</Link> : <button className="owner-button" onClick={() => setSelected(row)}>View details</button>}{row.status !== 'declined' && <Link className="owner-button" href={`/chat?id=${row.id}`}>Message</Link>}{!isHubWorkflow(row) && (row.status === 'approved' || row.status === 'active' || row.status === 'returned') ? <button className="owner-button" onClick={() => openChecklist(row, row.status === 'returned' ? 'return' : 'pickup')}>Checklist</button> : null}{!isHubWorkflow(row) && row.status === 'completed' && !reviewedBookings.includes(row.id) ? <button className="owner-button" onClick={() => openReview(row)}>Review renter</button> : null}</div></div>)}</div> : <EmptyState title="No matching rentals" hint="Try another status or search term." />}</PageCard>
+    <PageCard>{profileLoading || !loaded ? <SectionSkeleton rows={4} /> : visible.length ? <div className="owner-table">{visible.map((row) => <div className="owner-row" key={row.id}><div className="rental-id"><img className="rental-thumb" src={row.listing?.image_url || '/lensshare-camera.png'} alt="" /><div><Status>{row.status.toUpperCase()}</Status><h3>{row.listing?.name || 'Removed listing'}</h3><p>{dateLabel(row)} · {row.renter?.full_name || 'Renter'} · {shortId(row.id)}</p>{row.renter && <span className={`renter-flag ${row.renter.verification_status}`}>{renterVerificationLabel(row.renter)}</span>}</div></div><strong>{pesos(Number(row.subtotal))}</strong><div className="rental-actions">{row.status === 'returned' && <button className="owner-button dark" disabled={decisionBusy} onClick={() => decide(row, 'completed')}>Mark as done</button>}{isHubWorkflow(row) ? <Link className="owner-button dark" href={`/dashboard/rentals/${row.id}`}>Open rental hub</Link> : <button className="owner-button" onClick={() => setSelected(row)}>View details</button>}{row.status !== 'declined' && <Link className="owner-button" href={`/chat?id=${row.id}`}>Message</Link>}{!isHubWorkflow(row) && (row.status === 'approved' || row.status === 'active' || row.status === 'returned') ? <button className="owner-button" onClick={() => openChecklist(row, row.status === 'returned' ? 'return' : 'pickup')}>Checklist</button> : null}{!isHubWorkflow(row) && row.status === 'completed' && !reviewedBookings.includes(row.id) ? <button className="owner-button" onClick={() => openReview(row)}>Review renter</button> : null}</div></div>)}</div> : <EmptyState title="No matching rentals" hint="Try another status or search term." />}</PageCard>
     {selected && <div className="owner-modal-backdrop" onClick={() => setSelected(null)}><section className="owner-modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={() => setSelected(null)}>×</button><img src={selected.listing?.image_url || '/lensshare-camera.png'} alt="" /><span className="owner-eyebrow">BOOKING {shortId(selected.id)} · {selected.status.toUpperCase()}</span><h2>{selected.listing?.name || 'Removed listing'}</h2><p>{selected.listing?.brand} · rented by {selected.renter?.full_name || 'renter'}</p>{selected.renter && <span className={`renter-flag ${selected.renter.verification_status}`}>{renterVerificationLabel(selected.renter)}</span>}<div className="modal-grid"><div><small>Rental dates</small><strong>{dateLabel(selected)} ({selected.days} {selected.days === 1 ? 'day' : 'days'})</strong></div><div><small>Owner settlement basis</small><strong>{pesos(Number(selected.subtotal))}</strong>{Number(selected.discount_amount) > 0 && <small>Renter pays {pesos(Number(selected.total))} after a {pesos(Number(selected.discount_amount))} LensShare-funded Saver Pass discount.</small>}</div><div><small>Renter verification</small><strong>{selected.renter?.verification_status === 'verified' ? '✓ Identity verified' : selected.renter?.verification_status === 'pending' ? '✓ Documents pending review' : 'Not verified yet'}</strong></div><div><small>Renter contact</small><strong>{selected.renter?.phone || 'No phone on file'}</strong></div><div><small>Shoot description</small><strong>{selected.shoot_description || 'No description provided.'}</strong></div><div><small>Availability area</small><strong>{selected.listing?.pickup_address?.trim() || 'Availability area not added'}</strong><small>Arrange the exact handoff time and place privately in Messages.</small></div></div><div className="modal-actions">{selected.status === 'pending' && <><button className="owner-button dark" onClick={() => decide(selected, 'approved')}>Approve request</button><button className="owner-button" onClick={() => decide(selected, 'declined')}>Decline</button></>}{NEXT_ACTION[selected.status] && <button className="owner-button dark" onClick={() => decide(selected, NEXT_ACTION[selected.status]!.next)}>{NEXT_ACTION[selected.status]!.label}</button>}{selected.status === 'approved' || selected.status === 'active' || selected.status === 'returned' ? <button className="owner-button" onClick={() => { setSelected(null); openChecklist(selected, selected.status === 'returned' ? 'return' : 'pickup') }}>Checklist</button> : null}{selected.status === 'completed' && !reviewedBookings.includes(selected.id) && <button className="owner-button" onClick={() => { setSelected(null); openReview(selected) }}>Review renter</button>}<Link className="owner-button" href={`/agreement?id=${selected.id}`} target="_blank">Rental agreement</Link>{selected.status !== 'declined' && <Link className="owner-button" href={`/chat?id=${selected.id}`}>Message renter</Link>}{['active', 'returned', 'completed'].includes(selected.status) && <button className="owner-button" onClick={() => setReporting(true)}>Report an issue</button>}</div><p className="demo-note">Status changes are saved to the database instantly and appear in the renter's workspace in real time.</p></section></div>}
     {reporting && selected && <ReportIncidentModal bookingId={selected.id} onClose={() => setReporting(false)} onReported={() => setSelected(null)} />}
     {checklistBooking && <div className="owner-modal-backdrop" onClick={() => setChecklistBooking(null)}><section className="owner-modal checklist-modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={() => setChecklistBooking(null)}>×</button><span className="owner-eyebrow">{checklistStage === 'return' ? 'RETURN CHECKLIST' : 'PICKUP CHECKLIST'} · {shortId(checklistBooking.id)}</span><h2>{checklistBooking.listing?.name}</h2><p>{checklistBooking.renter?.full_name} · {checklistBooking.status.toUpperCase()}</p>{(checklistStage === 'return' ? RETURN_CHECKLIST : PICKUP_CHECKLIST).map((item) => <label className="check-item" key={item}><input type="checkbox" checked={Boolean(checklistItems[item])} disabled={checklistState === 'loading'} onChange={(e) => setChecklistItems((current) => ({ ...current, [item]: e.target.checked }))} />{item}</label>)}<div className="modal-actions"><button className="owner-button dark" disabled={checklistState === 'loading' || checklistState === 'saved'} onClick={saveChecklist}>{checklistState === 'saved' ? 'Saved ✓' : 'Save checklist'}</button><button className="owner-button" onClick={() => setChecklistBooking(null)}>Cancel</button></div>{checklistState === 'saved' && <p className="auth-success">Checklist saved to the booking record — it is part of the shared hand-off history now.</p>}{checklistState === 'error' && <p className="auth-error">Could not save the checklist. Try again.</p>}</section></div>}
@@ -209,17 +238,17 @@ export default function RentalsPage() {
     </>}</section></div>}
     <ConfirmDialog
       open={Boolean(confirmDecision)}
-      busy={false}
+      busy={decisionBusy}
       tone={confirmDecision?.status === 'declined' ? 'danger' : 'default'}
       title={confirmDecision?.status === 'declined'
         ? 'Decline this booking request?'
-        : 'Complete & settle this rental?'}
-      description={confirmDecision?.status === 'declined'
+        : 'Mark this rental as done?'}
+      description={<>{confirmDecision?.status === 'declined'
         ? <>The request from {confirmDecision.booking.renter?.full_name || 'the renter'} will be turned down. This cannot be undone — they would need to book again.</>
-        : <>This closes booking #{shortId(confirmDecision?.booking.id ?? '')} for good and creates the payout entry. The status cannot go back.</>}
-      confirmLabel={confirmDecision?.status === 'declined' ? 'Decline request' : 'Complete & settle'}
+        : <>This permanently completes booking {shortId(confirmDecision?.booking.id ?? '')} and creates a pending owner payout. It does not mark the payout as paid. {confirmDecision && isHubWorkflow(confirmDecision.booking) && 'All hub completion requirements must be met.'}</>}{decisionError && <span className="owner-decision-error" role="alert">{decisionError}</span>}</>}
+      confirmLabel={confirmDecision?.status === 'declined' ? 'Decline request' : 'Mark as done'}
       onConfirm={() => { if (confirmDecision) void applyDecision(confirmDecision.booking, confirmDecision.status) }}
-      onClose={() => setConfirmDecision(null)}
+      onClose={() => { if (!decisionBusy) setConfirmDecision(null) }}
     />
   </OwnerShell>
 }

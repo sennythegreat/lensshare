@@ -606,6 +606,10 @@ export type HubHandoffDetail = {
   deposit: {
     amount: number
     status: HubDepositStatus
+    raw_status: RawDepositState
+    refund_reference: string | null
+    refunded_at: string | null
+    forfeited_amount: number
     reference: string | null
     proof_path: string | null
     submitted_at: string | null
@@ -616,6 +620,7 @@ export type HubHandoffDetail = {
   inspections: HubInspection[]
   participant_confirmations: HubParticipantConfirmation[]
   blockers: string[]
+  completion_blockers: string[]
   allowed_transitions: HubPhysicalAction[]
   timeline: HubCustodyTimelineEvent[]
   updated_at: string | null
@@ -633,6 +638,13 @@ export type Payout = {
   status: PayoutStatus
   paid_at: string | null
   created_at: string
+}
+
+export type OwnerFinanceData = {
+  bookings: BookingWithRelations[]
+  payments: RentalPayment[]
+  payouts: (Payout & { booking: BookingWithRelations })[]
+  payment_setup_pending: boolean
 }
 
 export type HandoffParty = 'owner' | 'renter'
