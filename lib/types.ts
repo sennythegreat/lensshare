@@ -214,6 +214,7 @@ export type RentalDepositStatus =
 
 export type HubDepositStatus = 'not_submitted' | 'pending_review' | 'accepted' | 'rejected' | 'waived'
 export type RentalAgreementStatus = 'awaiting_signatures' | 'partially_signed' | 'signed'
+export type AgreementSignatureCaptureMethod = 'legacy_click' | 'drawn' | 'uploaded'
 export type RentalInspectionStatus = 'draft' | 'finalized'
 export type RentalInspectionResult = 'pass' | 'issue'
 export type RentalConfirmationKind =
@@ -406,6 +407,21 @@ export type RentalAgreementSnapshot = {
   approved_at: string | null
 }
 
+export type RentalAgreementAcceptance = {
+  id: string
+  agreement_id: string
+  booking_id: string
+  user_id: string
+  party: RentalHubParty
+  terms_hash_snapshot: string
+  accepted_at: string
+  signature_capture_method: AgreementSignatureCaptureMethod
+  signature_object_path: string | null
+  signature_sha256: string | null
+  signature_mime_type: string | null
+  signature_byte_size: number | null
+}
+
 export type RentalAgreement = {
   id: string
   booking_id: string
@@ -413,10 +429,10 @@ export type RentalAgreement = {
   status: RentalAgreementStatus
   snapshot: RentalAgreementSnapshot
   terms_hash: string
+  owner_acceptance: RentalAgreementAcceptance | null
+  renter_acceptance: RentalAgreementAcceptance | null
   owner_signed_at: string | null
   renter_signed_at: string | null
-  owner_signature_hash: string | null
-  renter_signature_hash: string | null
   created_at: string
   updated_at: string
 }

@@ -66,7 +66,7 @@ export default function BrowsePage() {
   const [locationError, setLocationError] = useState('')
   const locationRequest = useRef(0)
   const [unavailableIds, setUnavailableIds] = useState<Set<string>>(new Set())
-  const [availabilityOnly, setAvailabilityOnly] = useState(false)
+  const [availabilityOnly, setAvailabilityOnly] = useState(true)
   const [availabilityLoading, setAvailabilityLoading] = useState(false)
   const [availabilityError, setAvailabilityError] = useState('')
   const [availabilityRange, setAvailabilityRange] = useState('')
@@ -249,7 +249,7 @@ export default function BrowsePage() {
     setQuery('')
     setMaxRate(Number.POSITIVE_INFINITY)
     setMinRating(0)
-    setAvailabilityOnly(false)
+    setAvailabilityOnly(true)
   }
 
   const dateRangeLabel = useMemo(() => {

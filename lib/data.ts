@@ -2,7 +2,7 @@
 
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
-import { deriveRentalBlockers } from '@/lib/rental-workflow'
+import { deriveRentalBlockers, participantConfirmationReadiness } from '@/lib/rental-workflow'
 import type {
   AdminUserRow,
   Booking,
@@ -40,6 +40,8 @@ import type {
   PrimaryRentalUse,
   Profile,
   RentalAgreement,
+  RentalAgreementAcceptance,
+  AgreementSignatureCaptureMethod,
   RentalConfirmation,
   RentalConfirmationKind,
   RentalCustodyState,
@@ -385,9 +387,11 @@ export async function updateBookingStatus(id: string, status: BookingStatus): Pr
 
 export const HUB_DEPOSIT_BUCKET = 'deposit-proofs'
 export const HUB_INSPECTION_BUCKET = 'inspection-photos'
+export const HUB_AGREEMENT_SIGNATURE_BUCKET = 'agreement-signatures'
 export const HUB_PRIVATE_URL_TTL_SECONDS = 300
 export const HUB_DEPOSIT_PROOF_MAX_BYTES = 5 * 1024 * 1024
 export const HUB_INSPECTION_PHOTO_MAX_BYTES = 10 * 1024 * 1024
+export const HUB_AGREEMENT_SIGNATURE_MAX_BYTES = 512 * 1024
 export const HUB_INSPECTION_PHOTO_LIMIT = 8
 
 const HUB_DEPOSIT_FILE_TYPES: Record<string, string> = {
@@ -750,6 +754,29 @@ function normalizeAgreementSnapshot(value: unknown, booking: BookingWithRelation
   }
 }
 
+function normalizeAgreementAcceptance(value: unknown, agreementId: string, party: RentalHubParty): RentalAgreementAcceptance | null {
+  const row = asObject(value)
+  if (asString(row.agreement_id) !== agreementId || asString(row.party) !== party) return null
+  const rawMethod = asString(row.signature_capture_method, 'legacy_click')
+  const signatureByteSize = row.signature_byte_size === null || row.signature_byte_size === undefined
+    ? null
+    : asNumber(row.signature_byte_size)
+  return {
+    id: asString(row.id),
+    agreement_id: agreementId,
+    booking_id: asString(row.booking_id),
+    user_id: asString(row.user_id),
+    party,
+    terms_hash_snapshot: asString(row.terms_hash_snapshot),
+    accepted_at: asString(row.accepted_at),
+    signature_capture_method: rawMethod === 'drawn' || rawMethod === 'uploaded' ? rawMethod : 'legacy_click',
+    signature_object_path: asNullableString(row.signature_object_path),
+    signature_sha256: asNullableString(row.signature_sha256),
+    signature_mime_type: asNullableString(row.signature_mime_type),
+    signature_byte_size: signatureByteSize,
+  }
+}
+
 function normalizeAgreement(
   value: unknown,
   booking: BookingWithRelations,
@@ -760,22 +787,27 @@ function normalizeAgreement(
 ): RentalAgreement | null {
   const row = asObject(value)
   if (!Object.keys(row).length) return null
-  const acceptances = asArray(acceptancesValue).map(asObject)
-  const ownerAcceptance = acceptances.find((item) => asString(item.party) === 'owner')
-  const renterAcceptance = acceptances.find((item) => asString(item.party) === 'renter')
+  const agreementId = asString(row.id)
+  const acceptances = asArray(acceptancesValue)
+  const ownerAcceptance = acceptances
+    .map((item) => normalizeAgreementAcceptance(item, agreementId, 'owner'))
+    .find((item): item is RentalAgreementAcceptance => Boolean(item)) ?? null
+  const renterAcceptance = acceptances
+    .map((item) => normalizeAgreementAcceptance(item, agreementId, 'renter'))
+    .find((item): item is RentalAgreementAcceptance => Boolean(item)) ?? null
   const ownerSignedAt = asNullableString(row.owner_signed_at ?? ownerAcceptance?.accepted_at)
   const renterSignedAt = asNullableString(row.renter_signed_at ?? renterAcceptance?.accepted_at)
   return {
-    id: asString(row.id),
+    id: agreementId,
     booking_id: asString(row.booking_id, booking.id),
     version: asNumber(row.version, 1),
     status: ownerSignedAt && renterSignedAt ? 'signed' : ownerSignedAt || renterSignedAt ? 'partially_signed' : 'awaiting_signatures',
     snapshot: normalizeAgreementSnapshot(row.snapshot, booking, saverPass, waiver, hub),
     terms_hash: asString(row.terms_hash),
+    owner_acceptance: ownerAcceptance,
+    renter_acceptance: renterAcceptance,
     owner_signed_at: ownerSignedAt,
     renter_signed_at: renterSignedAt,
-    owner_signature_hash: asNullableString(row.owner_signature_hash ?? ownerAcceptance?.terms_hash_snapshot),
-    renter_signature_hash: asNullableString(row.renter_signature_hash ?? renterAcceptance?.terms_hash_snapshot),
     created_at: asString(row.created_at),
     updated_at: asString(row.updated_at),
   }
@@ -931,19 +963,8 @@ function inspectionConfirmationRows(row: UnknownRow): unknown[] {
 
 function deriveAllowedParticipantConfirmations(data: RentalHubData, viewerId: string | null): RentalConfirmationKind[] {
   const party: RentalHubParty | null = viewerId === data.booking.owner_id ? 'owner' : viewerId === data.booking.renter_id ? 'renter' : null
-  if (!party || !data.operation || ['declined', 'completed'].includes(data.booking.status)) return []
-  const existing = new Set(data.confirmations.filter((row) => row.party === party).map((row) => row.kind))
-  const blocked = (kind: RentalConfirmationKind) => data.blockers.some((row) => row.action === kind)
-  const allowed: RentalConfirmationKind[] = []
-  const finalized = new Set(data.inspections.filter((row) => row.status === 'finalized').map((row) => row.kind))
-
-  if (finalized.has('pre_rental') && !existing.has('pre_inspection')) allowed.push('pre_inspection')
-  if (finalized.has('post_rental') && !existing.has('post_inspection')) allowed.push('post_inspection')
-  if (party === 'owner' && data.operation.custody_state === 'with_owner' && !existing.has('owner_dropoff') && !blocked('owner_dropoff')) allowed.push('owner_dropoff')
-  if (party === 'renter' && data.operation.custody_state === 'at_hub_pre_rental' && !existing.has('renter_pickup') && !blocked('renter_pickup')) allowed.push('renter_pickup')
-  if (party === 'renter' && data.operation.custody_state === 'with_renter' && !existing.has('renter_return') && !blocked('renter_return')) allowed.push('renter_return')
-  if (party === 'owner' && data.operation.custody_state === 'at_hub_post_rental' && !existing.has('owner_collection') && !blocked('owner_collection')) allowed.push('owner_collection')
-  return allowed
+  if (!party) return []
+  return [...CONFIRMATION_KINDS].filter((kind) => participantConfirmationReadiness(data, party, kind).ready)
 }
 
 function normalizeRentalHub(value: unknown, viewerId: string | null = null): RentalHubData | null {
@@ -1035,6 +1056,17 @@ async function removeHubPrivateFiles(bucket: string, paths: string[]): Promise<v
   if (error) throw error
 }
 
+export function validateAgreementSignature(file: File): void {
+  if (file.type !== 'image/png') throw new Error('The signature must be a PNG image.')
+  if (!file.size) throw new Error('The signature image is empty.')
+  if (file.size > HUB_AGREEMENT_SIGNATURE_MAX_BYTES) throw new Error('The signature image is larger than 512 KB.')
+}
+
+async function sha256Hex(file: File): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 export async function submitDepositProof(bookingId: string, gcashReference: string, file: File): Promise<RentalDeposit | null> {
   const reference = gcashReference.trim()
   if (!reference) throw new Error('Enter the GCash receipt reference.')
@@ -1056,11 +1088,49 @@ export async function submitDepositProof(bookingId: string, gcashReference: stri
   }
 }
 
-export async function signRentalAgreement(bookingId: string): Promise<RentalAgreement | null> {
-  const value = await callRpc('accept_booking_agreement', { p_booking_id: bookingId })
-  const hub = await fetchRentalHub(bookingId)
-  if (hub?.agreement) return hub.agreement
-  return Object.keys(unwrapRpcObject(value)).length ? null : null
+export async function signRentalAgreement(
+  bookingId: string,
+  agreement: Pick<RentalAgreement, 'id' | 'terms_hash'>,
+  signatureFile: File,
+  captureMethod: Extract<AgreementSignatureCaptureMethod, 'drawn' | 'uploaded'>,
+): Promise<RentalAgreement | null> {
+  validateAgreementSignature(signatureFile)
+  const supabase = createClient()
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError) throw authError
+  if (!authData.user) throw new Error('Sign in before signing the rental agreement.')
+
+  const signatureSha256 = await sha256Hex(signatureFile)
+  const objectPath = `${authData.user.id}/${bookingId}/${agreement.id}/${crypto.randomUUID()}.png`
+  const { error: uploadError } = await supabase.storage.from(HUB_AGREEMENT_SIGNATURE_BUCKET).upload(objectPath, signatureFile, {
+    cacheControl: '3600',
+    contentType: 'image/png',
+    upsert: false,
+    metadata: { sha256: signatureSha256 },
+  })
+  if (uploadError) throw uploadError
+
+  try {
+    await callRpc('accept_booking_agreement', {
+      p_booking_id: bookingId,
+      p_agreement_id: agreement.id,
+      p_terms_hash: agreement.terms_hash,
+      p_signature_object_path: objectPath,
+      p_signature_sha256: signatureSha256,
+      p_signature_capture_method: captureMethod,
+      p_signature_mime_type: 'image/png',
+      p_signature_byte_size: signatureFile.size,
+    })
+  } catch (error) {
+    await removeHubPrivateFiles(HUB_AGREEMENT_SIGNATURE_BUCKET, [objectPath]).catch(() => undefined)
+    throw error
+  }
+
+  return (await fetchRentalHub(bookingId))?.agreement ?? null
+}
+
+export async function fetchAgreementSignatureUrl(path: string): Promise<string> {
+  return fetchSignedPrivateFileUrl(HUB_AGREEMENT_SIGNATURE_BUCKET, path)
 }
 
 export async function confirmRentalStep(bookingId: string, kind: RentalConfirmationKind): Promise<void> {
@@ -1375,10 +1445,15 @@ async function fetchSignedPrivateFileUrl(bucket: string, path: string): Promise<
 export async function fetchSignedAdminHubFileUrl(path: string): Promise<string> {
   if (path.startsWith(`${HUB_DEPOSIT_BUCKET}/`)) return fetchSignedPrivateFileUrl(HUB_DEPOSIT_BUCKET, path)
   if (path.startsWith(`${HUB_INSPECTION_BUCKET}/`)) return fetchSignedPrivateFileUrl(HUB_INSPECTION_BUCKET, path)
+  if (path.startsWith(`${HUB_AGREEMENT_SIGNATURE_BUCKET}/`)) return fetchSignedPrivateFileUrl(HUB_AGREEMENT_SIGNATURE_BUCKET, path)
   try {
     return await fetchSignedPrivateFileUrl(HUB_DEPOSIT_BUCKET, path)
   } catch {
-    return fetchSignedPrivateFileUrl(HUB_INSPECTION_BUCKET, path)
+    try {
+      return await fetchSignedPrivateFileUrl(HUB_INSPECTION_BUCKET, path)
+    } catch {
+      return fetchSignedPrivateFileUrl(HUB_AGREEMENT_SIGNATURE_BUCKET, path)
+    }
   }
 }
 

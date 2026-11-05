@@ -276,6 +276,9 @@
 
 .admin-hub-geo-note { font-size: 12px; color: #5c6662; margin: 0; }
 
+/* Admin button styles (matching owner-button from owner-pages.css) */
+.owner-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #d9deda;background:#fff;color:#26312e;border-radius:3px;padding:11px 14px;text-transform:uppercase;font:700 9px Arial;letter-spacing:.08em;text-decoration:none;cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease}.owner-button:hover{background:#f2f4f1;border-color:#c4ccc7;color:#17201d}.owner-button.dark{background:#07100e;color:#fff;border-color:#07100e}.owner-button.dark:hover{background:#1a2522}.owner-button:disabled{opacity:.5;cursor:not-allowed}
+
 /* ---------- Incident / dispute queue ---------- */
 
 .admin-incident-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }

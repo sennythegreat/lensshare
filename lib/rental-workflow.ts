@@ -44,6 +44,97 @@ function finalizedInspection(
   return inspections.find((row) => row.kind === kind && row.status === 'finalized')
 }
 
+export function participantConfirmationReadiness(
+  data: RentalHubData,
+  party: RentalHubParty,
+  kind: RentalConfirmationKind,
+): { ready: boolean; reason: string | null } {
+  const unavailable = (reason: string) => ({ ready: false, reason })
+  const { booking, operation } = data
+
+  if (!PARTICIPANT_CONFIRMATIONS[party].includes(kind)) {
+    return unavailable('This confirmation belongs to the other booking role.')
+  }
+  if (hasConfirmation(data.confirmations ?? [], party, kind)) {
+    return unavailable('This confirmation is already recorded.')
+  }
+  if (booking.status === 'declined') {
+    return unavailable('This rental request was declined and its hub record is read-only.')
+  }
+  if (booking.status === 'completed') {
+    return unavailable('This rental is complete and its custody record is read-only.')
+  }
+  if (!operation || operation.workflow_version !== 2) {
+    return unavailable('The Naga Hub workflow has not been created for this booking.')
+  }
+  if (booking.status === 'pending') {
+    return unavailable('The owner must approve this request before participant confirmations begin.')
+  }
+
+  const assignedOperator = Boolean(operation.assigned_operator_id)
+  const issueHold = operation.issue_hold_reason
+  const preInspection = finalizedInspection(data.inspections ?? [], 'pre_rental')
+  const postInspection = finalizedInspection(data.inspections ?? [], 'post_rental')
+  const ownerConfirmedPre = hasConfirmation(data.confirmations ?? [], 'owner', 'pre_inspection')
+  const renterConfirmedPre = hasConfirmation(data.confirmations ?? [], 'renter', 'pre_inspection')
+  const ownerConfirmedPost = hasConfirmation(data.confirmations ?? [], 'owner', 'post_inspection')
+  const renterConfirmedPost = hasConfirmation(data.confirmations ?? [], 'renter', 'post_inspection')
+
+  if (kind === 'owner_dropoff') {
+    if (booking.status !== 'approved') return unavailable('Owner drop-off can only be confirmed while the booking is approved.')
+    if (!assignedOperator) return unavailable('A Naga Hub operator must be assigned before owner drop-off.')
+    if (operation.raw_custody_state !== 'owner') return unavailable('The equipment is no longer recorded in owner custody.')
+    return { ready: true, reason: null }
+  }
+
+  if (kind === 'pre_inspection') {
+    if (!preInspection) return unavailable('The hub operator must finalize the pre-rental inspection first.')
+    return { ready: true, reason: null }
+  }
+
+  if (kind === 'renter_pickup') {
+    if (booking.status !== 'approved') return unavailable('Renter pickup can only be confirmed while the booking is approved.')
+    if (!assignedOperator) return unavailable('A Naga Hub operator must be assigned before renter pickup.')
+    if (operation.raw_custody_state !== 'hub') return unavailable('The equipment must be received at the Naga Hub before renter pickup.')
+    if (issueHold) return unavailable(`The hub issue hold must be resolved first: ${issueHold}`)
+    if (!preInspection) return unavailable('The hub operator must finalize the pre-rental inspection first.')
+    if (!ownerConfirmedPre && !renterConfirmedPre) return unavailable('The owner and renter must each confirm the finalized pre-rental inspection first.')
+    if (!ownerConfirmedPre) return unavailable('The owner must confirm the finalized pre-rental inspection first.')
+    if (!renterConfirmedPre) return unavailable('Confirm the finalized pre-rental inspection first.')
+    if (!data.deposit || !['held', 'waived_student'].includes(data.deposit.raw_status)) {
+      return unavailable('The security deposit must be accepted or the verified-student waiver must apply before pickup.')
+    }
+    if (!data.agreement?.owner_signed_at && !data.agreement?.renter_signed_at) {
+      return unavailable('The owner and renter must both sign the immutable rental agreement first.')
+    }
+    if (!data.agreement?.owner_signed_at) return unavailable('The owner must sign the immutable rental agreement first.')
+    if (!data.agreement?.renter_signed_at) return unavailable('Sign the immutable rental agreement first.')
+    return { ready: true, reason: null }
+  }
+
+  if (kind === 'renter_return') {
+    if (booking.status !== 'active') return unavailable('Renter return can only be confirmed while the rental is active.')
+    if (!assignedOperator) return unavailable('A Naga Hub operator must be assigned before renter return.')
+    if (operation.raw_custody_state !== 'renter') return unavailable('The equipment must be recorded in renter custody before it can be returned.')
+    return { ready: true, reason: null }
+  }
+
+  if (kind === 'post_inspection') {
+    if (!postInspection) return unavailable('The hub operator must finalize the post-rental inspection first.')
+    return { ready: true, reason: null }
+  }
+
+  if (booking.status !== 'returned') return unavailable('Owner collection can only be confirmed after the renter return is recorded.')
+  if (!assignedOperator) return unavailable('A Naga Hub operator must be assigned before owner collection.')
+  if (operation.raw_custody_state !== 'hub_return') return unavailable('The returned equipment must be in Naga Hub custody before owner collection.')
+  if (issueHold) return unavailable(`The hub issue hold must be resolved first: ${issueHold}`)
+  if (!postInspection) return unavailable('The hub operator must finalize the post-rental inspection first.')
+  if (!ownerConfirmedPost && !renterConfirmedPost) return unavailable('The owner and renter must each confirm the finalized post-rental inspection first.')
+  if (!ownerConfirmedPost) return unavailable('Confirm the finalized post-rental inspection first.')
+  if (!renterConfirmedPost) return unavailable('The renter must confirm the finalized post-rental inspection first.')
+  return { ready: true, reason: null }
+}
+
 function addBlocker(
   blockers: RentalWorkflowBlocker[],
   code: string,

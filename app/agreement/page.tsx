@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { Printer, Signature } from 'lucide-react'
 import './agreement.css'
 import { RentalAgreementSheet } from '@/components/rental-agreement-sheet'
+import { AgreementSignatureDialog, type SignatureCaptureMethod } from '@/components/agreement-signature-dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { SectionSkeleton, ErrorState } from '@/components/states'
 import { useToast } from '@/components/toast'
@@ -30,6 +31,7 @@ function AgreementContent() {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [signatureOpen, setSignatureOpen] = useState(false)
   const [confirmSign, setConfirmSign] = useState(false)
 
   const load = useCallback(async () => {
@@ -69,24 +71,42 @@ function AgreementContent() {
   const canSign = Boolean(
     booking
     && signerParty
-    && booking.status !== 'pending'
-    && booking.status !== 'declined'
     && !ownSigned
-    && (isHubWorkflow || signerParty === 'renter'),
+    && (isHubWorkflow
+      ? booking.status === 'approved' && rentalHub?.agreement
+      : signerParty === 'renter' && booking.status !== 'pending' && booking.status !== 'declined'),
   )
 
-  async function handleAccept() {
-    if (!booking || !user || !signerParty || !canSign) return
+  async function handleAccept(file: File, captureMethod: SignatureCaptureMethod) {
+    if (!booking || !user || !signerParty || !canSign || !rentalHub?.agreement) return
+    setBusy(true)
+    setMessage('')
+    try {
+      await signRentalAgreement(booking.id, rentalHub.agreement, file, captureMethod)
+      await load()
+      setSignatureOpen(false)
+      toast.success('Your signature was recorded — the agreement is immutable.')
+    } catch (cause) {
+      const signingError = cause instanceof Error ? cause.message : 'Could not save the signature.'
+      setMessage(signingError)
+      toast.error(signingError)
+      throw cause
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleLegacyAccept() {
+    if (!booking || !user || signerParty !== 'renter' || isHubWorkflow || !canSign) return
     setConfirmSign(false)
     setBusy(true)
     setMessage('')
     try {
-      if (isHubWorkflow) await signRentalAgreement(booking.id)
-      else await saveHandoff(booking.id, user.id, signerParty, 'agreement', {})
+      await saveHandoff(booking.id, user.id, signerParty, 'agreement', {})
       await load()
-      toast.success('Your signature was recorded — the agreement is immutable.')
+      toast.success('Your agreement acceptance was recorded.')
     } catch (cause) {
-      const signingError = cause instanceof Error ? cause.message : 'Could not save the signature.'
+      const signingError = cause instanceof Error ? cause.message : 'Could not save the agreement acceptance.'
       setMessage(signingError)
       toast.error(signingError)
     } finally {
@@ -99,7 +119,9 @@ function AgreementContent() {
   if (state === 'error' || !booking) return <main className="agreement-page"><ErrorState title="Agreement not available" hint={message || 'This booking could not be loaded, or you are not a participant in it.'} retry={() => void load()} /></main>
 
   const backHref = isHubWorkflow
-    ? signerParty === 'owner' ? `/dashboard/rentals/${booking.id}` : `/renter/bookings/${booking.id}`
+    ? profile?.role === 'admin'
+      ? `/admin/handoffs/${booking.id}`
+      : signerParty === 'owner' ? `/dashboard/rentals/${booking.id}` : `/renter/bookings/${booking.id}`
     : profile?.role === 'owner' ? '/dashboard/rentals' : '/renter/bookings'
 
   return <main className="agreement-page">
@@ -107,20 +129,28 @@ function AgreementContent() {
       <Link href={backHref}>← Back to {isHubWorkflow ? 'rental hub' : 'bookings'}</Link>
       <div className="agreement-toolbar-actions">
         <button className="button light" onClick={() => window.print()}><Printer size={14} /> Print / save PDF</button>
-        {canSign && <button className="button dark" disabled={busy} onClick={() => setConfirmSign(true)}><Signature size={14} /> {busy ? 'Signing…' : `Sign as ${signerParty}`}</button>}
+        {canSign && <button className="button dark" disabled={busy} onClick={() => isHubWorkflow ? setSignatureOpen(true) : setConfirmSign(true)}><Signature size={14} /> {busy ? 'Signing…' : isHubWorkflow ? 'Add your signature' : `Sign as ${signerParty}`}</button>}
       </div>
     </div>
     {message && <p className="agreement-error no-print">{message}</p>}
     {ownSigned && <p className="agreement-signed-banner no-print">Your immutable {signerParty} signature is recorded.</p>}
     <RentalAgreementSheet booking={booking} handoffs={handoffs} rentalHub={rentalHub} />
+    <AgreementSignatureDialog
+      open={signatureOpen}
+      busy={busy}
+      signerParty={signerParty === 'owner' ? 'owner' : 'renter'}
+      signerName={signerParty === 'owner' ? booking.owner?.full_name || 'Owner' : booking.renter?.full_name || 'Renter'}
+      onSubmit={handleAccept}
+      onClose={() => { if (!busy) setSignatureOpen(false) }}
+    />
     <ConfirmDialog
-      open={confirmSign}
+      open={confirmSign && !isHubWorkflow}
       busy={busy}
       tone="danger"
-      title={`Sign as the ${signerParty}?`}
-      description="Your signature accepts the immutable terms shown below — equipment, pricing, and hand-off details cannot be edited or withdrawn afterwards."
-      confirmLabel={`Sign as ${signerParty}`}
-      onConfirm={() => void handleAccept()}
+      title="Accept this rental agreement?"
+      description="Your authenticated acceptance is permanent and cannot be withdrawn afterwards."
+      confirmLabel="Accept agreement"
+      onConfirm={() => void handleLegacyAccept()}
       onClose={() => setConfirmSign(false)}
     />
   </main>

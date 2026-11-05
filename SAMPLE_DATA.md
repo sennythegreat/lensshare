@@ -13,11 +13,11 @@ corepack pnpm sample:data
 - Legacy workflow-v1 bookings in pending, approved, active, returned, completed, and declined states
 - Workflow-v2 scenarios: a pending request, an approved request with deposit proof awaiting review, an approved request still awaiting deposit payment, an active rental with full pre-release evidence, a completed rental with marked payout and refunded deposit, and an active rental under issue hold
 - An open damage incident (under review) with a forfeited deposit, plus a resolved accessory-missing incident
-- An active Saver Pass and private synthetic payment/inspection evidence
+- An active Saver Pass and private synthetic payment, agreement-signature, and inspection evidence
 - Approved government ID, selfie, student ID, and enrollment samples for the student renter; identity-only approval for the second renter
 - Messages (one unread per side for the badge), handoff checklists, reviews, and a payout
 
-Every private sample image is generated locally and visibly marked **SAMPLE — NOT A REAL ID** or **SAMPLE PAYMENT**. It contains no real identity or payment information.
+Every private sample image is generated locally and visibly marked as synthetic (for example, **SAMPLE — NOT A REAL ID**, **SAMPLE PAYMENT**, or **SAMPLE SIGNATURE**). It contains no real identity, signature, or payment information.
 
 ## Requirements
 

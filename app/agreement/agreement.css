@@ -91,6 +91,10 @@
 }
 .agreement-signature small { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); display: block; margin-bottom: 6px; }
 .agreement-signed-name { font-family: Georgia, serif; font-style: italic; font-size: 18px; display: block; border-bottom: 1px solid var(--ink); padding-bottom: 4px; }
+.agreement-signature-image { display: block; width: 100%; height: 92px; object-fit: contain; object-position: left center; margin-bottom: 4px; background: #fff; }
+.agreement-signature-loading { display: flex; align-items: center; min-height: 92px; padding: 10px; border: 1px dashed var(--line); color: var(--muted); font-size: 11px; }
+.agreement-legacy-acceptance { display: flex; align-items: center; gap: 8px; min-height: 58px; padding: 10px 12px; margin-bottom: 6px; border: 1px solid #b8d3ca; background: #e8f2ef; color: #315f57; font-size: 11px; line-height: 1.45; }
+.agreement-legacy-acceptance svg { flex: none; }
 .agreement-signature-state { display: flex; align-items: center; gap: 5px; color: #2e6e5e; font-size: 9px; margin-top: 6px; }
 .agreement-unsigned { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); border: 1px dashed var(--line); padding: 6px 12px; }
 
@@ -201,4 +205,332 @@
   .agreement-parties{padding:16px 0}
   .agreement-deposit,.agreement-price{padding:12px 0}
   .agreement-signatures{padding-top:18px}
+}
+
+/* Reusable draw-or-upload agreement signature dialog */
+.agreement-signature-dialog-backdrop{
+  position:fixed;
+  z-index:150;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow-y:auto;
+  padding:28px;
+  background:rgba(7,16,14,.68);
+  backdrop-filter:blur(3px);
+}
+.agreement-signature-dialog-panel{
+  position:relative;
+  width:min(720px,100%);
+  max-height:calc(100dvh - 56px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  border:1px solid #bfc9c4;
+  background:#f8f8f5;
+  color:#07100e;
+  box-shadow:0 24px 70px rgba(0,0,0,.28);
+  font-family:Arial,Helvetica,sans-serif;
+}
+.agreement-signature-dialog-panel:focus{outline:none}
+.agreement-signature-dialog-close{
+  position:absolute;
+  z-index:2;
+  top:18px;
+  right:18px;
+  display:grid;
+  place-items:center;
+  width:40px;
+  height:40px;
+  border:1px solid #cbd4cf;
+  border-radius:0;
+  background:#fff;
+  color:#35433e;
+  cursor:pointer;
+}
+.agreement-signature-dialog-header{
+  padding:32px 76px 23px 32px;
+  border-bottom:1px solid #d6ddd9;
+  background:#fff;
+}
+.agreement-signature-dialog-eyebrow{
+  display:block;
+  margin-bottom:8px;
+  color:#56645f;
+  font:700 10px/1.4 'DM Mono',monospace;
+  letter-spacing:.13em;
+}
+.agreement-signature-dialog-header h2{
+  margin:0;
+  font:29px/1.18 Georgia,serif;
+  letter-spacing:-.02em;
+}
+.agreement-signature-dialog-header p{
+  max-width:570px;
+  margin:9px 0 0;
+  color:#53615c;
+  font-size:13px;
+  line-height:1.6;
+}
+.agreement-signature-dialog-form{padding:24px 32px 30px}
+.agreement-signature-dialog-methods{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  border:1px solid #cbd4cf;
+  background:#fff;
+}
+.agreement-signature-dialog-methods button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-height:45px;
+  border:0;
+  background:#fff;
+  color:#52605b;
+  font:700 10px/1.3 Arial,Helvetica,sans-serif;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.agreement-signature-dialog-methods button+button{border-left:1px solid #cbd4cf}
+.agreement-signature-dialog-methods button.active{
+  background:#10201c;
+  color:#fff;
+}
+.agreement-signature-dialog-workspace{
+  margin-top:16px;
+  padding:17px;
+  border:1px solid #d5ddd8;
+  background:#f0f2ef;
+}
+.agreement-signature-dialog-canvas-heading{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:9px;
+}
+.agreement-signature-dialog-canvas-label{
+  color:#263832;
+  font:700 10px/1.35 'DM Mono',monospace;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+}
+.agreement-signature-dialog-canvas-heading span{
+  color:#68756f;
+  font-size:10px;
+  line-height:1.4;
+  text-align:right;
+}
+.agreement-signature-dialog-canvas-frame{
+  position:relative;
+  width:100%;
+  aspect-ratio:8/3;
+  overflow:hidden;
+  border:1px solid #bfc9c4;
+  background:#fff;
+  box-shadow:inset 0 0 0 1px rgba(7,16,14,.025);
+}
+.agreement-signature-dialog-canvas-frame canvas{
+  position:absolute;
+  inset:0;
+  display:block;
+  width:100%;
+  height:100%;
+  background:#fff;
+  touch-action:none;
+}
+.agreement-signature-dialog-canvas-frame.drawn canvas{cursor:crosshair}
+.agreement-signature-dialog-canvas-frame.uploaded canvas{cursor:default}
+.agreement-signature-dialog-canvas-placeholder{
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  padding:20px;
+  color:#87918d;
+  font:11px/1.5 'DM Mono',monospace;
+  letter-spacing:.03em;
+  text-align:center;
+  pointer-events:none;
+}
+.agreement-signature-dialog-tools{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin-top:11px;
+}
+.agreement-signature-dialog-tools>div{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+}
+.agreement-signature-dialog-tools button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-height:38px;
+  padding:8px 11px;
+  border:1px solid #c4cec9;
+  border-radius:0;
+  background:#fff;
+  color:#34433d;
+  font:700 9px/1.25 Arial,Helvetica,sans-serif;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.agreement-signature-dialog-file-note{
+  min-width:0;
+  color:#65716c;
+  font-size:9.5px;
+  line-height:1.45;
+  overflow-wrap:anywhere;
+  text-align:right;
+}
+.agreement-signature-dialog-acknowledgment{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  margin-top:17px;
+  padding:15px 16px;
+  border:1px solid #cbd8d3;
+  background:#fff;
+  color:#43514c;
+  font-size:12px;
+  line-height:1.55;
+  cursor:pointer;
+}
+.agreement-signature-dialog-acknowledgment input{
+  width:18px;
+  height:18px;
+  flex:none;
+  margin:1px 0 0;
+  accent-color:#315f57;
+}
+.agreement-signature-dialog-acknowledgment span{display:block}
+.agreement-signature-dialog-acknowledgment strong{
+  display:block;
+  margin-bottom:2px;
+  color:#17241f;
+  font-family:Georgia,serif;
+  font-size:14px;
+}
+.agreement-signature-dialog-security-note{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  margin-top:11px;
+  color:#48655c;
+  font-size:10px;
+  line-height:1.5;
+}
+.agreement-signature-dialog-security-note svg{flex:none;margin-top:1px}
+.agreement-signature-dialog-error{
+  margin:13px 0 0;
+  padding:10px 12px;
+  border:1px solid #dfb6ae;
+  background:#f8e7e3;
+  color:#80382e;
+  font-size:12px;
+  line-height:1.5;
+}
+.agreement-signature-dialog-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:9px;
+  margin-top:19px;
+  padding-top:18px;
+  border-top:1px solid #d5ddd8;
+}
+.agreement-signature-dialog-actions button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-height:43px;
+  padding:10px 15px;
+  border:1px solid #c5cfca;
+  border-radius:0;
+  background:#fff;
+  color:#34423d;
+  font:700 10px/1.3 Arial,Helvetica,sans-serif;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.agreement-signature-dialog-actions button.primary{
+  border-color:#07100e;
+  background:#07100e;
+  color:#fff;
+}
+.agreement-signature-dialog-panel button:disabled,
+.agreement-signature-dialog-panel input:disabled{
+  cursor:not-allowed;
+  opacity:.5;
+}
+.agreement-signature-dialog-panel button:focus-visible,
+.agreement-signature-dialog-panel input:focus-visible,
+.agreement-signature-dialog-panel canvas:focus-visible{
+  outline:2px solid #4f7b70;
+  outline-offset:3px;
+}
+
+@media(max-width:640px){
+  .agreement-signature-dialog-backdrop{
+    align-items:flex-end;
+    padding:12px 0 0;
+  }
+  .agreement-signature-dialog-panel{
+    width:100%;
+    max-height:calc(100dvh - 12px);
+    border-right:0;
+    border-bottom:0;
+    border-left:0;
+  }
+  .agreement-signature-dialog-close{
+    top:13px;
+    right:14px;
+    width:42px;
+    height:42px;
+  }
+  .agreement-signature-dialog-header{padding:23px 66px 18px 18px}
+  .agreement-signature-dialog-header h2{font-size:25px}
+  .agreement-signature-dialog-header p{font-size:12.5px;line-height:1.55}
+  .agreement-signature-dialog-form{padding:18px 14px max(22px,env(safe-area-inset-bottom))}
+  .agreement-signature-dialog-methods button{min-height:46px;padding:8px;font-size:9px}
+  .agreement-signature-dialog-workspace{margin-top:12px;padding:12px}
+  .agreement-signature-dialog-canvas-heading{align-items:flex-start;flex-direction:column;gap:3px}
+  .agreement-signature-dialog-canvas-heading span{text-align:left}
+  .agreement-signature-dialog-canvas-frame{min-height:128px;aspect-ratio:8/3}
+  .agreement-signature-dialog-tools{align-items:stretch;flex-direction:column;gap:8px}
+  .agreement-signature-dialog-tools>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .agreement-signature-dialog-tools>div button:only-child{grid-column:1/-1}
+  .agreement-signature-dialog-tools button{min-height:42px;padding:8px}
+  .agreement-signature-dialog-file-note{text-align:left}
+  .agreement-signature-dialog-acknowledgment{gap:10px;margin-top:13px;padding:13px}
+  .agreement-signature-dialog-security-note{font-size:9.5px}
+  .agreement-signature-dialog-actions{display:grid;grid-template-columns:1fr 1.45fr;gap:8px;margin-top:16px;padding-top:15px}
+  .agreement-signature-dialog-actions button{width:100%;min-height:46px;padding:9px}
+}
+
+@media(max-width:390px){
+  .agreement-signature-dialog-methods button{gap:5px;font-size:8.5px;letter-spacing:.05em}
+  .agreement-signature-dialog-canvas-frame{min-height:118px}
+  .agreement-signature-dialog-tools>div{grid-template-columns:1fr 1fr}
+  .agreement-signature-dialog-tools>div button:first-of-type:nth-last-of-type(3){grid-column:1/-1}
+  .agreement-signature-dialog-actions{grid-template-columns:1fr}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .agreement-signature-dialog-backdrop{scroll-behavior:auto}
+}
+
+@media print{
+  .agreement-signature-dialog-backdrop{display:none!important}
 }

@@ -1,7 +1,11 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import { CheckCircle2, MapPin, ShieldCheck, X } from 'lucide-react'
 import '@/app/agreement/agreement.css'
+import { fetchAgreementSignatureUrl } from '@/lib/data'
 import { pesos } from '@/lib/types'
-import type { BookingHandoff, BookingWithRelations, RentalHubData } from '@/lib/types'
+import type { BookingHandoff, BookingWithRelations, RentalAgreementAcceptance, RentalHubData } from '@/lib/types'
 
 type RentalAgreementSheetProps = {
   booking: BookingWithRelations
@@ -39,7 +43,7 @@ export function RentalAgreementSheet({ booking, handoffs = [], rentalHub = null 
       <span className="agreement-logo"><img src="/lensshare-logo.png" alt="LensShare" /></span>
     </header>
 
-    {agreement && <div className="agreement-lock"><ShieldCheck size={15} /><div><b>Immutable booking terms</b><span>This document is the version signed by both participants. Fingerprint {shortHash(agreement.terms_hash)}.</span></div></div>}
+    {agreement && <div className="agreement-lock"><ShieldCheck size={15} /><div><b>Immutable booking terms</b><span>{agreement.status === 'signed' ? 'Both participants signed this version.' : agreement.status === 'partially_signed' ? 'One participant has signed this version; the other signature is still required.' : 'This version is locked and awaiting both participant signatures.'} Fingerprint {shortHash(agreement.terms_hash)}.</span></div></div>}
 
     <section className="agreement-parties">
       <div><small>OWNER (LENDER)</small><b>{booking.owner?.full_name || '—'}</b></div>
@@ -81,19 +85,45 @@ export function RentalAgreementSheet({ booking, handoffs = [], rentalHub = null 
     </section>
 
     <section className="agreement-signatures">
-      <SignatureBlock label="OWNER" name={booking.owner?.full_name ?? '—'} signedAt={ownerSignedAt} />
-      <SignatureBlock label="RENTER" name={booking.renter?.full_name ?? '—'} signedAt={renterSignedAt} />
+      <SignatureBlock label="OWNER" name={booking.owner?.full_name ?? '—'} signedAt={ownerSignedAt} acceptance={agreement?.owner_acceptance ?? null} />
+      <SignatureBlock label="RENTER" name={booking.renter?.full_name ?? '—'} signedAt={renterSignedAt} acceptance={agreement?.renter_acceptance ?? null} />
     </section>
     <footer className="agreement-foot"><ShieldCheck size={13} /> This agreement and its signatures are attached to booking #{booking.id.slice(0, 8).toUpperCase()}.</footer>
   </article>
 }
 
-function SignatureBlock({ label, name, signedAt }: { label: string; name: string; signedAt: string | null }) {
-  return <div className="agreement-signature">
+function SignatureBlock({ label, name, signedAt, acceptance }: { label: string; name: string; signedAt: string | null; acceptance: RentalAgreementAcceptance | null }) {
+  const [signatureUrl, setSignatureUrl] = useState('')
+  const [previewFailed, setPreviewFailed] = useState(false)
+  const signaturePath = acceptance?.signature_object_path ?? null
+
+  useEffect(() => {
+    let active = true
+    setSignatureUrl('')
+    setPreviewFailed(false)
+    if (!signaturePath) return () => { active = false }
+    fetchAgreementSignatureUrl(signaturePath)
+      .then((url) => { if (active) setSignatureUrl(url) })
+      .catch(() => { if (active) setPreviewFailed(true) })
+    return () => { active = false }
+  }, [signaturePath])
+
+  if (!signedAt) return <div className="agreement-signature">
     <small>{label}</small>
-    {signedAt
-      ? <><span className="agreement-signed-name">{name}</span><span className="agreement-signature-state"><CheckCircle2 size={13} /> Signed immutably · {new Date(signedAt).toLocaleString('en-PH')}</span></>
-      : <><span className="agreement-unsigned"><X size={14} /> Not yet signed</span><small>{name}</small></>}
+    <span className="agreement-unsigned"><X size={14} /> Not yet signed</span>
+    <small>{name}</small>
+  </div>
+
+  const legacy = !acceptance || acceptance.signature_capture_method === 'legacy_click' || !signaturePath
+  return <div className="agreement-signature signed">
+    <small>{label}</small>
+    {legacy
+      ? <div className="agreement-legacy-acceptance"><CheckCircle2 size={18} /><span>Authenticated acceptance recorded before signature-image capture</span></div>
+      : signatureUrl
+        ? <img className="agreement-signature-image" src={signatureUrl} alt={`${label.toLowerCase()} signature by ${name}`} />
+        : <div className="agreement-signature-loading">{previewFailed ? 'Private signature preview unavailable' : 'Loading private signature…'}</div>}
+    <span className="agreement-signed-name">{name}</span>
+    <span className="agreement-signature-state"><CheckCircle2 size={13} /> {legacy ? 'Accepted' : acceptance.signature_capture_method === 'drawn' ? 'Drawn and signed' : 'Uploaded and signed'} immutably · {new Date(signedAt).toLocaleString('en-PH')}</span>
   </div>
 }
 

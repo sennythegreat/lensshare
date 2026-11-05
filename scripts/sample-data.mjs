@@ -622,7 +622,50 @@ async function assignAndApprove(booking, owner, admin) {
 }
 
 async function acceptAgreement(supabase, bookingId) {
-  const { error } = await supabase.rpc('accept_booking_agreement', { p_booking_id: bookingId })
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError) throw authError
+  if (!authData.user) throw new Error('Sample agreement signing requires an authenticated participant.')
+
+  const { data: agreement, error: agreementError } = await supabase
+    .from('booking_agreements')
+    .select('id, terms_hash')
+    .eq('booking_id', bookingId)
+    .order('version', { ascending: false })
+    .limit(1)
+    .single()
+  if (agreementError) throw agreementError
+
+  const { data: existing, error: existingError } = await supabase
+    .from('booking_agreement_acceptances')
+    .select('id')
+    .eq('agreement_id', agreement.id)
+    .eq('user_id', authData.user.id)
+    .maybeSingle()
+  if (existingError) throw existingError
+  if (existing) return
+
+  const signature = samplePng('SAMPLE SIGNATURE', `SIGNED BY ${authData.user.email?.split('@')[0]?.toUpperCase() || 'PARTICIPANT'}`)
+  const signatureSha256 = createHash('sha256').update(signature).digest('hex')
+  const signaturePath = `${authData.user.id}/${bookingId}/${agreement.id}/5a160001-0000-4000-8000-000000000001.png`
+  if (!(await objectExists(supabase, 'agreement-signatures', signaturePath))) {
+    const { error: uploadError } = await supabase.storage.from('agreement-signatures').upload(signaturePath, signature, {
+      contentType: 'image/png',
+      cacheControl: '3600',
+      metadata: { sha256: signatureSha256 },
+    })
+    if (uploadError && !/exist|duplicate/i.test(uploadError.message ?? '')) throw uploadError
+  }
+
+  const { error } = await supabase.rpc('accept_booking_agreement', {
+    p_booking_id: bookingId,
+    p_agreement_id: agreement.id,
+    p_terms_hash: agreement.terms_hash,
+    p_signature_object_path: signaturePath,
+    p_signature_sha256: signatureSha256,
+    p_signature_capture_method: 'drawn',
+    p_signature_mime_type: 'image/png',
+    p_signature_byte_size: signature.length,
+  })
   if (error) throw error
 }
 

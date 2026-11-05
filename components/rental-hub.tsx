@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { ErrorState, SectionSkeleton } from '@/components/states'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { AgreementSignatureDialog, type SignatureCaptureMethod } from '@/components/agreement-signature-dialog'
 import { useToast } from '@/components/toast'
 import { RentalAgreementSheet } from '@/components/rental-agreement-sheet'
 import {
@@ -32,6 +33,7 @@ import {
   signRentalAgreement,
   submitDepositProof,
 } from '@/lib/data'
+import { participantConfirmationKinds, participantConfirmationReadiness } from '@/lib/rental-workflow'
 import { pesos } from '@/lib/types'
 import { useRentalHub } from '@/lib/use-rental-hub'
 import type {
@@ -79,7 +81,8 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
   const [depositReference, setDepositReference] = useState('')
   const [depositFile, setDepositFile] = useState<File | null>(null)
   const [notice, setNotice] = useState('')
-  const [confirmAction, setConfirmAction] = useState<'decline' | 'sign' | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'decline' | null>(null)
+  const [signatureOpen, setSignatureOpen] = useState(false)
 
   async function perform(action: string, operation: () => Promise<unknown>, success: string) {
     setBusyAction(action)
@@ -94,6 +97,42 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
       const message = cause instanceof Error ? cause.message : 'That action could not be completed.'
       setActionError(message)
       toast.error(message)
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  async function confirmParticipantStep(kind: RentalConfirmationKind) {
+    if (!hubData) return
+    const readiness = participantConfirmationReadiness(hubData, party, kind)
+    if (!readiness.ready) {
+      const message = readiness.reason || 'This confirmation is not available yet.'
+      setNotice('')
+      setActionError(message)
+      toast.error(message)
+      return
+    }
+    const copy = CONFIRMATION_COPY[kind]
+    await perform(`confirm-${kind}`, () => confirmRentalStep(bookingId, kind), `${copy.label} recorded.`)
+  }
+
+  async function submitSignature(file: File, captureMethod: SignatureCaptureMethod) {
+    if (!hubData?.agreement) return
+    setBusyAction('sign')
+    setActionError('')
+    setNotice('')
+    try {
+      await signRentalAgreement(bookingId, hubData.agreement, file, captureMethod)
+      const success = 'Your immutable agreement signature was recorded.'
+      setNotice(success)
+      toast.success(success)
+      await refresh(true)
+      setSignatureOpen(false)
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'That signature could not be saved.'
+      setActionError(message)
+      toast.error(message)
+      throw cause
     } finally {
       setBusyAction('')
     }
@@ -121,9 +160,8 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
   const ownerSigned = Boolean(hubData.agreement?.owner_signed_at)
   const renterSigned = Boolean(hubData.agreement?.renter_signed_at)
   const ownSigned = party === 'owner' ? ownerSigned : renterSigned
-  const canSign = Boolean(hubData.agreement && !ownSigned && !isPending && !isDeclined)
+  const canSign = Boolean(hubData.agreement && !ownSigned && booking.status === 'approved')
   const operatorAssigned = Boolean(hubData.operation?.assigned_operator_id)
-  const allowedConfirmations = hubData.allowed_confirmation_kinds ?? []
   const confirmationSet = new Set((hubData.confirmations ?? []).map((confirmation) => `${confirmation.party}:${confirmation.kind}`))
   const depositRequired = Boolean(hubData.deposit && hubData.deposit.status !== 'waived')
   const canSubmitDeposit = party === 'renter' && depositRequired && ['proof_required', 'rejected'].includes(hubData.deposit?.status ?? '') && !isDeclined
@@ -185,7 +223,7 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
             <SignatureStatus label="Owner" name={booking.owner?.full_name} signedAt={hubData.agreement?.owner_signed_at} />
             <SignatureStatus label="Renter" name={booking.renter?.full_name} signedAt={hubData.agreement?.renter_signed_at} />
           </div>
-          {canSign && <div className="hub-action-callout"><div><strong>Your signature is required</strong><p>Signing accepts this booking’s immutable equipment, Naga Hub, rental-price, and security-deposit snapshot. It cannot be edited or withdrawn.</p></div><button type="button" className="hub-button primary" disabled={Boolean(busyAction)} onClick={() => setConfirmAction('sign')}>{busyAction === 'sign' ? 'Signing…' : 'Sign agreement'}</button></div>}
+          {canSign && <div className="hub-action-callout"><div><strong>Your signature is required</strong><p>Review the full agreement, then draw or upload your signature to accept this booking’s immutable equipment, Naga Hub, rental-price, and security-deposit snapshot.</p></div><button type="button" className="hub-button primary" disabled={Boolean(busyAction)} onClick={() => setSignatureOpen(true)}>{busyAction === 'sign' ? 'Signing…' : 'Add your signature'}</button></div>}
         </HubSection>
 
         <HubSection eyebrow="PRIVATE INSPECTIONS" title="Finalized condition evidence" icon={<Camera size={17} />}>
@@ -197,14 +235,14 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
 
         <HubSection eyebrow="PARTICIPANT CONFIRMATIONS" title="Your part of the custody record" icon={<UserCheck size={17} />}>
           <div className="hub-confirmations">
-            {partyConfirmationKinds(party).map((kind) => {
+            {participantConfirmationKinds(party).map((kind) => {
               const copy = CONFIRMATION_COPY[kind] ?? { label: humanize(kind), description: 'Confirm this recorded rental step.' }
               const done = confirmationSet.has(`${party}:${kind}`)
-              const allowed = allowedConfirmations.includes(kind as RentalConfirmationKind)
-              return <article className={`hub-confirmation ${done ? 'done' : ''}`} key={kind}>
+              const readiness = participantConfirmationReadiness(hubData, party, kind)
+              return <article className={`hub-confirmation ${done ? 'done' : readiness.ready ? 'ready' : 'waiting'}`} key={kind}>
                 <span className="hub-confirmation-check">{done ? <Check size={14} /> : null}</span>
-                <div><strong>{copy.label}</strong><p>{copy.description}</p></div>
-                {done ? <small>Recorded</small> : <button type="button" className="hub-button secondary" disabled={!allowed || Boolean(busyAction)} title={!allowed ? blockerForAction(hubData.blockers, kind) || 'This confirmation is not available yet.' : undefined} onClick={() => perform(`confirm-${kind}`, () => confirmRentalStep(booking.id, kind as RentalConfirmationKind), `${copy.label} recorded.`)}>{busyAction === `confirm-${kind}` ? 'Saving…' : 'Confirm'}</button>}
+                <div><strong>{copy.label}</strong><p>{copy.description}</p>{!done && !readiness.ready && <p className="hub-confirmation-reason"><Clock3 size={12} /> Not ready — {readiness.reason}</p>}</div>
+                {done ? <small>Recorded</small> : <button type="button" className="hub-button secondary" disabled={Boolean(busyAction)} onClick={() => { void confirmParticipantStep(kind) }}>{busyAction === `confirm-${kind}` ? 'Saving…' : 'Confirm'}</button>}
               </article>
             })}
           </div>
@@ -237,14 +275,13 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
       onConfirm={() => { setConfirmAction(null); void perform('decline', () => decideRentalRequest(booking.id, 'declined'), 'Request declined.') }}
       onClose={() => setConfirmAction(null)}
     />
-    <ConfirmDialog
-      open={confirmAction === 'sign'}
+    <AgreementSignatureDialog
+      open={signatureOpen}
       busy={busyAction === 'sign'}
-      title="Sign the immutable agreement?"
-      description="Your signature accepts this booking’s equipment, Naga Hub, rental-price, and security-deposit snapshot. It cannot be edited or withdrawn afterwards."
-      confirmLabel="Sign agreement"
-      onConfirm={() => { setConfirmAction(null); void perform('sign', () => signRentalAgreement(booking.id), 'Your immutable agreement signature was recorded.') }}
-      onClose={() => setConfirmAction(null)}
+      signerParty={party}
+      signerName={party === 'owner' ? booking.owner?.full_name || 'Owner' : booking.renter?.full_name || 'Renter'}
+      onSubmit={submitSignature}
+      onClose={() => { if (busyAction !== 'sign') setSignatureOpen(false) }}
     />
   </div>
 }
@@ -361,16 +398,6 @@ function EventList({ events }: { events: RentalHubEvent[] }) {
 
 function HubBadge({ value }: { value: string }) {
   return <span className={`hub-badge ${value.replaceAll('_', '-')}`}>{humanize(value)}</span>
-}
-
-function partyConfirmationKinds(party: RentalHubParty): string[] {
-  return party === 'owner'
-    ? ['owner_dropoff', 'pre_inspection', 'post_inspection', 'owner_collection']
-    : ['pre_inspection', 'renter_pickup', 'renter_return', 'post_inspection']
-}
-
-function blockerForAction(blockers: RentalWorkflowBlocker[], action: string): string {
-  return blockers.find((blocker) => blocker.action === action)?.message ?? ''
 }
 
 function agreementEquipmentName(data: RentalHubData): string | null {

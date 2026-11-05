@@ -15,6 +15,7 @@ import {
   fetchBookingMessages,
   fetchCounterpartyVerificationProofs,
   fetchMessageAttachmentUrl,
+  fetchRentalHub,
   fetchSignedDocUrl,
   markMessagesRead,
   sendMessage,
@@ -25,7 +26,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/lib/use-profile'
 import { ownerVerificationLabel, pesos, renterVerificationLabel } from '@/lib/types'
 import { isHubWorkflow } from '@/lib/rental-workflow'
-import type { BookingHandoff, BookingStatus, BookingWithRelations, CounterpartyVerificationProof, Message, MessageAttachment } from '@/lib/types'
+import type { BookingHandoff, BookingStatus, BookingWithRelations, CounterpartyVerificationProof, Message, MessageAttachment, RentalHubData } from '@/lib/types'
 import './chat.css'
 
 const ATTACHMENT_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv'
@@ -51,6 +52,7 @@ function ChatContent() {
   const [agreementOpen, setAgreementOpen] = useState(false)
   const [agreementState, setAgreementState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [handoffs, setHandoffs] = useState<BookingHandoff[]>([])
+  const [agreementHub, setAgreementHub] = useState<RentalHubData | null>(null)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [proofs, setProofs] = useState<CounterpartyVerificationProof[]>([])
   const [proofsState, setProofsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -167,9 +169,15 @@ function ChatContent() {
     setAgreementOpen(true)
     setAgreementState('loading')
     setHandoffs([])
-    fetchBookingHandoffs(booking.id)
-      .then((rows) => {
+    setAgreementHub(null)
+    const hubWorkflow = isHubWorkflow(booking)
+    Promise.all([
+      fetchBookingHandoffs(booking.id),
+      hubWorkflow ? fetchRentalHub(booking.id) : Promise.resolve(null),
+    ])
+      .then(([rows, hub]) => {
         setHandoffs(rows)
+        setAgreementHub(hub)
         setAgreementState('ready')
       })
       .catch(() => setAgreementState('error'))
@@ -274,7 +282,7 @@ function ChatContent() {
           <div className="chat-agreement-toolbar"><div><span>Booking agreement</span><p>Read-only preview · {isHubWorkflow(booking) ? 'sign both parties’ immutable terms in the rental hub' : 'signing remains in the booking agreement flow'}</p></div><button type="button" aria-label="Close rental agreement" onClick={() => setAgreementOpen(false)}><X size={18} /></button></div>
           {agreementState === 'loading' && <SectionSkeleton rows={5} />}
           {agreementState === 'error' && <ErrorState title="Agreement not available" hint="The signature record could not be loaded. Try again from the booking page." />}
-          {agreementState === 'ready' && <RentalAgreementSheet booking={booking} handoffs={handoffs} />}
+          {agreementState === 'ready' && <RentalAgreementSheet booking={booking} handoffs={handoffs} rentalHub={agreementHub} />}
         </section>
       </div>}
     </section>
