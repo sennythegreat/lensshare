@@ -180,7 +180,7 @@ export default function AdminHubSettingsPage() {
     }
   }
 
-  return <AdminShell title="Naga Hub settings" subtitle="Maintain the exact desk location, operating hours, and manual deposit instructions used for hub hand-offs.">
+  return <AdminShell title="Naga Hub settings" subtitle="Maintain the exact desk location, operating hours, and manual payment receiving details for rent and security deposits.">
     <div className="admin-handoff-detail-nav"><Link href="/admin/handoffs"><ArrowLeft size={13} /> Back to hand-off queue</Link>{savedSettings?.updated_at && <span>Last saved {new Date(savedSettings.updated_at).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}</span>}</div>
 
     {state === 'error' ? <div className="admin-handoff-state"><ErrorState title="Hub settings unavailable" hint={error || 'The configured Naga Hub details could not be loaded.'} retry={() => void load()} /></div>
@@ -209,7 +209,7 @@ export default function AdminHubSettingsPage() {
           </section>
 
           <section className="admin-handoff-panel">
-            <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">MANUAL GCASH CHECK</span><h2>Deposit receiving details</h2><p>Staff compare renter-uploaded proof against these configured details.</p></div><Smartphone size={18} /></div>
+            <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">MANUAL GCASH CHECK</span><h2>Payment receiving details</h2><p>The same receiving account is used for rental payments and security deposits. Staff review each receipt independently against these details.</p></div><Smartphone size={18} /></div>
             <div className="admin-handoff-proof-warning" role="note"><ShieldAlert size={18} /><p><strong>No provider confirmation or escrow.</strong> LensShare only stores staff’s manual visual review of submitted proof. The interface does not query GCash, guarantee settlement, hold funds, or provide an escrow service.</p></div>
             <div className="admin-hub-settings-fields">
               <label htmlFor="hub-gcash-name"><span>GCash account name <b>Required</b></span><input id="hub-gcash-name" required maxLength={160} autoComplete="off" value={values.gcash_account_name} onChange={(event) => change('gcash_account_name', event.target.value)} placeholder="Registered receiving name" /></label>

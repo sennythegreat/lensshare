@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   AlertCircle,
@@ -30,11 +30,14 @@ import {
   confirmRentalStep,
   decideRentalRequest,
   fetchInspectionPhotoUrl,
+  HUB_PAYMENT_PROOF_ACCEPT,
+  HUB_PAYMENT_PROOF_MAX_BYTES,
   signRentalAgreement,
   submitDepositProof,
+  submitRentalPaymentProof,
 } from '@/lib/data'
 import { participantConfirmationKinds, participantConfirmationReadiness } from '@/lib/rental-workflow'
-import { pesos } from '@/lib/types'
+import { pesos, RENTAL_PAYMENT_STATUS_LABELS } from '@/lib/types'
 import { useRentalHub } from '@/lib/use-rental-hub'
 import type {
   BookingWithRelations,
@@ -47,9 +50,6 @@ import type {
   RentalWorkflowBlocker,
 } from '@/lib/types'
 import './rental-hub.css'
-
-const DEPOSIT_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf'
-const MAX_DEPOSIT_BYTES = 10 * 1024 * 1024
 
 const CUSTODY_STEPS = [
   { state: 'with_owner', label: 'With owner', detail: 'Owner prepares the complete kit.' },
@@ -78,25 +78,32 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
   const toast = useToast()
   const [actionError, setActionError] = useState('')
   const [busyAction, setBusyAction] = useState('')
+  const [rentalReference, setRentalReference] = useState('')
+  const [rentalFile, setRentalFile] = useState<File | null>(null)
   const [depositReference, setDepositReference] = useState('')
   const [depositFile, setDepositFile] = useState<File | null>(null)
   const [notice, setNotice] = useState('')
   const [confirmAction, setConfirmAction] = useState<'decline' | null>(null)
   const [signatureOpen, setSignatureOpen] = useState(false)
+  const paymentRecipientReady = Boolean(hubData?.hub?.gcash_recipient_name?.trim() && hubData?.hub?.gcash_recipient_number?.trim())
+  const canSubmitRentalPayment = party === 'renter' && hubData?.booking.status === 'approved' && ['awaiting_payment', 'rejected'].includes(hubData.rental_payment?.status ?? '')
+  const canSubmitDeposit = party === 'renter' && hubData?.booking.status === 'approved' && ['proof_required', 'rejected'].includes(hubData.deposit?.status ?? '')
 
-  async function perform(action: string, operation: () => Promise<unknown>, success: string) {
+  async function perform(action: string, operation: () => Promise<unknown>, success: string): Promise<boolean> {
     setBusyAction(action)
     setActionError('')
     setNotice('')
     try {
       await operation()
+      await refresh(true)
       setNotice(success)
       toast.success(success)
-      await refresh(true)
+      return true
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'That action could not be completed.'
       setActionError(message)
       toast.error(message)
+      return false
     } finally {
       setBusyAction('')
     }
@@ -138,15 +145,30 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
     }
   }
 
-  async function submitDeposit() {
-    if (!depositFile || !depositReference.trim()) return
-    if (depositFile.size > MAX_DEPOSIT_BYTES) {
-      setActionError('Deposit proof must be 10 MB or smaller.')
-      return
+  async function submitRentalPayment(): Promise<boolean> {
+    if (!canSubmitRentalPayment || !paymentRecipientReady || busyAction || !rentalFile || !rentalReference.trim()) return false
+    const submitted = await perform('rental-payment', async () => {
+      const payment = await submitRentalPaymentProof(bookingId, rentalReference.trim(), rentalFile)
+      if (!payment) throw new Error('Rental-payment submission was not confirmed. Your receipt and reference have been kept; contact the hub operator before trying again.')
+    }, 'Rental-payment receipt submitted for manual review.')
+    if (submitted) {
+      setRentalFile(null)
+      setRentalReference('')
     }
-    await perform('deposit', () => submitDepositProof(bookingId, depositReference.trim(), depositFile), 'Deposit receipt submitted for manual review.')
-    setDepositFile(null)
-    setDepositReference('')
+    return submitted
+  }
+
+  async function submitDeposit(): Promise<boolean> {
+    if (!canSubmitDeposit || !paymentRecipientReady || busyAction || !depositFile || !depositReference.trim()) return false
+    const submitted = await perform('deposit', async () => {
+      const deposit = await submitDepositProof(bookingId, depositReference.trim(), depositFile)
+      if (!deposit) throw new Error('Deposit submission was not confirmed. Your receipt and reference have been kept; contact the hub operator before trying again.')
+    }, 'Deposit receipt submitted for manual review.')
+    if (submitted) {
+      setDepositFile(null)
+      setDepositReference('')
+    }
+    return submitted
   }
 
   if (loading) return <div className="hub-loading"><SectionSkeleton rows={6} /></div>
@@ -163,8 +185,6 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
   const canSign = Boolean(hubData.agreement && !ownSigned && booking.status === 'approved')
   const operatorAssigned = Boolean(hubData.operation?.assigned_operator_id)
   const confirmationSet = new Set((hubData.confirmations ?? []).map((confirmation) => `${confirmation.party}:${confirmation.kind}`))
-  const depositRequired = Boolean(hubData.deposit && hubData.deposit.status !== 'waived')
-  const canSubmitDeposit = party === 'renter' && depositRequired && ['proof_required', 'rejected'].includes(hubData.deposit?.status ?? '') && !isDeclined
 
   return <div className="rental-hub">
     <div className="hub-topbar">
@@ -191,7 +211,7 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
       <div><button type="button" className="hub-button primary" disabled={!operatorAssigned || Boolean(busyAction)} title={!operatorAssigned ? 'Waiting for a platform admin to assign a Naga Hub operator.' : undefined} onClick={() => perform('approve', () => decideRentalRequest(booking.id, 'approved'), 'Request approved. The hub workflow is ready.')}>{busyAction === 'approve' ? 'Approving…' : operatorAssigned ? 'Approve request' : 'Waiting for operator'}</button><button type="button" className="hub-button danger" disabled={Boolean(busyAction)} onClick={() => setConfirmAction('decline')}>{busyAction === 'decline' ? 'Declining…' : 'Decline request'}</button></div>
     </section>}
 
-    {isPending && party === 'renter' && <section className="hub-waiting"><Clock3 size={17} /><div><strong>Waiting for owner approval</strong><span>Your price request is recorded. Hub operations, the deposit receipt, and agreement signatures open only after approval creates an immutable booking snapshot.</span></div></section>}
+    {isPending && party === 'renter' && <section className="hub-waiting"><Clock3 size={17} /><div><strong>Waiting for owner approval</strong><span>Your price request is recorded. Hub operations, rental-payment and deposit receipts, and agreement signatures open only after approval creates an immutable booking snapshot.</span></div></section>}
     {isDeclined && <section className="hub-waiting declined"><AlertCircle size={17} /><div><strong>This request was declined</strong><span>The hub record is retained as a read-only booking history.</span></div></section>}
     {notice && <p className="hub-notice" role="status"><CheckCircle2 size={15} /> {notice}</p>}
     {actionError && <p className="hub-error" role="alert"><AlertCircle size={15} /> {actionError}</p>}
@@ -202,16 +222,34 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
           <CustodyTimeline data={hubData} />
         </HubSection>
 
-        <HubSection eyebrow="PRICING & DEPOSIT" title="Two separate booking amounts" icon={<Banknote size={17} />}>
-          <PriceAndDeposit data={hubData} />
-          {canSubmitDeposit && <div className="hub-deposit-form">
-            <div><p className="hub-kicker">MANUAL GCASH VERIFICATION</p><h3>Submit the {pesos(depositAmount(hubData))} security-deposit receipt</h3><p>Send the deposit only to the configured recipient below. Uploading a receipt does not verify payment; the assigned hub operator reviews it manually.</p></div>
-            <dl className="hub-payment-recipient"><div><dt>Recipient</dt><dd>{hubData.hub?.gcash_recipient_name || 'Ask the hub operator'}</dd></div><div><dt>GCash number</dt><dd>{hubData.hub?.gcash_recipient_number || 'Not configured'}</dd></div></dl>
-            <label>GCash reference<input value={depositReference} onChange={(event) => setDepositReference(event.target.value)} maxLength={80} placeholder="Enter the receipt reference" /></label>
-            <label>Receipt image or PDF<input type="file" accept={DEPOSIT_ACCEPT} onChange={(event) => setDepositFile(event.target.files?.[0] ?? null)} /></label>
-            {depositFile && <small>{depositFile.name} · {formatBytes(depositFile.size)}</small>}
-            <button type="button" className="hub-button primary" disabled={!depositReference.trim() || !depositFile || Boolean(busyAction)} onClick={submitDeposit}><Upload size={14} /> {busyAction === 'deposit' ? 'Uploading…' : 'Submit receipt'}</button>
-          </div>}
+        <HubSection eyebrow="RENTAL PAYMENT & DEPOSIT" title="Two separate booking amounts" icon={<Banknote size={17} />}>
+          <PriceAndDeposit
+            data={hubData}
+            rentalForm={canSubmitRentalPayment && <PaymentProofForm
+              purpose="rental"
+              amount={hubData.rental_payment?.amount ?? Number(booking.total)}
+              hub={hubData.hub}
+              reference={rentalReference}
+              file={rentalFile}
+              onReferenceChange={setRentalReference}
+              onFileChange={setRentalFile}
+              onSubmit={submitRentalPayment}
+              busy={busyAction === 'rental-payment'}
+              disabled={Boolean(busyAction)}
+            />}
+            depositForm={canSubmitDeposit && <PaymentProofForm
+              purpose="deposit"
+              amount={depositAmount(hubData)}
+              hub={hubData.hub}
+              reference={depositReference}
+              file={depositFile}
+              onReferenceChange={setDepositReference}
+              onFileChange={setDepositFile}
+              onSubmit={submitDeposit}
+              busy={busyAction === 'deposit'}
+              disabled={Boolean(busyAction)}
+            />}
+          />
         </HubSection>
 
         <HubSection eyebrow="AGREEMENT" title="One immutable set of terms" icon={<Signature size={17} />}>
@@ -325,20 +363,89 @@ function depositAmount(data: RentalHubData): number {
   return data.deposit?.amount ?? data.agreement?.snapshot?.deposit?.amount ?? data.hub?.deposit_amount ?? 2000
 }
 
-function PriceAndDeposit({ data }: { data: RentalHubData }) {
+function PriceAndDeposit({ data, rentalForm, depositForm }: { data: RentalHubData; rentalForm: React.ReactNode; depositForm: React.ReactNode }) {
   const booking = data.booking
+  const payment = data.rental_payment
   const deposit = data.deposit
   const snapshot = data.agreement?.snapshot
   const subtotal = snapshot?.pricing?.subtotal ?? Number(booking.subtotal)
   const discount = snapshot?.pricing?.discount_amount ?? Number(booking.discount_amount)
-  const total = snapshot?.pricing?.total ?? Number(booking.total)
+  const total = payment?.amount ?? Number(booking.total)
   const amount = depositAmount(data)
-  const waived = deposit?.status === 'waived' || snapshot?.deposit?.waived
+  const waived = deposit ? deposit.status === 'waived' : Boolean(snapshot?.deposit?.waived)
+  const historicalPayment = payment?.status === 'not_required' && payment.not_required_reason === 'pre_feature_released'
+  const zeroTotal = payment?.status === 'not_required' && payment.not_required_reason === 'zero_total'
+  const paymentLabel = !payment ? 'Rental-payment setup pending' : historicalPayment ? 'Payment not recorded in LensShare' : zeroTotal ? 'No rental fee due' : RENTAL_PAYMENT_STATUS_LABELS[payment.status]
 
-  return <div className="hub-money-grid">
-    <article className="hub-money-card rental"><p className="hub-kicker">RENTAL PRICE</p><dl><div><dt>Rental subtotal</dt><dd>{pesos(subtotal)}</dd></div>{discount > 0 && <div className="saving"><dt>Saver Pass saving</dt><dd>− {pesos(discount)}</dd></div>}<div className="total"><dt>Renter total</dt><dd>{pesos(total)}</dd></div></dl><p>Saver Pass changes only the rental price. It never changes or pays the security deposit.</p></article>
-    <article className={`hub-money-card deposit ${waived ? 'waived' : ''}`}><p className="hub-kicker">SECURITY DEPOSIT</p><strong>{waived ? 'Waived' : pesos(amount)}</strong><HubBadge value={deposit?.status || (waived ? 'waived' : 'created after approval')} />{waived ? <p>Booking-level verified-student waiver{deposit?.waiver_reason || snapshot?.deposit?.waiver_reason ? ` · ${deposit?.waiver_reason || snapshot?.deposit?.waiver_reason}` : ''}. This is separate from Saver Pass.</p> : <p>Manually verified GCash security deposit. It is separate from and not included in the rental total.</p>}{deposit?.gcash_reference && <small>Receipt reference · {deposit.gcash_reference}</small>}{deposit?.review_note && <small className="hub-review-note">Review note · {deposit.review_note}</small>}{deposit?.refund_reference && <small>Refund reference · {deposit.refund_reference}</small>}</article>
-  </div>
+  return <>
+    <p className="hub-payment-separation">Use separate GCash transactions and references for the rental payment and security deposit. Do not combine them in one transfer.</p>
+    <div className="hub-money-grid">
+      <article className="hub-money-card rental">
+        <h3 className="hub-money-title">Rental payment</h3>
+        <dl className="hub-price-breakdown"><div><dt>Rental subtotal</dt><dd>{pesos(subtotal)}</dd></div>{discount > 0 && <div className="saving"><dt>Saver Pass saving</dt><dd>− {pesos(discount)}</dd></div>}<div className="total"><dt>Renter total</dt><dd>{pesos(total)}</dd></div></dl>
+        <HubBadge value={payment?.status || 'setup_pending'} label={paymentLabel} />
+        {!payment ? <p>Rental-payment tracking is not ready for this booking. This does not mean the rental is paid or waived. Contact the hub operator for setup.</p>
+          : historicalPayment ? <p>This booking was already released or closed before rental-payment tracking. No new payment is requested.</p>
+          : zeroTotal ? <p>No rental fee is due because the recorded rental total after discounts is zero.</p>
+          : payment.status === 'not_required' ? <p>No rental-payment proof is required for this booking.</p>
+          : payment.status === 'pending_review' ? <p>Your rental receipt is awaiting manual review by the assigned hub operator. Uploading a receipt does not confirm payment.</p>
+          : payment.status === 'proof_accepted' ? <p>The assigned hub operator accepted the rental-payment proof. Deposit status is recorded separately.</p>
+          : payment.status === 'rejected' ? <p>The rental-payment proof was rejected. Review the operator’s note before submitting a corrected receipt.</p>
+          : <p>Rental-payment proof has not yet been accepted in LensShare. This status does not mean no money was received.</p>}
+        <p>Saver Pass changes only the rental price. A verified-student waiver applies only to the security deposit, not the rental fee.</p>
+        {payment?.gcash_reference && <small>Rental receipt reference · {payment.gcash_reference}</small>}
+        {payment?.submitted_at && <small>Submitted · {dateTime(payment.submitted_at)}</small>}
+        {payment?.reviewed_at && <small>Reviewed · {dateTime(payment.reviewed_at)}</small>}
+        {payment?.review_note && <small className="hub-review-note">Review note · {payment.review_note}</small>}
+        {rentalForm}
+      </article>
+      <article className={`hub-money-card deposit ${waived ? 'waived' : ''}`}>
+        <h3 className="hub-money-title">Security deposit</h3>
+        <strong>{waived ? 'Waived' : pesos(amount)}</strong>
+        <HubBadge value={deposit?.status || (waived ? 'waived' : 'created after approval')} />
+        {waived ? <p>Booking-level verified-student waiver{deposit?.waiver_reason || snapshot?.deposit?.waiver_reason ? ` · ${deposit?.waiver_reason || snapshot?.deposit?.waiver_reason}` : ''}. This waives only the deposit, not the rental payment, and is separate from Saver Pass.</p> : <p>Manually verified GCash security deposit. It is separate from and not included in the rental total.</p>}
+        {deposit?.gcash_reference && <small>Deposit receipt reference · {deposit.gcash_reference}</small>}
+        {deposit?.submitted_at && <small>Submitted · {dateTime(deposit.submitted_at)}</small>}
+        {deposit?.reviewed_at && <small>Reviewed · {dateTime(deposit.reviewed_at)}</small>}
+        {deposit?.review_note && <small className="hub-review-note">Review note · {deposit.review_note}</small>}
+        {deposit?.refund_reference && <small>Refund reference · {deposit.refund_reference}</small>}
+        {!waived && depositForm}
+      </article>
+    </div>
+  </>
+}
+
+function PaymentProofForm({ purpose, amount, hub, reference, file, onReferenceChange, onFileChange, onSubmit, busy, disabled }: {
+  purpose: 'rental' | 'deposit'
+  amount: number
+  hub: RentalHubData['hub']
+  reference: string
+  file: File | null
+  onReferenceChange: (value: string) => void
+  onFileChange: (value: File | null) => void
+  onSubmit: () => Promise<boolean>
+  busy: boolean
+  disabled: boolean
+}) {
+  const id = useId()
+  const label = purpose === 'rental' ? 'rental-payment' : 'security-deposit'
+  const recipientReady = Boolean(hub?.gcash_recipient_name?.trim() && hub?.gcash_recipient_number?.trim())
+
+  if (!recipientReady) return <div className="hub-payment-unconfigured" role="status"><AlertCircle size={15} /><div><strong>GCash recipient not configured</strong><p>Contact the hub operator before sending this {label} payment or uploading proof. Both the recipient name and GCash number must be configured.</p>{hub?.contact_phone && <a href={`tel:${hub.contact_phone}`}>Contact hub operator · {hub.contact_phone}</a>}</div></div>
+
+  return <form className="hub-payment-form" aria-labelledby={`${id}-heading`} onSubmit={async (event) => {
+    event.preventDefault()
+    const form = event.currentTarget
+    if (await onSubmit()) form.reset()
+  }}>
+    <div><p className="hub-kicker">MANUAL GCASH VERIFICATION</p><h4 id={`${id}-heading`}>Submit the {pesos(amount)} {label} receipt</h4><p>Send only this amount to the configured recipient below. Use a separate GCash transaction and reference for each purpose; do not combine rental and deposit payments. The assigned hub operator reviews each receipt manually.</p>{purpose === 'rental' && <p>If you already paid outside LensShare, submit your existing rental receipt rather than pay again.</p>}</div>
+    <dl className="hub-payment-recipient"><div><dt>Recipient</dt><dd>{hub?.gcash_recipient_name}</dd></div><div><dt>GCash number</dt><dd>{hub?.gcash_recipient_number}</dd></div></dl>
+    <label htmlFor={`${id}-reference`}>{purpose === 'rental' ? 'Rental-payment' : 'Security-deposit'} GCash reference<input id={`${id}-reference`} name={`${purpose}-reference`} value={reference} onChange={(event) => onReferenceChange(event.target.value)} maxLength={80} placeholder="Enter this receipt’s reference" required disabled={disabled} /></label>
+    <label htmlFor={`${id}-proof`}>{purpose === 'rental' ? 'Rental-payment' : 'Security-deposit'} receipt image or PDF<input id={`${id}-proof`} name={`${purpose}-proof`} type="file" accept={HUB_PAYMENT_PROOF_ACCEPT} aria-describedby={`${id}-file-help`} onChange={(event) => onFileChange(event.target.files?.[0] ?? null)} required disabled={disabled} /></label>
+    <small id={`${id}-file-help`}>JPEG, PNG, WebP or PDF · up to {HUB_PAYMENT_PROOF_MAX_BYTES / (1024 * 1024)} MB.</small>
+    {file && <small>{file.name} · {formatBytes(file.size)}</small>}
+    <button type="submit" className="hub-button primary" disabled={!reference.trim() || !file || disabled}><Upload size={14} /> {busy ? 'Uploading…' : purpose === 'rental' ? 'Submit rental receipt' : 'Submit deposit receipt'}</button>
+  </form>
 }
 
 function SignatureStatus({ label, name, signedAt }: { label: string; name?: string | null; signedAt?: string | null }) {
@@ -396,8 +503,8 @@ function EventList({ events }: { events: RentalHubEvent[] }) {
   return <ol className="hub-event-list">{sorted.map((event) => <li key={event.id}><span /><div><strong>{event.summary || humanize(event.event_type)}</strong>{event.details && <p>{event.details}</p>}<small>{dateTime(event.created_at)}{event.actor_name ? ` · ${event.actor_name}` : ''}</small></div></li>)}</ol>
 }
 
-function HubBadge({ value }: { value: string }) {
-  return <span className={`hub-badge ${value.replaceAll('_', '-')}`}>{humanize(value)}</span>
+function HubBadge({ value, label }: { value: string; label?: string }) {
+  return <span className={`hub-badge ${value.replaceAll('_', '-')}`}>{label ?? humanize(value)}</span>
 }
 
 function agreementEquipmentName(data: RentalHubData): string | null {

@@ -9,6 +9,7 @@ import type {
   RentalInspection,
   RentalInspectionKind,
   RentalOperation,
+  RentalPayment,
   RentalWorkflowBlocker,
   RentalWorkflowVersion,
 } from '@/lib/types'
@@ -42,6 +43,11 @@ function finalizedInspection(
   kind: RentalInspectionKind,
 ): RentalInspection | undefined {
   return inspections.find((row) => row.kind === kind && row.status === 'finalized')
+}
+
+export function isRentalPaymentResolved(payment: RentalPayment | null | undefined): boolean {
+  return payment?.status === 'proof_accepted'
+    || (payment?.status === 'not_required' && payment.not_required_reason === 'zero_total' && payment.amount === 0)
 }
 
 export function participantConfirmationReadiness(
@@ -101,6 +107,9 @@ export function participantConfirmationReadiness(
     if (!ownerConfirmedPre && !renterConfirmedPre) return unavailable('The owner and renter must each confirm the finalized pre-rental inspection first.')
     if (!ownerConfirmedPre) return unavailable('The owner must confirm the finalized pre-rental inspection first.')
     if (!renterConfirmedPre) return unavailable('Confirm the finalized pre-rental inspection first.')
+    if (!isRentalPaymentResolved(data.rental_payment)) {
+      return unavailable('The rental-payment proof must be accepted before pickup. A deposit waiver does not waive rent.')
+    }
     if (!data.deposit || !['held', 'waived_student'].includes(data.deposit.raw_status)) {
       return unavailable('The security deposit must be accepted or the verified-student waiver must apply before pickup.')
     }
@@ -206,6 +215,11 @@ export function deriveRentalBlockers(data: RentalHubData): RentalWorkflowBlocker
   }
   if (!agreement?.renter_signed_at) {
     addBlocker(blockers, 'renter_signature_required', 'renter_pickup', 'The renter must sign the immutable rental agreement.', 'renter')
+  }
+  if (booking.status === 'approved' && !isRentalPaymentResolved(data.rental_payment)) {
+    addBlocker(blockers, 'rental_payment_unresolved', 'renter_pickup', data.rental_payment
+      ? 'The rental-payment proof must be accepted before pickup. A deposit waiver does not waive rent.'
+      : 'Rental-payment setup is pending. Ask an administrator to install the rental-payment SQL before pickup.', 'renter')
   }
   if (deposit && !['held', 'waived_student', 'refunded', 'forfeited'].includes(deposit.raw_status)) {
     addBlocker(blockers, 'deposit_unresolved', 'renter_pickup', 'The security deposit proof must be accepted or the booking waiver must apply.', 'renter')

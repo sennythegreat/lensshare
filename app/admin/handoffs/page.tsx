@@ -13,7 +13,7 @@ import {
   subscribeToAdminHubHandoffs,
 } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
-import { pesos, type AdminUserRow, type HubHandoffQueueItem } from '@/lib/types'
+import { pesos, RENTAL_PAYMENT_STATUS_LABELS, type AdminUserRow, type HubHandoffQueueItem } from '@/lib/types'
 
 const FILTERS = [
   { value: 'mine', label: 'Mine' },
@@ -35,11 +35,11 @@ const CUSTODY_LABELS: Record<HubHandoffQueueItem['custody_state'], string> = {
 }
 
 const DEPOSIT_LABELS: Record<HubHandoffQueueItem['deposit_status'], string> = {
-  not_submitted: 'Deposit not submitted',
-  pending_review: 'Deposit proof to review',
+  not_submitted: 'Not submitted',
+  pending_review: 'Proof to review',
   accepted: 'Proof accepted',
   rejected: 'Proof rejected',
-  waived: 'Deposit waived',
+  waived: 'Waived',
 }
 
 function shortId(id: string) {
@@ -178,7 +178,8 @@ export default function AdminHubHandoffsPage() {
                 <div className="admin-handoff-card-facts">
                   <span><Clock3 size={13} /> {dueLabel(dueAt)}</span>
                   <span>{CUSTODY_LABELS[row.custody_state]}</span>
-                  <span className={`deposit-${row.deposit_status}`}>{DEPOSIT_LABELS[row.deposit_status]}</span>
+                  <span className={`deposit-${row.deposit_status}`}>Deposit · {DEPOSIT_LABELS[row.deposit_status]}</span>
+                  <span className={`admin-rental-payment-${row.rental_payment_status ?? 'missing'}`}>Rent · {row.rental_payment_status ? RENTAL_PAYMENT_STATUS_LABELS[row.rental_payment_status] : 'Setup pending'}</span>
                 </div>
                 {row.issue_hold_reason && <p className="admin-handoff-issue-note">Hold: {row.issue_hold_reason}</p>}
               </div>

@@ -213,6 +213,32 @@ export type RentalDepositStatus =
   | 'rejected'
 
 export type HubDepositStatus = 'not_submitted' | 'pending_review' | 'accepted' | 'rejected' | 'waived'
+export type RentalPaymentStatus = 'awaiting_payment' | 'pending_review' | 'proof_accepted' | 'rejected' | 'not_required'
+
+export const RENTAL_PAYMENT_STATUS_LABELS: Record<RentalPaymentStatus, string> = {
+  awaiting_payment: 'Awaiting payment',
+  pending_review: 'Pending review',
+  proof_accepted: 'Proof accepted',
+  rejected: 'Proof rejected',
+  not_required: 'Not required',
+}
+
+export type RentalPayment = {
+  booking_id: string
+  amount: number
+  currency: 'PHP'
+  status: RentalPaymentStatus
+  not_required_reason: 'zero_total' | 'pre_feature_released' | null
+  gcash_reference: string | null
+  proof_path: string | null
+  submitted_at: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  review_note: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
 export type RentalAgreementStatus = 'awaiting_signatures' | 'partially_signed' | 'signed'
 export type AgreementSignatureCaptureMethod = 'legacy_click' | 'drawn' | 'uploaded'
 export type RentalInspectionStatus = 'draft' | 'finalized'
@@ -501,6 +527,7 @@ export type RentalHubData = {
   operation: RentalOperation | null
   saver_pass: RentalSaverPassDisplay
   deposit_waiver: RentalDepositWaiverDisplay
+  rental_payment: RentalPayment | null
   deposit: RentalDeposit | null
   agreement: RentalAgreement | null
   inspections: RentalInspection[]
@@ -523,6 +550,7 @@ export type HubHandoffQueueItem = {
   booking_id: string
   booking: BookingWithRelations
   custody_state: HubCustodyState
+  rental_payment_status: RentalPaymentStatus | null
   deposit_status: HubDepositStatus
   queue_bucket: HubQueueBucket
   assigned_admin_id: string | null
@@ -566,6 +594,7 @@ export type HubHandoffDetail = {
   booking_id: string
   booking: BookingWithRelations
   custody_state: HubCustodyState
+  rental_payment_status: RentalPaymentStatus | null
   deposit_status: HubDepositStatus
   queue_bucket: HubQueueBucket
   assigned_admin_id: string | null
@@ -573,6 +602,7 @@ export type HubHandoffDetail = {
   pickup_due_at: string | null
   return_due_at: string | null
   issue_hold_reason: string | null
+  rental_payment: RentalPayment | null
   deposit: {
     amount: number
     status: HubDepositStatus

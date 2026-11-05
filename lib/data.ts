@@ -2,7 +2,7 @@
 
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
-import { deriveRentalBlockers, participantConfirmationReadiness } from '@/lib/rental-workflow'
+import { deriveRentalBlockers, isRentalPaymentResolved, participantConfirmationReadiness } from '@/lib/rental-workflow'
 import type {
   AdminUserRow,
   Booking,
@@ -46,6 +46,8 @@ import type {
   RentalConfirmationKind,
   RentalCustodyState,
   RentalDeposit,
+  RentalPayment,
+  RentalPaymentStatus,
   RentalDepositWaiverDisplay,
   RentalHubConfig,
   RentalHubData,
@@ -386,10 +388,13 @@ export async function updateBookingStatus(id: string, status: BookingStatus): Pr
 // ---------- Version 2 Naga Hub workflow ----------
 
 export const HUB_DEPOSIT_BUCKET = 'deposit-proofs'
+export const HUB_RENTAL_PAYMENT_BUCKET = 'rental-payment-proofs'
 export const HUB_INSPECTION_BUCKET = 'inspection-photos'
 export const HUB_AGREEMENT_SIGNATURE_BUCKET = 'agreement-signatures'
 export const HUB_PRIVATE_URL_TTL_SECONDS = 300
-export const HUB_DEPOSIT_PROOF_MAX_BYTES = 5 * 1024 * 1024
+export const HUB_PAYMENT_PROOF_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf'
+export const HUB_PAYMENT_PROOF_MAX_BYTES = 5 * 1024 * 1024
+export const HUB_DEPOSIT_PROOF_MAX_BYTES = HUB_PAYMENT_PROOF_MAX_BYTES
 export const HUB_INSPECTION_PHOTO_MAX_BYTES = 10 * 1024 * 1024
 export const HUB_AGREEMENT_SIGNATURE_MAX_BYTES = 512 * 1024
 export const HUB_INSPECTION_PHOTO_LIMIT = 8
@@ -515,11 +520,12 @@ async function enrichHubRpcValue(value: unknown): Promise<{ row: UnknownRow; vie
   const hubId = asNullableString(operationRow.hub_id ?? operationRow.hub_config_id)
   const operatorId = asNullableString(operationRow.operator_id ?? operationRow.assigned_operator_id)
   const supabase = createClient()
-  const [{ data: authData, error: authError }, booking, hub, operator] = await Promise.all([
+  const [{ data: authData, error: authError }, booking, hub, operator, rentalPayment] = await Promise.all([
     supabase.auth.getUser(),
     bookingId ? fetchBookingById(bookingId) : Promise.resolve(null),
     fetchHubRow(hubId),
     fetchOperatorRow(operatorId),
+    bookingId ? fetchRentalPayment(bookingId) : Promise.resolve(null),
   ])
   if (authError) throw authError
   return {
@@ -527,6 +533,7 @@ async function enrichHubRpcValue(value: unknown): Promise<{ row: UnknownRow; vie
     row: {
       ...row,
       booking: booking ?? bookingRow,
+      rental_payment: rentalPayment,
       hub: hub ?? row.hub,
       operation: { ...operationRow, ...(operator ? { assigned_operator: operator } : {}) },
     },
@@ -706,6 +713,61 @@ function normalizeDeposit(value: unknown, bookingId: string): RentalDeposit | nu
     created_at: asNullableString(row.created_at),
     updated_at: asNullableString(row.updated_at),
   }
+}
+
+function rentalPaymentStatus(value: unknown): RentalPaymentStatus {
+  const status = asString(value)
+  return ['awaiting_payment', 'pending_review', 'proof_accepted', 'rejected', 'not_required'].includes(status)
+    ? status as RentalPaymentStatus
+    : 'awaiting_payment'
+}
+
+function normalizeRentalPayment(value: unknown, bookingId: string): RentalPayment | null {
+  const row = asObject(value)
+  if (!Object.keys(row).length) return null
+  const reason = asString(row.not_required_reason)
+  return {
+    booking_id: asString(row.booking_id, bookingId),
+    amount: asNumber(row.amount),
+    currency: 'PHP',
+    status: rentalPaymentStatus(row.status),
+    not_required_reason: reason === 'zero_total' || reason === 'pre_feature_released' ? reason : null,
+    gcash_reference: asNullableString(row.gcash_reference),
+    proof_path: asNullableString(row.proof_path),
+    submitted_at: asNullableString(row.submitted_at),
+    reviewed_by: asNullableString(row.reviewed_by),
+    reviewed_at: asNullableString(row.reviewed_at),
+    review_note: asNullableString(row.review_note),
+    created_at: asNullableString(row.created_at),
+    updated_at: asNullableString(row.updated_at),
+  }
+}
+
+// Keep existing hub records readable while the dashboard SQL upgrade is pending.
+function isRentalPaymentSetupMissing(error: { code?: string; message?: string }): boolean {
+  return (error.code === '42P01' || error.code === 'PGRST205')
+    && Boolean(error.message?.includes('booking_rental_payments'))
+}
+
+export async function fetchRentalPayment(bookingId: string): Promise<RentalPayment | null> {
+  const { data, error } = await createClient().from('booking_rental_payments').select('*').eq('booking_id', bookingId).maybeSingle()
+  if (error) {
+    if (isRentalPaymentSetupMissing(error)) return null
+    rethrowPostgrest('fetchRentalPayment', error)
+  }
+  return data ? normalizeRentalPayment(data, bookingId) : null
+}
+
+async function fetchRentalPayments(bookingIds: string[]): Promise<Map<string, RentalPayment>> {
+  if (!bookingIds.length) return new Map()
+  const { data, error } = await createClient().from('booking_rental_payments').select('*').in('booking_id', bookingIds)
+  if (error) {
+    if (isRentalPaymentSetupMissing(error)) return new Map()
+    rethrowPostgrest('fetchRentalPayments', error)
+  }
+  const payments = (data ?? []).map((row) => normalizeRentalPayment(row, asString(row.booking_id)))
+    .filter((row): row is RentalPayment => Boolean(row))
+  return new Map(payments.map((row) => [row.booking_id, row]))
 }
 
 function normalizeAgreementSnapshot(value: unknown, booking: BookingWithRelations, saverPass: RentalSaverPassDisplay, waiver: RentalDepositWaiverDisplay, hub: RentalHubConfig | null): RentalAgreement['snapshot'] {
@@ -980,6 +1042,7 @@ function normalizeRentalHub(value: unknown, viewerId: string | null = null): Ren
     operation: normalizeOperation(row.operation ?? row.booking_operation),
     saver_pass: saverPass,
     deposit_waiver: waiver,
+    rental_payment: normalizeRentalPayment(row.rental_payment, booking.id),
     deposit: normalizeDeposit(row.deposit ?? row.booking_deposit, booking.id),
     agreement: normalizeAgreement(row.agreement ?? row.booking_agreement, booking, saverPass, waiver, hub, row.acceptances),
     inspections: asArray(row.inspections).map((item) => normalizeInspection(item, booking.id, row.inspection_photos)).filter((item): item is RentalInspection => Boolean(item)),
@@ -1086,6 +1149,28 @@ export async function submitDepositProof(bookingId: string, gcashReference: stri
     await removeHubPrivateFiles(HUB_DEPOSIT_BUCKET, [proofPath!]).catch(() => undefined)
     throw error
   }
+}
+
+export async function submitRentalPaymentProof(bookingId: string, gcashReference: string, file: File): Promise<RentalPayment | null> {
+  const reference = gcashReference.trim()
+  if (!reference || reference.length > 80) throw new Error('Enter a GCash reference of 1 to 80 characters.')
+  const { extension, contentType } = validatedHubFile(file, HUB_DEPOSIT_FILE_TYPES, HUB_PAYMENT_PROOF_MAX_BYTES, 'rental-payment proof')
+  const supabase = createClient()
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError) rethrowPostgrest('getUser', authError)
+  if (!authData.user) throw new Error('Sign in before submitting rental-payment proof.')
+  const proofPath = `${authData.user.id}/${bookingId}/${crypto.randomUUID()}.${extension}`
+  const { error: uploadError } = await supabase.storage.from(HUB_RENTAL_PAYMENT_BUCKET).upload(proofPath, file, {
+    cacheControl: '3600', contentType, upsert: false,
+  })
+  if (uploadError) rethrowPostgrest('uploadRentalPaymentProof', uploadError)
+  // Payment evidence is append-only; a failed submission does not delete its upload.
+  const value = await callRpc('submit_booking_rental_payment_proof', {
+    p_booking_id: bookingId,
+    p_gcash_reference: reference,
+    p_proof_path: proofPath,
+  })
+  return normalizeRentalPayment(unwrapRpcObject(value, 'submit_booking_rental_payment_proof'), bookingId)
 }
 
 export async function signRentalAgreement(
@@ -1276,6 +1361,7 @@ function normalizeQueueItem(value: unknown): HubHandoffQueueItem | null {
     booking_id: bookingId,
     booking,
     custody_state: custody,
+    rental_payment_status: row.rental_payment ? rentalPaymentStatus(asObject(row.rental_payment).status) : null,
     deposit_status: adminDepositStatus(row.deposit_status ?? asObject(row.deposit).status),
     queue_bucket: queueBucket(row.queue_bucket, custody, issueReason),
     assigned_admin_id: asNullableString(row.assigned_admin_id ?? row.assigned_operator_id ?? operation.assigned_operator_id),
@@ -1291,6 +1377,7 @@ function normalizeQueueItem(value: unknown): HubHandoffQueueItem | null {
 export async function fetchAdminHubHandoffQueue(): Promise<HubHandoffQueueItem[]> {
   const value = await callRpc('fetch_hub_admin_queue')
   const rows = unwrapRpcRows(value, 'fetch_hub_admin_queue')
+  const payments = await fetchRentalPayments(rows.map((item) => asString(asObject(item).booking_id)).filter(Boolean))
   return Promise.all(rows.map(async (value) => {
     const raw = asObject(value)
     const bookingId = asString(raw.booking_id)
@@ -1302,6 +1389,7 @@ export async function fetchAdminHubHandoffQueue(): Promise<HubHandoffQueueItem[]
     return normalizeQueueItem({
       ...raw,
       booking,
+      rental_payment: payments.get(bookingId) ?? null,
       assigned_operator_id: raw.operator_id ?? raw.assigned_operator_id,
       assigned_operator: operator,
       issue_hold_reason: asBoolean(raw.issue_hold) ? 'Issue hold' : null,
@@ -1364,10 +1452,13 @@ function normalizeHandoffDetail(value: unknown): HubHandoffDetail | null {
   }))
   const events = asArray(row.timeline ?? row.events)
   const depositStatus = adminDepositStatus(row.deposit_status ?? depositRow.status)
+  const rentalPayment = normalizeRentalPayment(row.rental_payment, booking.id)
   const detail: HubHandoffDetail = {
     booking_id: booking.id,
     booking,
     custody_state: custody,
+    rental_payment_status: rentalPayment?.status ?? null,
+    rental_payment: rentalPayment,
     deposit_status: depositStatus,
     queue_bucket: queueBucket(row.queue_bucket, custody, issueReason),
     assigned_admin_id: asNullableString(row.assigned_admin_id ?? row.assigned_operator_id ?? operation.assigned_operator_id),
@@ -1409,6 +1500,12 @@ function normalizeHandoffDetail(value: unknown): HubHandoffDetail | null {
       }
     }),
     updated_at: asNullableString(row.updated_at ?? operation.updated_at),
+  }
+  if (booking.status === 'approved' && custody === 'at_hub_for_pickup' && !isRentalPaymentResolved(rentalPayment)) {
+    detail.blockers.push(rentalPayment
+      ? 'The rental-payment proof must be accepted before releasing gear to the renter.'
+      : 'Rental-payment setup is pending. Apply rental-payments.sql before renter pickup.')
+    detail.allowed_transitions = detail.allowed_transitions.filter((action) => action !== 'release_to_renter')
   }
   return detail
 }
@@ -1455,6 +1552,21 @@ export async function fetchSignedAdminHubFileUrl(path: string): Promise<string> 
       return fetchSignedPrivateFileUrl(HUB_AGREEMENT_SIGNATURE_BUCKET, path)
     }
   }
+}
+
+export async function fetchRentalPaymentProofUrl(path: string): Promise<string> {
+  return fetchSignedPrivateFileUrl(HUB_RENTAL_PAYMENT_BUCKET, path)
+}
+
+export async function reviewAdminRentalPaymentProof(bookingId: string, decision: 'accepted' | 'rejected', note: string | null, expectedProofPath: string): Promise<void> {
+  if (!expectedProofPath) throw new Error('Open the current rental-payment receipt before reviewing it.')
+  if (decision === 'rejected' && !note?.trim()) throw new Error('Enter a reason for rejecting this rental-payment proof.')
+  await callRpc('review_booking_rental_payment', {
+    p_booking_id: bookingId,
+    p_decision: decision === 'accepted' ? 'approve' : 'reject',
+    p_review_note: note?.trim() || null,
+    p_expected_proof_path: expectedProofPath,
+  })
 }
 
 export async function reviewAdminHubDepositProof(bookingId: string, decision: 'accepted' | 'rejected', note: string | null): Promise<void> {
@@ -1587,6 +1699,7 @@ const HUB_REALTIME_TABLES = [
   'bookings',
   'booking_operations',
   'booking_deposits',
+  'booking_rental_payments',
   'booking_inspections',
   'booking_transfers',
   'booking_operation_events',

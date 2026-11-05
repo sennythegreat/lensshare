@@ -361,7 +361,7 @@ async function seedHub(service) {
     hub_longitude: 123.1948,
     service_radius_km: 15.0,
     contact_phone: '+63 917 000 0303',
-    instructions: '{"hours":"Mon-Sat, 9:00 AM-6:00 PM","arrival_notes":"Bring the booking QR and one valid ID. This is sample hub information.","gcash_name":"LENSSHARE SAMPLE ONLY","gcash_number":"09XX XXX XXXX","deposit_policy":"Manual sample proof review; never send real money."}',
+    instructions: '{"operating_hours":"Mon-Sat, 9:00 AM-6:00 PM","location_notes":"Bring the booking QR and one valid ID. This is sample hub information.","gcash_account_name":"LENSSHARE SAMPLE ONLY","gcash_mobile_number":"09XX XXX XXXX","deposit_policy":"Manual sample proof review; never send real money."}',
     standard_deposit: 2000.0,
     is_active: true,
     updated_at: new Date().toISOString(),
@@ -578,6 +578,12 @@ async function getDeposit(admin, bookingId) {
   return data
 }
 
+async function getRentalPayment(admin, bookingId) {
+  const { data, error } = await admin.supabase.from('booking_rental_payments').select('*').eq('booking_id', bookingId).single()
+  if (error) throw new Error(`Rental payment: ${error.message}. Apply supabase/rental-payments.sql before running sample:data.`)
+  return data
+}
+
 async function existingSampleBooking(renter, description) {
   const { data, error } = await renter.supabase
     .from('bookings')
@@ -702,6 +708,34 @@ async function ensureDepositHeld(renter, admin, bookingId, referenceLabel) {
   return deposit
 }
 
+async function ensureRentalPaymentAccepted(renter, admin, bookingId, referenceLabel) {
+  let payment = await getRentalPayment(admin, bookingId)
+  if (payment.status === 'proof_accepted' || (payment.status === 'not_required' && payment.not_required_reason === 'zero_total')) return payment
+  if (payment.status === 'not_required') throw new Error('A historical rental-payment exemption cannot authorize a new sample pickup.')
+  if (['awaiting_payment', 'rejected'].includes(payment.status)) {
+    const path = `${renter.user.id}/${bookingId}/sample-rental-payment-proof${payment.status === 'rejected' ? `-${Date.now()}` : ''}.png`
+    await uploadSample(renter.supabase, 'rental-payment-proofs', path, 'RENTAL PAYMENT', `SAMPLE PROOF - PHP ${Number(payment.amount)}`)
+    const { error } = await renter.supabase.rpc('submit_booking_rental_payment_proof', {
+      p_booking_id: bookingId,
+      p_gcash_reference: `SAMPLE-RENT-${bookingId.slice(0, 8)}-${referenceLabel}`,
+      p_proof_path: path,
+    })
+    if (error) throw error
+    payment = await getRentalPayment(admin, bookingId)
+  }
+  if (payment.status === 'pending_review') {
+    const { error } = await admin.supabase.rpc('review_booking_rental_payment', {
+      p_booking_id: bookingId,
+      p_decision: 'approve',
+      p_review_note: 'SAMPLE — synthetic rental-payment receipt accepted for demonstration. No real payment.',
+      p_expected_proof_path: payment.proof_path,
+    })
+    if (error) throw error
+    payment = await getRentalPayment(admin, bookingId)
+  }
+  return payment
+}
+
 const INSPECTION_SUMMARIES = {
   pre_release: 'SAMPLE — body, controls, mounts, and accessories checked in good condition.',
   post_return: 'SAMPLE — returned unit checked; all accessories present and working.',
@@ -758,6 +792,7 @@ async function advanceV2(booking, owner, renter, admin, { through, depositLabel 
   if (through !== 'approved' && status === 'approved') {
     await acceptAgreement(owner.supabase, booking.id)
     await acceptAgreement(renter.supabase, booking.id)
+    await ensureRentalPaymentAccepted(renter, admin, booking.id, depositLabel)
     await ensureDepositHeld(renter, admin, booking.id, depositLabel)
 
     let custody = (await getOperation(admin, booking.id)).custody_state

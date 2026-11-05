@@ -203,6 +203,13 @@
 .admin-handoff-card-facts .deposit-not_submitted,.admin-handoff-card-facts .deposit-rejected{color:#8a3f32}
 .admin-handoff-card-facts .deposit-pending_review{color:#75612d}
 .admin-handoff-card-facts .deposit-accepted,.admin-handoff-card-facts .deposit-waived{color:#315f57}
+.admin-handoff-badge.admin-rental-payment-pending_review{background:#f3e9c9;color:#725d24}
+.admin-handoff-badge.admin-rental-payment-rejected{background:#f5dfda;color:#8a3f32}
+.admin-handoff-badge.admin-rental-payment-proof_accepted{background:#dcebe7;color:#244b43}
+.admin-handoff-card-facts .admin-rental-payment-awaiting_payment,.admin-handoff-card-facts .admin-rental-payment-rejected{color:#8a3f32}
+.admin-handoff-card-facts .admin-rental-payment-pending_review{color:#75612d}
+.admin-handoff-card-facts .admin-rental-payment-proof_accepted{color:#315f57}
+.admin-handoff-card-facts .admin-rental-payment-not_required,.admin-handoff-card-facts .admin-rental-payment-missing{color:#65716c}
 .admin-handoff-issue-note{margin-top:10px!important;display:block!important;padding:8px 10px;background:#fbefec;color:#8a3f32!important;line-height:1.45}
 .admin-handoff-card-side{border-left:1px solid #e8ebe8;padding-left:20px;display:flex;flex-direction:column;align-items:stretch;gap:8px}
 .admin-handoff-value small,.admin-handoff-assign>span{display:block;font:8px 'DM Mono',monospace;letter-spacing:.07em;color:#7b8781;text-transform:uppercase;margin-bottom:5px}
@@ -247,6 +254,12 @@
 .admin-handoff-custody li.done,.admin-handoff-custody li.current{color:#315f57}.admin-handoff-custody li.done>span{background:#315f57;border-color:#315f57;color:#fff}.admin-handoff-custody li.current>span{border:2px solid #315f57;box-shadow:0 0 0 4px #e5f0ec}
 .admin-handoff-detail-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.85fr);gap:14px;align-items:start}
 .admin-handoff-detail-primary,.admin-handoff-detail-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.admin-handoff-payments-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px;align-items:start}
+.admin-handoff-payments-grid>.admin-handoff-panel{min-width:0}
+.admin-handoff-payments-grid .admin-handoff-section-head{flex-wrap:wrap}
+.admin-handoff-payments-grid .admin-handoff-badge{white-space:normal;line-height:1.5}
+.admin-handoff-payments-grid .admin-handoff-review-note{overflow-wrap:anywhere;white-space:pre-wrap}
+@media(max-width:1000px){.admin-handoff-payments-grid{grid-template-columns:1fr}}
 .admin-handoff-proof-warning{display:flex;align-items:flex-start;gap:11px;background:#f7f0d8;border:1px solid #dfd09b;color:#655429;padding:12px 14px;margin-bottom:14px}
 .admin-handoff-proof-warning svg{flex:none;margin-top:1px}.admin-handoff-proof-warning p{font-size:10px;line-height:1.55;margin:0}.admin-handoff-proof-warning strong{color:#463b20}
 .admin-handoff-facts{margin:0 0 14px}

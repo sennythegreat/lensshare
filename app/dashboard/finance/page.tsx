@@ -56,7 +56,7 @@ export default function FinancePage() {
   const totalPaid = paid.reduce((sum, row) => sum + Number(row.net), 0)
   const pendingNet = pendingPayouts.reduce((sum, row) => sum + Number(row.net), 0)
   const totalCommission = payouts.reduce((sum, row) => sum + Number(row.commission), 0)
-  const escrow = bookings
+  const upcomingRentalValue = bookings
     .filter((b) => b.status === 'pending' || b.status === 'approved')
     .reduce((sum, b) => sum + Number(b.subtotal), 0)
 
@@ -65,7 +65,7 @@ export default function FinancePage() {
       <PageCard><span className="owner-eyebrow">PAID OUT</span><strong>{pesos(totalPaid)}</strong><p>{paid.length} settled {paid.length === 1 ? 'payout' : 'payouts'} · owner net</p></PageCard>
       <PageCard><span className="owner-eyebrow">PENDING PAYOUT</span><strong>{pesos(pendingNet)}</strong><p>{pendingPayouts.length} awaiting settlement</p></PageCard>
       <PageCard><span className="owner-eyebrow">CO-OP COMMISSION</span><strong>{pesos(totalCommission)}</strong><p>15% across all settled bookings</p></PageCard>
-      <PageCard><span className="owner-eyebrow">IN ESCROW</span><strong>{pesos(escrow)}</strong><p>Pending + approved bookings</p></PageCard>
+      <PageCard><span className="owner-eyebrow">UPCOMING RENTAL VALUE</span><strong>{pesos(upcomingRentalValue)}</strong><p>Pending + approved subtotals · not a payment balance</p></PageCard>
     </div>
     <PageCard>
       <OwnerHeading eyebrow="PAYOUT LEDGER" title="Settled & awaiting payouts" detail="Payout rows are created automatically when a booking is completed."/>

@@ -11,8 +11,9 @@ corepack pnpm sample:data
 - Four sample accounts (created and auto-confirmed automatically): one owner, two renters, one admin
 - Seven sample listings across every catalog category, with private sample serials and two blackout dates
 - Legacy workflow-v1 bookings in pending, approved, active, returned, completed, and declined states
-- Workflow-v2 scenarios: a pending request, an approved request with deposit proof awaiting review, an approved request still awaiting deposit payment, an active rental with full pre-release evidence, a completed rental with marked payout and refunded deposit, and an active rental under issue hold
+- Workflow-v2 scenarios: approved requests awaiting hub handoff (student-waived, accepted-deposit, and awaiting-deposit cases), an active rental with full pre-release evidence, a completed rental with marked payout and refunded deposit, and an active rental under issue hold
 - An open damage incident (under review) with a forfeited deposit, plus a resolved accessory-missing incident
+- Separate synthetic rental-payment and deposit receipts; newly advanced v2 rentals pass both payment gates before pickup. Approved-only scenarios keep rental payment awaiting submission. Rentals already released before this upgrade retain an explicit unrecorded historical payment status rather than being marked paid.
 - An active Saver Pass and private synthetic payment, agreement-signature, and inspection evidence
 - Approved government ID, selfie, student ID, and enrollment samples for the student renter; identity-only approval for the second renter
 - Messages (one unread per side for the badge), handoff checklists, reviews, and a payout
@@ -21,7 +22,7 @@ Every private sample image is generated locally and visibly marked as synthetic 
 
 ## Requirements
 
-1. The canonical SQL layer must be installed first (`schema.sql` through `hub-operations.sql`, then `service-area-and-incidents.sql` last), as documented in `AGENTS.md`.
+1. The canonical SQL layer must be installed first (`schema.sql` through `hub-operations.sql`, then `service-area-and-incidents.sql`, then `rental-payments.sql` last), as documented in `AGENTS.md`. See [Rental payment setup](RENTAL_PAYMENTS.md) for the one-file upgrade.
 2. Add the service-role key to `.env` (Supabase Dashboard → Settings → API → service_role). It is used only by this local script to create the sample auth users and seed base rows — never commit it and never use it in app code:
 
 ```

@@ -27,8 +27,10 @@ import { useToast } from '@/components/toast'
 import {
   completeHubBooking,
   fetchAdminHubHandoffDetail,
+  fetchRentalPaymentProofUrl,
   fetchSignedAdminHubFileUrl,
   reviewAdminHubDepositProof,
+  reviewAdminRentalPaymentProof,
   saveAdminHubInspection,
   setAdminHubIssueHold,
   subscribeToRentalHub,
@@ -36,6 +38,7 @@ import {
 } from '@/lib/data'
 import {
   pesos,
+  RENTAL_PAYMENT_STATUS_LABELS,
   type HubHandoffDetail,
   type HubInspection,
   type HubInspectionStage,
@@ -112,8 +115,17 @@ function dateLabel(value: string) {
   return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+type ViewedProof = { bookingId: string; path: string }
+
+type ProofReview = {
+  bookingId: string
+  proofPath: string
+  decision: 'accepted' | 'rejected'
+  reviewNote: string | null
+}
+
 type ConfirmAction =
-  | { type: 'deposit'; decision: 'accepted' | 'rejected' }
+  | ({ type: 'deposit' | 'rental-payment' } & ProofReview)
   | { type: 'clear-hold' }
   | { type: 'transition'; action: HubPhysicalAction }
 
@@ -126,8 +138,10 @@ export default function AdminHubHandoffDetailPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
-  const [proofViewed, setProofViewed] = useState(false)
+  const [viewedDepositProof, setViewedDepositProof] = useState<ViewedProof | null>(null)
   const [proofNote, setProofNote] = useState('')
+  const [viewedRentalProof, setViewedRentalProof] = useState<ViewedProof | null>(null)
+  const [rentalProofNote, setRentalProofNote] = useState('')
   const [holdReason, setHoldReason] = useState('')
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
 
@@ -154,11 +168,35 @@ export default function AdminHubHandoffDetailPage() {
   }, [bookingId, load])
 
   const booking = detail?.booking
+  const rentalPayment = detail?.rental_payment ?? null
+  const rentalPaymentStatus = detail?.rental_payment_status ?? rentalPayment?.status ?? null
+  const depositProofPath = detail?.deposit?.proof_path ?? null
+  const rentalProofPath = rentalPayment?.proof_path ?? null
+  const proofViewed = Boolean(depositProofPath && detail?.booking_id === bookingId && viewedDepositProof?.bookingId === bookingId && viewedDepositProof.path === depositProofPath)
+  const rentalProofViewed = Boolean(rentalProofPath && detail?.booking_id === bookingId && rentalPayment?.booking_id === bookingId && viewedRentalProof?.bookingId === bookingId && viewedRentalProof.path === rentalProofPath)
+  const rentalReviewAvailable = detail?.booking_id === bookingId && rentalPayment?.booking_id === bookingId && rentalPayment.status === 'pending_review' && booking?.status === 'approved'
   const currentCustodyIndex = detail ? CUSTODY_STEPS.findIndex((step) => step.value === detail.custody_state) : -1
   const preInspection = detail?.inspections.find((inspection) => inspection.stage === 'pre_release')
   const postInspection = detail?.inspections.find((inspection) => inspection.stage === 'post_return')
 
+  useEffect(() => {
+    setViewedDepositProof(null)
+    setProofNote('')
+    setConfirmAction((current) => current?.type === 'deposit' ? null : current)
+  }, [bookingId, depositProofPath])
+
+  useEffect(() => {
+    setViewedRentalProof(null)
+    setRentalProofNote('')
+    setConfirmAction((current) => current?.type === 'rental-payment' ? null : current)
+  }, [bookingId, rentalProofPath])
+
+  useEffect(() => {
+    if (!rentalReviewAvailable) setConfirmAction((current) => current?.type === 'rental-payment' ? null : current)
+  }, [rentalReviewAvailable])
+
   async function openPrivateFile(path: string, label: string, markViewed = false) {
+    const proofBookingId = detail?.booking_id
     setError('')
     const fileWindow = window.open('', '_blank')
     if (!fileWindow) {
@@ -167,45 +205,125 @@ export default function AdminHubHandoffDetailPage() {
     }
     fileWindow.opener = null
     try {
-      fileWindow.location.href = await fetchSignedAdminHubFileUrl(path)
-      if (markViewed) setProofViewed(true)
+      const url = await fetchSignedAdminHubFileUrl(path)
+      if (fileWindow.closed) throw new Error(`The ${label.toLowerCase()} window was closed. Open it again before reviewing.`)
+      fileWindow.location.href = url
+      if (markViewed && proofBookingId) setViewedDepositProof({ bookingId: proofBookingId, path })
     } catch (fileError) {
       fileWindow.close()
       setError(fileError instanceof Error ? fileError.message : `Could not open the ${label.toLowerCase()}.`)
     }
   }
 
-  function reviewDeposit(decision: 'accepted' | 'rejected') {
-    if (!detail) return
-    if (!detail.deposit?.proof_path) {
-      setError('No deposit proof is attached to this booking.')
+  async function openRentalReceipt() {
+    if (!rentalPayment?.proof_path || rentalPayment.booking_id !== bookingId) return
+    const viewedProof = { bookingId: rentalPayment.booking_id, path: rentalPayment.proof_path }
+    setError('')
+    const fileWindow = window.open('', '_blank')
+    if (!fileWindow) {
+      setError('The rental receipt could not open. Allow pop-ups for LensShare, then try again.')
       return
     }
-    if (!proofViewed) {
-      setError('Open the receipt before recording a manual proof-review decision.')
-      return
+    fileWindow.opener = null
+    try {
+      const url = await fetchRentalPaymentProofUrl(viewedProof.path)
+      if (fileWindow.closed) throw new Error('The rental receipt window was closed. Open it again before reviewing.')
+      fileWindow.location.href = url
+      setViewedRentalProof(viewedProof)
+    } catch (fileError) {
+      fileWindow.close()
+      setError(fileError instanceof Error ? fileError.message : 'Could not open the private rental receipt.')
     }
-    if (decision === 'rejected' && !proofNote.trim()) {
-      setError('Enter a rejection reason that staff can use to resolve the proof issue.')
-      return
-    }
-    setConfirmAction({ type: 'deposit', decision })
   }
 
-  async function confirmDepositReview(decision: 'accepted' | 'rejected') {
-    if (!detail) return
-    setBusy(`deposit-${decision}`)
+  function reviewRentalPayment(decision: 'accepted' | 'rejected') {
+    if (busy) return
+    if (!rentalReviewAvailable) {
+      setError('Rental-payment proof can only be reviewed while the booking is approved and the proof is pending review.')
+      return
+    }
+    if (!rentalProofViewed || !viewedRentalProof) {
+      setError('Open the current rental receipt before recording a manual proof-review decision.')
+      return
+    }
+    const reviewNote = rentalProofNote.trim() || null
+    if (decision === 'rejected' && !reviewNote) {
+      setError('Enter a reason for rejecting the rental receipt so the renter can correct the proof.')
+      return
+    }
+    setConfirmAction({ type: 'rental-payment', bookingId: viewedRentalProof.bookingId, proofPath: viewedRentalProof.path, decision, reviewNote })
+  }
+
+  async function confirmRentalPaymentReview(review: ProofReview) {
+    if (busy) return
+    if (!rentalReviewAvailable || review.bookingId !== bookingId || !rentalProofViewed || viewedRentalProof?.path !== review.proofPath || rentalProofPath !== review.proofPath || (review.decision === 'rejected' && !review.reviewNote?.trim())) {
+      const message = 'The booking or rental receipt changed. Open the current receipt and review it again.'
+      setConfirmAction(null)
+      setError(message)
+      toast.error(message)
+      return
+    }
+    setBusy(`rental-payment-${review.decision}`)
     setError('')
     setNotice('')
     try {
-      await reviewAdminHubDepositProof(detail.booking_id, decision, proofNote.trim() || null)
-      setNotice(decision === 'accepted' ? 'Manual proof review recorded.' : 'Proof rejection and review note recorded.')
-      toast.success(decision === 'accepted' ? 'Deposit proof check accepted.' : 'Deposit proof rejected — the note was recorded.')
-      setProofNote('')
+      await reviewAdminRentalPaymentProof(review.bookingId, review.decision, review.reviewNote, review.proofPath)
+      const message = review.decision === 'accepted' ? 'Rental receipt accepted after manual staff review.' : 'Rental receipt rejected — the reason was recorded for the renter.'
+      setNotice(message)
+      toast.success(message)
+      setRentalProofNote('')
+      setViewedRentalProof(null)
       setConfirmAction(null)
       await load(true)
     } catch (reviewError) {
-      const message = reviewError instanceof Error ? reviewError.message : 'Could not save the proof review.'
+      const message = reviewError instanceof Error ? reviewError.message : 'Could not save the rental-payment proof review.'
+      setError(message)
+      toast.error(message)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  function reviewDeposit(decision: 'accepted' | 'rejected') {
+    if (!detail || busy || detail.deposit?.status !== 'pending_review') return
+    if (!detail.deposit.proof_path) {
+      setError('No deposit proof is attached to this booking.')
+      return
+    }
+    if (!proofViewed || !viewedDepositProof) {
+      setError('Open the current deposit receipt before recording a manual proof-review decision.')
+      return
+    }
+    const reviewNote = proofNote.trim() || null
+    if (decision === 'rejected' && !reviewNote) {
+      setError('Enter a rejection reason that staff can use to resolve the proof issue.')
+      return
+    }
+    setConfirmAction({ type: 'deposit', bookingId: viewedDepositProof.bookingId, proofPath: viewedDepositProof.path, decision, reviewNote })
+  }
+
+  async function confirmDepositReview(review: ProofReview) {
+    if (busy) return
+    if (!detail || detail.booking_id !== review.bookingId || review.bookingId !== bookingId || detail.deposit?.status !== 'pending_review' || !proofViewed || viewedDepositProof?.path !== review.proofPath || depositProofPath !== review.proofPath || (review.decision === 'rejected' && !review.reviewNote?.trim())) {
+      const message = 'The deposit receipt changed. Open the current receipt and review it again.'
+      setConfirmAction(null)
+      setError(message)
+      toast.error(message)
+      return
+    }
+    setBusy(`deposit-${review.decision}`)
+    setError('')
+    setNotice('')
+    try {
+      await reviewAdminHubDepositProof(review.bookingId, review.decision, review.reviewNote)
+      setNotice(review.decision === 'accepted' ? 'Manual deposit proof review recorded.' : 'Deposit proof rejection and review note recorded.')
+      toast.success(review.decision === 'accepted' ? 'Deposit proof check accepted.' : 'Deposit proof rejected — the note was recorded.')
+      setProofNote('')
+      setViewedDepositProof(null)
+      setConfirmAction(null)
+      await load(true)
+    } catch (reviewError) {
+      const message = reviewError instanceof Error ? reviewError.message : 'Could not save the deposit proof review.'
       setError(message)
       toast.error(message)
     } finally {
@@ -323,9 +441,21 @@ export default function AdminHubHandoffDetailPage() {
       <ol>{CUSTODY_STEPS.map((step, index) => <li className={`${index < currentCustodyIndex ? 'done' : ''} ${index === currentCustodyIndex ? 'current' : ''}`} key={step.value}><span>{index < currentCustodyIndex ? <Check size={13} /> : index + 1}</span><b>{step.label}</b></li>)}</ol>
     </section>
 
-    <div className="admin-handoff-detail-grid">
-      <div className="admin-handoff-detail-primary">
-        <section className="admin-handoff-panel" aria-labelledby="deposit-heading">
+    <div className="admin-handoff-payments-grid">
+      <section className="admin-handoff-panel" aria-labelledby="rental-payment-heading">
+        <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">RENTAL PAYMENT · SEPARATE FROM DEPOSIT</span><h2 id="rental-payment-heading">Rental-payment proof review</h2></div><span className={`admin-handoff-badge admin-rental-payment-${rentalPaymentStatus ?? 'missing'}`}>{rentalPaymentStatus ? RENTAL_PAYMENT_STATUS_LABELS[rentalPaymentStatus] : 'Setup pending'}</span></div>
+        <div className="admin-handoff-proof-warning" role="note"><ShieldAlert size={18} /><p><strong>Manual receipt review, not provider verification.</strong> Staff compare the rental receipt with the configured GCash receiving details. Acceptance does not confirm settlement or create escrow. Deposit review is separate; a student deposit waiver does not waive rent.</p></div>
+        {!rentalPayment ? <div className="admin-handoff-inline-state muted"><CircleAlert size={18} /><div><b>Rental-payment setup pending</b><p>No rental-payment record is available. Do not treat the missing record as payment received or ask for a repeat payment; resolve setup first.</p></div></div>
+          : rentalPayment.status === 'not_required' ? <div className={`admin-handoff-inline-state ${rentalPayment.not_required_reason === 'zero_total' ? '' : 'muted'}`}><CheckCircle2 size={18} /><div><b>{rentalPayment.not_required_reason === 'zero_total' ? 'No rent due' : rentalPayment.not_required_reason === 'pre_feature_released' ? 'Historical booking — no rental payment recorded' : 'Rental payment not required'}</b><p>{rentalPayment.not_required_reason === 'zero_total' ? 'The recorded rental total is ₱0. No rental receipt is required; any deposit requirement remains separate.' : rentalPayment.not_required_reason === 'pre_feature_released' ? 'This booking was already released or closed before rental-payment tracking. This is not a paid receipt; no new payment is requested.' : 'No rental receipt review is required for this booking. This status does not record a received payment.'}</p></div></div>
+            : <>
+              <dl className="admin-handoff-facts"><div><dt>Rental amount (PHP)</dt><dd>{pesos(Number(rentalPayment.amount))}</dd></div><div><dt>GCash reference</dt><dd>{rentalPayment.gcash_reference || 'Not supplied'}</dd></div><div><dt>Submitted</dt><dd>{dateTimeLabel(rentalPayment.submitted_at)}</dd></div><div><dt>Reviewed</dt><dd>{dateTimeLabel(rentalPayment.reviewed_at)}</dd></div></dl>
+              {rentalPayment.review_note && <p className="admin-handoff-review-note"><b>Rental review note:</b> {rentalPayment.review_note}</p>}
+              {rentalPayment.proof_path ? <div className="admin-handoff-proof-actions"><button className="owner-button" type="button" onClick={() => void openRentalReceipt()}>View private rental receipt <ExternalLink size={12} /></button><span>{rentalProofViewed ? 'Current rental receipt opened' : 'Open rental receipt before deciding'}</span></div> : <div className="admin-handoff-inline-state muted"><Clock3 size={18} /><div><b>No rental receipt attached</b><p>The renter’s rental receipt and GCash reference will appear here after submission.</p></div></div>}
+              {rentalReviewAvailable ? <div className="admin-handoff-review-form"><label htmlFor="rental-payment-review-note">Rental reviewer note <span>{rentalProofNote.length}/500</span></label><textarea id="rental-payment-review-note" maxLength={500} value={rentalProofNote} disabled={Boolean(busy)} onChange={(event) => setRentalProofNote(event.target.value)} placeholder="Required for rejection so the renter can correct the proof; optional for acceptance." /><div><button className="owner-button dark" type="button" disabled={!rentalProofViewed || Boolean(busy)} onClick={() => reviewRentalPayment('accepted')}>{busy === 'rental-payment-accepted' ? 'Saving…' : 'Accept rental proof check'}</button><button className="owner-button" type="button" disabled={!rentalProofViewed || !rentalProofNote.trim() || Boolean(busy)} onClick={() => reviewRentalPayment('rejected')}>{busy === 'rental-payment-rejected' ? 'Saving…' : 'Reject rental proof'}</button></div></div> : rentalPayment.status === 'pending_review' && <p className="admin-handoff-review-note">Rental proof review is only available while the booking is approved.</p>}
+            </>}
+      </section>
+
+      <section className="admin-handoff-panel" aria-labelledby="deposit-heading">
           <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">SECURITY DEPOSIT</span><h2 id="deposit-heading">Deposit proof review</h2></div><span className={`admin-handoff-badge deposit-${detail.deposit_status}`}>{DEPOSIT_LABELS[detail.deposit_status]}</span></div>
           <div className="admin-handoff-proof-warning" role="note"><ShieldAlert size={18} /><p><strong>Manual visual review only.</strong> Accepting a receipt checks the submitted image against the configured LensShare GCash details. It does not confirm the GCash provider transaction, place funds in LensShare custody, or create escrow.</p></div>
           {detail.deposit_status === 'waived' ? <div className="admin-handoff-inline-state"><CheckCircle2 size={18} /><div><b>Deposit waived for this booking</b><p>No receipt review is required. Continue only when all other hand-off blockers are clear.</p></div></div>
@@ -335,8 +465,11 @@ export default function AdminHubHandoffDetailPage() {
               {detail.deposit.proof_path ? <div className="admin-handoff-proof-actions"><button className="owner-button" type="button" onClick={() => void openPrivateFile(detail.deposit!.proof_path!, 'Deposit receipt', true)}>View private receipt <ExternalLink size={12} /></button><span>{proofViewed ? 'Opened in this session' : 'Open before deciding'}</span></div> : <div className="admin-handoff-inline-state muted"><CircleAlert size={18} /><div><b>No receipt attached</b><p>A proof-review decision cannot be recorded until a receipt is submitted.</p></div></div>}
               {detail.deposit.status === 'pending_review' && <div className="admin-handoff-review-form"><label htmlFor="deposit-review-note">Reviewer note <span>{proofNote.length}/500</span></label><textarea id="deposit-review-note" maxLength={500} value={proofNote} onChange={(event) => setProofNote(event.target.value)} placeholder="Required for rejection; optional internal context for acceptance." /><div><button className="owner-button dark" type="button" disabled={!proofViewed || Boolean(busy)} onClick={() => void reviewDeposit('accepted')}>{busy === 'deposit-accepted' ? 'Saving…' : 'Accept proof check'}</button><button className="owner-button" type="button" disabled={!proofViewed || Boolean(busy)} onClick={() => void reviewDeposit('rejected')}>{busy === 'deposit-rejected' ? 'Saving…' : 'Reject proof'}</button></div></div>}
             </> : <div className="admin-handoff-inline-state muted"><CircleAlert size={18} /><div><b>Deposit not submitted</b><p>The renter’s proof and GCash reference will appear here after submission.</p></div></div>}
-        </section>
+      </section>
+    </div>
 
+    <div className="admin-handoff-detail-grid">
+      <div className="admin-handoff-detail-primary">
         <section className="admin-handoff-panel" aria-labelledby="agreement-heading">
           <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">PARTICIPANT AGREEMENT</span><h2 id="agreement-heading">Rental agreement</h2></div><Link className="owner-button" href={`/agreement?id=${booking.id}`} target="_blank">Open agreement <ExternalLink size={12} /></Link></div>
           <div className="admin-handoff-signatures"><Signature name={booking.owner?.full_name || 'Owner'} party="Owner" signedAt={detail.agreement.owner_signed_at} /><Signature name={booking.renter?.full_name || 'Renter'} party="Renter" signedAt={detail.agreement.renter_signed_at} /></div>
@@ -376,6 +509,19 @@ export default function AdminHubHandoffDetailPage() {
     </div>
 
     <ConfirmDialog
+      open={confirmAction?.type === 'rental-payment'}
+      busy={busy === 'rental-payment-accepted' || busy === 'rental-payment-rejected'}
+      tone={confirmAction?.type === 'rental-payment' && confirmAction.decision === 'rejected' ? 'danger' : 'default'}
+      title={confirmAction?.type === 'rental-payment' && confirmAction.decision === 'accepted' ? 'Accept this rental receipt after manual review?' : 'Reject this rental-payment proof?'}
+      description={<>
+        <p>{confirmAction?.type === 'rental-payment' && confirmAction.decision === 'accepted' ? 'This records a manual visual check of the exact rental receipt you opened. It does not verify the GCash transaction, guarantee settlement, create escrow, or accept the separate deposit proof.' : 'Your reason will be recorded so the renter can correct and resubmit the rental receipt. The separate deposit review is unchanged.'}</p>
+        {confirmAction?.type === 'rental-payment' && confirmAction.reviewNote && <p><strong>Rental reviewer note:</strong> {confirmAction.reviewNote}</p>}
+      </>}
+      confirmLabel={confirmAction?.type === 'rental-payment' && confirmAction.decision === 'accepted' ? 'Accept rental proof check' : 'Reject rental proof'}
+      onConfirm={() => { if (confirmAction?.type === 'rental-payment') void confirmRentalPaymentReview(confirmAction) }}
+      onClose={() => setConfirmAction(null)}
+    />
+    <ConfirmDialog
       open={confirmAction?.type === 'deposit'}
       busy={busy === 'deposit-accepted' || busy === 'deposit-rejected'}
       tone={confirmAction?.type === 'deposit' && confirmAction.decision === 'rejected' ? 'danger' : 'default'}
@@ -386,7 +532,7 @@ export default function AdminHubHandoffDetailPage() {
         ? 'This records that the receipt image passed the manual visual check. It does not confirm the GCash provider transaction and is not escrow.'
         : 'The renter will be asked to submit a new proof, and your reviewer note is kept on the record.'}
       confirmLabel={confirmAction?.type === 'deposit' && confirmAction.decision === 'accepted' ? 'Accept proof check' : 'Reject proof'}
-      onConfirm={() => { if (confirmAction?.type === 'deposit') void confirmDepositReview(confirmAction.decision) }}
+      onConfirm={() => { if (confirmAction?.type === 'deposit') void confirmDepositReview(confirmAction) }}
       onClose={() => setConfirmAction(null)}
     />
     <ConfirmDialog

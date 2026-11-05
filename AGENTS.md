@@ -32,11 +32,15 @@ finishing any change.
   `schema.sql` → `verification.sql` → `renter-primary-use.sql` → `enums.sql` →
   `admin.sql` → `listing-locations.sql` → `listing-media.sql` → `features.sql` →
   `community.sql` → `message-actions.sql` → `emails.sql` → `promo-pass.sql` →
-  `storage.sql` → **`hub-operations.sql` LAST**. `seed.sql` is optional/demo-only
+  `storage.sql` → `hub-operations.sql` → `service-area-and-incidents.sql` →
+  **`rental-payments.sql` LAST**. `seed.sql` is optional/demo-only
   and destructive for the resolved demo owner; never use it as a migration.
-  `hub-operations.sql` owns the final overlapping booking/verification RPCs,
+  `hub-operations.sql` owns the overlapping booking/verification RPCs,
   v2 transition guards, aggregate verification, and private hub storage policies.
-  If any earlier canonical file is rerun, rerun `hub-operations.sql` afterwards.
+  If an earlier canonical file is rerun, rerun `hub-operations.sql`, then
+  `service-area-and-incidents.sql`, then `rental-payments.sql` afterwards.
+  On an existing installation with hub and incident operations installed,
+  `rental-payments.sql` alone installs the rental-payment upgrade.
 - `supabase/schema.sql` creates the base schema (tables, RLS, signup trigger,
   realtime, gear storage); `supabase/verification.sql` adds the verification
   layer (`verification_submissions` table, private `verification-docs` bucket,
@@ -75,10 +79,19 @@ finishing any change.
   them to public `gear-photos`. Deposit proofs use private `deposit-proofs`
   (`{renter_id}/{booking_id}/{filename}`); inspection evidence uses private
   `inspection-photos` (`{booking_id}/{inspection_id}/{filename}`).
+- Rental-fee payments use `booking_rental_payments` and the private append-only
+  `rental-payment-proofs` bucket (`{renter_id}/{booking_id}/{filename}`, 5 MB
+  JPEG/PNG/WebP/PDF). `rental-payments.sql` installs this additive upgrade.
+  Rent uses the snapshotted `bookings.total` after discounts; rent and deposit
+  require separate GCash transactions/references and independent admin review.
+  Student verification waives only the deposit, not rent. Manual proof acceptance
+  is not provider-confirmed payment or escrow and does not mark owner payouts paid.
+  Pending/approved v2 bookings require rental proof before pickup; historical
+  released/closed bookings are explicitly unrecorded, never automatically paid.
 - Row Level Security is the security core — the browser queries Supabase
   directly with the publishable key. Never replace RLS with client-side
   checks.
-- Realtime: `bookings` and the version-2 operation/deposit/inspection/transfer/
+- Realtime: `bookings`, `booking_rental_payments`, and the version-2 operation/deposit/inspection/transfer/
   event tables are published to `supabase_realtime`; clients must still filter by
   their booking/operator identifiers and RLS remains authoritative.
 - Gear photos upload to the public `gear-photos` storage bucket under
