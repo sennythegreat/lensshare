@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BadgePercent, CalendarDays, CheckCircle2, Clock3, CreditCard, ShieldCheck } from 'lucide-react'
 import { RenterHeadbar, Status } from '@/components/renter-headbar'
+import { useToast } from '@/components/toast'
 import { fetchMyPromoPasses, submitPromoPassPayment, uploadPromoPaymentProof } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import { pesos, type PromoPass } from '@/lib/types'
@@ -49,6 +50,7 @@ function remainingOf(pass: PromoPass) {
 
 export default function SaverPassPage() {
   const { user, profile, loading: profileLoading } = useProfile()
+  const toast = useToast()
   const [passes, setPasses] = useState<PromoPass[]>([])
   const [loaded, setLoaded] = useState(false)
   const [reference, setReference] = useState('')
@@ -122,9 +124,12 @@ export default function SaverPassPage() {
       const input = document.getElementById('saver-pass-receipt') as HTMLInputElement | null
       if (input) input.value = ''
       setNotice('Payment proof submitted. LensShare will manually verify the receipt before your pass starts.')
+      toast.success('Payment proof submitted — an admin will verify your receipt.')
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not submit your payment proof. Please try again.')
+      const message = e instanceof Error ? e.message : 'Could not submit your payment proof. Please try again.'
+      setError(message)
+      toast.error(message)
     } finally {
       setBusy(false)
     }

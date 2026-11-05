@@ -6,8 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { fetchBookingHandoffs, fetchBookingReviews, fetchOwnerBookings, fetchOwnerListings, saveHandoff, submitReview, updateBookingStatus } from '@/lib/data'
 import { isHubWorkflow } from '@/lib/rental-workflow'
 import { OwnerShell, PageCard, Status } from '@/components/owner-shell'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { EmptyState, SectionSkeleton } from '@/components/states'
 import { ReportIncidentModal } from '@/components/report-incident-modal'
+import { useToast } from '@/components/toast'
 import { useProfile } from '@/lib/use-profile'
 import { pesos, renterVerificationLabel, type BookingHandoff, type BookingStatus, type BookingWithRelations, type HandoffStage, type Review } from '@/lib/types'
 
@@ -43,6 +45,7 @@ function dateLabel(booking: BookingWithRelations) {
 
 export default function RentalsPage() {
   const { user, loading: profileLoading } = useProfile()
+  const toast = useToast()
   const [bookings, setBookings] = useState<BookingWithRelations[]>([])
   const [listedCount, setListedCount] = useState(0)
   const [filter, setFilter] = useState<(typeof filters)[number]>('ALL')
@@ -61,6 +64,7 @@ export default function RentalsPage() {
   const [reviewState, setReviewState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle')
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
+  const [confirmDecision, setConfirmDecision] = useState<{ booking: BookingWithRelations; status: BookingStatus } | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -87,14 +91,31 @@ export default function RentalsPage() {
     setSelected((current) => current && current.id === id ? { ...current, status } : current)
   }
 
-  async function decide(booking: BookingWithRelations, status: BookingStatus) {
+  function decide(booking: BookingWithRelations, status: BookingStatus) {
+    // Declining a request and settling a rental are irreversible — confirm first.
+    if (status === 'declined' || status === 'completed') {
+      setConfirmDecision({ booking, status })
+      return
+    }
+    void applyDecision(booking, status)
+  }
+
+  async function applyDecision(booking: BookingWithRelations, status: BookingStatus) {
     patchStatus(booking.id, status)
     setSelected(null)
+    setConfirmDecision(null)
     try {
       await updateBookingStatus(booking.id, status)
+      toast.success(status === 'approved'
+        ? `Request approved — ${booking.renter?.full_name || 'the renter'} has been notified.`
+        : status === 'completed'
+          ? `Rental settled and completed for ${booking.listing?.name || 'the booking'}.`
+          : `Booking #${booking.id.slice(0, 8).toUpperCase()} is now ${status}.`)
     } catch (e) {
       patchStatus(booking.id, booking.status)
-      setError(e instanceof Error ? e.message : 'Status update failed.')
+      const message = e instanceof Error ? e.message : 'Status update failed.'
+      setError(message)
+      toast.error(message)
     }
   }
 
@@ -118,8 +139,11 @@ export default function RentalsPage() {
     try {
       await saveHandoff(checklistBooking.id, user.id, 'owner', checklistStage, checklistItems)
       setChecklistState('saved')
+      toast.success('Checklist saved to the booking record.')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save the checklist.')
+      const message = e instanceof Error ? e.message : 'Could not save the checklist.'
+      setError(message)
+      toast.error(message)
       setChecklistState('error')
     }
   }
@@ -149,8 +173,11 @@ export default function RentalsPage() {
       })
       setReviewedBookings((current) => [...current, reviewBooking.id])
       setReviewState('done')
+      toast.success('Review submitted — thank you.')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not submit the review.')
+      const message = e instanceof Error ? e.message : 'Could not submit the review.'
+      setError(message)
+      toast.error(message)
       setReviewState('error')
     }
   }
@@ -180,5 +207,19 @@ export default function RentalsPage() {
       <textarea className="review-comment" placeholder="How was the renter? Condition of the gear on return, communication, punctuality…" value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} />
       <div className="modal-actions"><button className="owner-button dark" disabled={reviewState === 'busy'} onClick={handleReview}>{reviewState === 'busy' ? 'Submitting…' : 'Submit review'}</button><button className="owner-button" onClick={() => setReviewBooking(null)}>Cancel</button></div>
     </>}</section></div>}
+    <ConfirmDialog
+      open={Boolean(confirmDecision)}
+      busy={false}
+      tone={confirmDecision?.status === 'declined' ? 'danger' : 'default'}
+      title={confirmDecision?.status === 'declined'
+        ? 'Decline this booking request?'
+        : 'Complete & settle this rental?'}
+      description={confirmDecision?.status === 'declined'
+        ? <>The request from {confirmDecision.booking.renter?.full_name || 'the renter'} will be turned down. This cannot be undone — they would need to book again.</>
+        : <>This closes booking #{shortId(confirmDecision?.booking.id ?? '')} for good and creates the payout entry. The status cannot go back.</>}
+      confirmLabel={confirmDecision?.status === 'declined' ? 'Decline request' : 'Complete & settle'}
+      onConfirm={() => { if (confirmDecision) void applyDecision(confirmDecision.booking, confirmDecision.status) }}
+      onClose={() => setConfirmDecision(null)}
+    />
   </OwnerShell>
 }

@@ -61,13 +61,14 @@ import type {
   Review,
   ReviewWithNames,
   Role,
+  CounterpartyVerificationProof,
   VerificationDocType,
   VerificationSubmission,
   VerificationSubmissionWithUser,
 } from '@/lib/types'
 
-const BOOKING_SELECT = '*, listing:gear_listings(*), renter:profiles!bookings_renter_id_fkey(id, full_name, verification_status, is_student, phone), owner:profiles!bookings_owner_id_fkey(id, full_name)'
-const OWNER_BOOKING_SELECT = '*, listing:gear_listings(*), renter:profiles!bookings_renter_id_fkey(id, full_name, verification_status, is_student, phone, primary_rental_use), owner:profiles!bookings_owner_id_fkey(id, full_name)'
+const BOOKING_SELECT = '*, listing:gear_listings(*), renter:profiles!bookings_renter_id_fkey(id, full_name, verification_status, is_student, phone), owner:profiles!bookings_owner_id_fkey(id, full_name, verification_status, phone)'
+const OWNER_BOOKING_SELECT = '*, listing:gear_listings(*), renter:profiles!bookings_renter_id_fkey(id, full_name, verification_status, is_student, phone, primary_rental_use), owner:profiles!bookings_owner_id_fkey(id, full_name, verification_status, phone)'
 
 function missingPrimaryRentalUseColumn(error: { message?: string } | null): boolean {
   const message = error?.message ?? ''
@@ -78,17 +79,17 @@ export async function fetchListings(): Promise<ListingWithOwner[]> {
   const supabase = createClient()
   const fetchWithFilter = () => supabase
     .from('gear_listings')
-    .select('*, owner:profiles!gear_listings_owner_id_fkey(id, full_name)')
+    .select('*, owner:profiles!gear_listings_owner_id_fkey(id, full_name, verification_status)')
     .eq('status', 'available')
-    .eq('in_service_area', true)
+    .or('in_service_area.eq.true,and(pickup_latitude.is.null,pickup_longitude.is.null)')
     .order('rating', { ascending: false })
   let { data, error } = await fetchWithFilter()
-  // Before supabase/service-area-and-incidents.sql is applied the column
-  // does not exist; fall back to the unfiltered query so browse still works.
-  if (error && (error.code === 'PGRST204' || error.code === '42703') && /in_service_area/.test(error.message)) {
+  // Before the listing location/service-area SQL is applied these columns do
+  // not exist; fall back to status-only browse results.
+  if (error && (error.code === 'PGRST204' || error.code === '42703') && /(in_service_area|pickup_latitude|pickup_longitude)/.test(error.message)) {
     ({ data, error } = await supabase
       .from('gear_listings')
-      .select('*, owner:profiles!gear_listings_owner_id_fkey(id, full_name)')
+      .select('*, owner:profiles!gear_listings_owner_id_fkey(id, full_name, verification_status)')
       .eq('status', 'available')
       .order('rating', { ascending: false }))
   }
@@ -114,10 +115,22 @@ export type NewListing = Pick<Listing, 'name' | 'brand' | 'category' | 'daily_ra
   description?: string | null
   image_url?: string | null
   image_urls?: string[]
+  security_deposit?: number | null
   pickup_address?: string | null
   pickup_latitude?: number | null
   pickup_longitude?: number | null
   status?: ListingStatus
+}
+
+/** The hub's default security deposit, used when a listing sets none. */
+export async function fetchHubDepositDefault(): Promise<number> {
+  const { data, error } = await createClient()
+    .from('rental_hubs')
+    .select('standard_deposit')
+    .eq('code', 'naga')
+    .maybeSingle()
+  if (error) throw error
+  return asNumber(data?.standard_deposit, 2000)
 }
 
 function listingErrorMessage(error: { code?: string; message?: string }): string {
@@ -150,6 +163,15 @@ export async function insertListing(ownerId: string, values: NewListing): Promis
     .single()
 
   let { data, error } = await save(values)
+  if (missingListingColumn(error, 'security_deposit')) {
+    // Before supabase/hub-operations.sql is applied the column does not
+    // exist; fall back to saving without a per-listing deposit.
+    const { security_deposit: _securityDeposit, ...legacyValues } = values
+    const legacyResult = await save(legacyValues)
+    data = legacyResult.data
+    error = legacyResult.error
+    if (data) data = { ...data, security_deposit: null }
+  }
   if (missingListingColumn(error, 'image_urls') && (values.image_urls?.length ?? 0) <= 1) {
     const { image_urls: _imageUrls, ...legacyValues } = values
     const legacyResult = await save(legacyValues)
@@ -162,7 +184,7 @@ export async function insertListing(ownerId: string, values: NewListing): Promis
 }
 
 export async function updateListing(id: string, ownerId: string, values: NewListing): Promise<Listing> {
-  const fields = ['name', 'brand', 'category', 'daily_rate', 'meta', 'specs', 'included', 'description', 'image_url', 'image_urls', 'pickup_address', 'pickup_latitude', 'pickup_longitude', 'status'] as const
+  const fields = ['name', 'brand', 'category', 'daily_rate', 'meta', 'specs', 'included', 'description', 'image_url', 'image_urls', 'security_deposit', 'pickup_address', 'pickup_latitude', 'pickup_longitude', 'status'] as const
   const updates = Object.fromEntries(fields.filter((field) => values[field] !== undefined).map((field) => [field, values[field]]))
   const supabase = createClient()
   const save = (payload: Record<string, unknown>) => supabase
@@ -174,6 +196,15 @@ export async function updateListing(id: string, ownerId: string, values: NewList
     .single()
 
   let { data, error } = await save(updates)
+  if (missingListingColumn(error, 'security_deposit')) {
+    // Before supabase/hub-operations.sql is applied the column does not
+    // exist; fall back to saving without a per-listing deposit.
+    const { security_deposit: _securityDeposit, ...legacyUpdates } = updates
+    const legacyResult = await save(legacyUpdates)
+    data = legacyResult.data
+    error = legacyResult.error
+    if (data) data = { ...data, security_deposit: null }
+  }
   if (missingListingColumn(error, 'image_urls') && (values.image_urls?.length ?? 0) <= 1) {
     const { image_urls: _imageUrls, ...legacyUpdates } = updates
     const legacyResult = await save(legacyUpdates)
@@ -285,7 +316,7 @@ export async function quoteBooking(listingId: string, startDate: string, endDate
   const { data, error } = await supabase
     .rpc('quote_booking', { p_listing_id: listingId, p_start_date: startDate, p_end_date: endDate })
     .single()
-  if (error) throw error
+  if (error) rethrowPostgrest('quote_booking', error)
   return data as BookingQuote
 }
 
@@ -306,7 +337,7 @@ export async function createBooking(input: {
       p_expected_daily_rate: input.expected_daily_rate,
     })
     .single()
-  if (error) throw error
+  if (error) rethrowPostgrest('create_booking', error)
   return data as Booking
 }
 
@@ -426,19 +457,21 @@ function unwrapRpcRows(value: unknown, key?: string): unknown[] {
   return asArray(row.items ?? row.rows ?? row.data)
 }
 
+// PostgREST errors are plain objects, not Error instances — rethrow as a
+// real Error so `instanceof Error` checks in pages surface the message
+// instead of a generic fallback.
+function rethrowPostgrest(name: string, error: unknown): never {
+  const detail = (error ?? {}) as { message?: string; code?: string; details?: string }
+  const parts = [detail.message || `Could not call ${name}.`]
+  if (detail.code) parts.unshift(`${detail.code}:`)
+  if (detail.details) parts.push(`(${detail.details})`)
+  throw new Error(parts.join(' '))
+}
+
 async function callRpc(name: string, args: UnknownRow = {}): Promise<unknown> {
   const supabase = createClient()
   const { data, error } = await supabase.rpc(name, args)
-  if (error) {
-    // PostgREST errors are plain objects, not Error instances — rethrow as a
-    // real Error so `instanceof Error` checks in pages surface the message
-    // instead of a generic fallback.
-    const detail = error as { message?: string; code?: string; details?: string }
-    const parts = [detail.message || `Could not call ${name}.`]
-    if (detail.code) parts.unshift(`${detail.code}:`)
-    if (detail.details) parts.push(`(${detail.details})`)
-    throw new Error(parts.join(' '))
-  }
+  if (error) rethrowPostgrest(name, error)
   return data
 }
 
@@ -1083,7 +1116,10 @@ export async function fetchAdminHubSettings(): Promise<HubSettings> {
 }
 
 export async function saveAdminHubSettings(input: HubSettingsInput): Promise<HubSettings> {
-  if (Number(input.deposit_amount) !== 2000) throw new Error('The approved Naga Hub deposit is fixed at ₱2,000.')
+  const depositAmount = Number(input.deposit_amount)
+  if (!Number.isFinite(depositAmount) || depositAmount < 0 || depositAmount > 1000000) {
+    throw new Error('Enter a default hub deposit between ₱0 and ₱1,000,000.')
+  }
   const hubLatitude = input.hub_latitude ?? 13.6218
   const hubLongitude = input.hub_longitude ?? 123.1948
   const serviceRadiusKm = Number(input.service_radius_km || 15)
@@ -1105,7 +1141,7 @@ export async function saveAdminHubSettings(input: HubSettingsInput): Promise<Hub
     p_address_text: input.exact_address.trim(),
     p_contact_phone: current.contact_phone,
     p_instructions: instructions,
-    p_standard_deposit: 2000,
+    p_standard_deposit: depositAmount,
     p_is_active: current.active,
     p_hub_latitude: hubLatitude,
     p_hub_longitude: hubLongitude,
@@ -1586,13 +1622,14 @@ export async function submitReview(input: {
 }
 
 export async function updateProfile(
-  values: { full_name: string; phone: string | null; primary_rental_use?: PrimaryRentalUse | null },
+  values: { full_name: string; phone: string | null; primary_rental_use?: PrimaryRentalUse | null; address?: string | null },
 ): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase.rpc('update_own_profile', {
     p_full_name: values.full_name,
     p_phone: values.phone,
     p_primary_rental_use: values.primary_rental_use ?? null,
+    p_address: values.address ?? null,
   })
   if (error) throw error
 }
@@ -1712,7 +1749,7 @@ export async function fetchVerificationQueue(): Promise<VerificationSubmissionWi
   const supabase = createClient()
   const { data, error } = await supabase
     .from('verification_submissions')
-    .select('*, user:profiles!verification_submissions_user_id_fkey(id, full_name, email, verification_status, is_student)')
+    .select('*, user:profiles!verification_submissions_user_id_fkey(id, full_name, email, role, verification_status, is_student)')
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as VerificationSubmissionWithUser[]
@@ -1723,6 +1760,15 @@ export async function fetchSignedDocUrl(filePath: string): Promise<string> {
   const { data, error } = await supabase.storage.from('verification-docs').createSignedUrl(filePath, 300)
   if (error) throw error
   return data.signedUrl
+}
+
+// Proof documents for the other party of a booking conversation. Returns the
+// counterparty's latest identity submissions (government ID + selfie); approved
+// documents become viewable through fetchSignedDocUrl.
+export async function fetchCounterpartyVerificationProofs(bookingId: string): Promise<CounterpartyVerificationProof[]> {
+  const { data, error } = await createClient().rpc('counterparty_verification_proofs', { p_booking_id: bookingId })
+  if (error) throw error
+  return (data ?? []) as CounterpartyVerificationProof[]
 }
 
 export async function reviewSubmission(
@@ -1992,6 +2038,29 @@ export async function fetchUnreadMessageCount(userId: string): Promise<number> {
     .is('read_at', null)
   if (error) throw error
   return count ?? 0
+}
+
+// Bookings that changed since the renter last opened /renter/bookings — the
+// "My Bookings" nav badge. Column-to-column comparison isn't expressible in a
+// PostgREST head-count, so the (small) set of own bookings is filtered here.
+// Pending was created by the renter themselves, so it never counts as news.
+export async function fetchUnseenBookingCount(userId: string): Promise<number> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('status, updated_at, renter_seen_at')
+    .eq('renter_id', userId)
+    .neq('status', 'pending')
+  if (error) throw error
+  return (data ?? []).filter(
+    (row) => new Date(row.updated_at as string) > new Date(row.renter_seen_at as string),
+  ).length
+}
+
+export async function markRenterBookingsSeen(): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.rpc('mark_renter_bookings_seen')
+  if (error) throw error
 }
 
 // All messages visible to this user, across their bookings (for thread

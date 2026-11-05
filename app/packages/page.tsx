@@ -52,7 +52,7 @@ export default function PackagesPage() {
           <div><dt>Savings limit</dt><dd>₱500</dd><small>Total discount cap</small></div>
         </dl>
         <div className="packages-pass-action">
-          <p><WalletCards size={17} aria-hidden="true" /><span><b>GCash, manually verified</b>The ₱99 pass fee is checked by an admin before the 30-day pass activates; it is separate from the ₱2,000 booking deposit.</span></p>
+          <p><WalletCards size={17} aria-hidden="true" /><span><b>GCash, manually verified</b>The ₱99 pass fee is checked by an admin before the 30-day pass activates; it is separate from the refundable security deposit, which varies by item.</span></p>
           <div className="packages-pass-access" aria-live="polite">
             {loading
               ? <span className="packages-pass-checking">Checking account access…</span>
@@ -80,7 +80,7 @@ export default function PackagesPage() {
         <div>
           <p className="eyebrow">BOOKING DEPOSIT</p>
           <h2>Manual proof, clearly tracked.</h2>
-          <p>For bookings without a waiver, the renter sends the ₱2,000 deposit by GCash and submits proof for manual review. This is not an escrow account or a provider-authorized card hold.</p>
+          <p>For bookings without a waiver, the renter sends the refundable security deposit — set per listing, or the hub default — by GCash and submits proof for manual review. This is not an escrow account or a provider-authorized card hold.</p>
         </div>
         <div className="packages-coverage-item"><ShieldCheck size={18} /><b>Booking-level student waiver</b><span>Approved student status makes a booking eligible for the deposit waiver; the booking record confirms whether it applies.</span></div>
         <div className="packages-coverage-item"><CheckCircle2 size={18} /><b>Configured hub exchange</b><span>Approved rentals are handed off and returned at the configured Naga City Hub, with booking checklists recorded in the app.</span></div>

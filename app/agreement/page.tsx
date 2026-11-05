@@ -6,7 +6,9 @@ import { useSearchParams } from 'next/navigation'
 import { Printer, Signature } from 'lucide-react'
 import './agreement.css'
 import { RentalAgreementSheet } from '@/components/rental-agreement-sheet'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { SectionSkeleton, ErrorState } from '@/components/states'
+import { useToast } from '@/components/toast'
 import { fetchBookingById, fetchBookingHandoffs, fetchRentalHub, saveHandoff, signRentalAgreement } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import type { BookingHandoff, BookingWithRelations, HandoffParty, RentalHubData } from '@/lib/types'
@@ -19,6 +21,7 @@ export default function AgreementPage() {
 
 function AgreementContent() {
   const params = useSearchParams()
+  const toast = useToast()
   const bookingId = params.get('id') ?? ''
   const { user, profile, loading: profileLoading } = useProfile()
   const [booking, setBooking] = useState<BookingWithRelations | null>(null)
@@ -27,6 +30,7 @@ function AgreementContent() {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [confirmSign, setConfirmSign] = useState(false)
 
   const load = useCallback(async () => {
     if (!bookingId || !user) return
@@ -73,14 +77,18 @@ function AgreementContent() {
 
   async function handleAccept() {
     if (!booking || !user || !signerParty || !canSign) return
+    setConfirmSign(false)
     setBusy(true)
     setMessage('')
     try {
       if (isHubWorkflow) await signRentalAgreement(booking.id)
       else await saveHandoff(booking.id, user.id, signerParty, 'agreement', {})
       await load()
+      toast.success('Your signature was recorded — the agreement is immutable.')
     } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : 'Could not save the signature.')
+      const signingError = cause instanceof Error ? cause.message : 'Could not save the signature.'
+      setMessage(signingError)
+      toast.error(signingError)
     } finally {
       setBusy(false)
     }
@@ -99,11 +107,21 @@ function AgreementContent() {
       <Link href={backHref}>← Back to {isHubWorkflow ? 'rental hub' : 'bookings'}</Link>
       <div className="agreement-toolbar-actions">
         <button className="button light" onClick={() => window.print()}><Printer size={14} /> Print / save PDF</button>
-        {canSign && <button className="button dark" disabled={busy} onClick={handleAccept}><Signature size={14} /> {busy ? 'Signing…' : `Sign as ${signerParty}`}</button>}
+        {canSign && <button className="button dark" disabled={busy} onClick={() => setConfirmSign(true)}><Signature size={14} /> {busy ? 'Signing…' : `Sign as ${signerParty}`}</button>}
       </div>
     </div>
     {message && <p className="agreement-error no-print">{message}</p>}
     {ownSigned && <p className="agreement-signed-banner no-print">Your immutable {signerParty} signature is recorded.</p>}
     <RentalAgreementSheet booking={booking} handoffs={handoffs} rentalHub={rentalHub} />
+    <ConfirmDialog
+      open={confirmSign}
+      busy={busy}
+      tone="danger"
+      title={`Sign as the ${signerParty}?`}
+      description="Your signature accepts the immutable terms shown below — equipment, pricing, and hand-off details cannot be edited or withdrawn afterwards."
+      confirmLabel={`Sign as ${signerParty}`}
+      onConfirm={() => void handleAccept()}
+      onClose={() => setConfirmSign(false)}
+    />
   </main>
 }

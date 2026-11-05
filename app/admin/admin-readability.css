@@ -1,0 +1,331 @@
+/* ============================================================
+   Readability refinement — final admin cascade.
+   Retains the existing editorial console while giving dense
+   operational queues more space, contrast, and usable controls.
+   ============================================================ */
+
+.admin-page {
+  --admin-ink: #17201d;
+  --admin-muted: #596762;
+  --admin-line: #d9dfda;
+  --admin-surface: #fff;
+  --admin-soft: #f7f8f5;
+  --admin-success: #245b4c;
+  --admin-success-bg: #dcebe5;
+  --admin-warning: #6b5318;
+  --admin-warning-bg: #f4e8bf;
+  --admin-danger: #87382d;
+  --admin-danger-bg: #f7e2dd;
+  --admin-info: #2d566c;
+  --admin-info-bg: #dceaf1;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.admin-sidebar {
+  width: 248px;
+  padding: 30px 20px 24px;
+}
+
+.admin-logo { margin-bottom: 32px; }
+.admin-logo b { font-size: 18px; }
+.admin-logo small { font-size: 10px; line-height: 1.45; }
+.admin-sidebar nav { gap: 5px; }
+.admin-sidebar nav a {
+  min-height: 44px;
+  padding: 12px;
+  border-radius: 5px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.admin-sidebar nav a.active {
+  background: var(--admin-success-bg);
+  box-shadow: inset 3px 0 0 var(--admin-success);
+}
+
+.admin-topbar { min-height: 68px; height: 68px; padding: 0 32px; }
+.admin-tag { padding: 8px 12px; font-size: 10px; color: #45544f; }
+.admin-menu { min-width: 42px; min-height: 42px; place-items: center; }
+.admin-avatar { width: 34px; height: 34px; font-size: 11px; }
+.admin-content { max-width: 1720px; margin: 0 auto; padding: 40px 42px 88px; }
+.admin-heading { margin-bottom: 30px; }
+.admin-eyebrow { font-size: 10px; color: #596762; }
+.admin-heading h1 { font-size: clamp(36px, 3.3vw, 48px); line-height: 1.05; margin: 10px 0 8px; }
+.admin-heading p { max-width: 760px; color: var(--admin-muted); font-size: 14px; line-height: 1.6; }
+
+.admin-grid { gap: 18px; margin: 30px 0; }
+.admin-card { padding: 24px; border-color: var(--admin-line); box-shadow: 0 3px 14px rgba(23, 32, 29, .04); }
+.admin-card strong { font-size: 28px; margin: 12px 0 7px; }
+.admin-card p { font-size: 13px; line-height: 1.5; }
+.admin-table { border-color: var(--admin-line); }
+.admin-row { gap: 18px; padding: 17px 20px; }
+.admin-row h3 { font-size: 17px; line-height: 1.35; margin-bottom: 4px; }
+.admin-row small,
+.admin-row p { font-size: 12px; line-height: 1.5; }
+.admin-chips { gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.admin-thumb { width: 54px; height: 44px; }
+.admin-pill,
+.admin-handoff-badge,
+.admin-incident-status {
+  border: 1px solid transparent;
+  padding: 6px 10px;
+  font-size: 10px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+.admin-pill.pending { background: var(--admin-warning-bg); color: var(--admin-warning); border-color: #dfcf91; }
+.admin-pill.verified,
+.admin-pill.available,
+.admin-pill.active { background: var(--admin-success-bg); color: var(--admin-success); border-color: #b9d4ca; }
+.admin-pill.rejected,
+.admin-pill.admin { background: var(--admin-danger-bg); color: var(--admin-danger); border-color: #dfb6ae; }
+.admin-pill.unverified,
+.admin-pill.paused { color: #4f5c57; border-color: #d7dcd8; }
+
+.admin-empty { padding: 56px 28px; color: var(--admin-muted); }
+.admin-empty h3 { font-size: 24px; }
+.admin-empty p { max-width: 560px; margin: 0 auto; line-height: 1.6; }
+
+.admin-mail-bar { padding: 19px 22px; margin-top: 26px; }
+.admin-mail-bar p { font-size: 13px; line-height: 1.5; }
+.admin-mail-bar small { font-size: 12px; }
+
+.admin-search,
+.admin-handoff-search { min-height: 44px; border-color: var(--admin-line); }
+.admin-search input,
+.admin-handoff-search input { font-size: 13px; padding: 11px 0; }
+.admin-search input::placeholder { font-size: 12px; }
+.admin-search-clear { min-width: 34px; min-height: 34px; justify-content: center; }
+.admin-search:focus-within,
+.admin-handoff-search:focus-within { outline: 2px solid #5a8770; outline-offset: 2px; }
+
+.admin-gear-grid { grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 20px; }
+.admin-gear-photo { height: 190px; }
+.admin-gear-body { padding: 18px; gap: 8px; }
+.admin-gear-body h3 { font-size: 19px; line-height: 1.3; }
+.admin-gear-body small { font-size: 12px; line-height: 1.5; }
+.admin-gear-foot { padding-top: 16px; }
+.admin-gear-foot strong { font-size: 22px; }
+.admin-gear-foot strong em { font-size: 11px; }
+
+.admin-pass-warning { gap: 14px; padding: 18px 20px; margin: 28px 0 20px; background: #faf2d7; }
+.admin-pass-warning strong { font-size: 17px; }
+.admin-pass-warning p { font-size: 13px; line-height: 1.6; }
+.admin-pass-section { margin-bottom: 22px; }
+.admin-pass-list { gap: 18px; }
+.admin-pass-card { padding: 22px; }
+.admin-pass-card-head h3,
+.admin-pass-reviewed-row h3 { font-size: 20px; margin-top: 10px; }
+.admin-pass-card-head p,
+.admin-pass-reviewed-row p { font-size: 12px; line-height: 1.6; }
+.admin-pass-card-head > strong { font-size: 28px; }
+.admin-pass-facts { margin: 20px 0; }
+.admin-pass-facts div { padding: 15px; }
+.admin-pass-facts dt { font-size: 10px; }
+.admin-pass-facts dd { font-size: 13px; line-height: 1.5; }
+.admin-pass-confirm { min-height: 36px; font-size: 13px; }
+.admin-pass-actions { gap: 10px; }
+.admin-pass-reviewed-row { padding: 20px 0; }
+
+.admin-verification-card { margin-top: 28px; }
+.admin-verification-users { gap: 22px; }
+.admin-verification-user-head { padding: 22px 24px; }
+.admin-verification-user-head h2 { font-size: 24px; }
+.admin-verification-user-head p { font-size: 12px; }
+.admin-verification-profile-flags > span:first-child { font-size: 10px; }
+.admin-verification-group { padding: 22px 24px; }
+.admin-verification-group-head { gap: 18px; padding-bottom: 16px; }
+.admin-verification-group-head h3 { font-size: 20px; }
+.admin-verification-group-head p { font-size: 12px; line-height: 1.55; }
+.admin-verification-group-status small { font-size: 11px; }
+.admin-verification-warning { gap: 9px; padding: 12px 13px; font-size: 12px; line-height: 1.55; }
+.admin-verification-doc { min-height: 76px; padding: 15px 0; }
+.admin-verification-doc-main { gap: 10px; }
+.admin-verification-doc-main strong { font-size: 16px; }
+.admin-verification-doc-main small { font-size: 11px; }
+.admin-verification-doc-main p { font-size: 12px; line-height: 1.5; }
+.admin-verification-doc .owner-button,
+.admin-verification-group-foot .owner-button { min-height: 40px; padding: 9px 11px; font-size: 10px; }
+.admin-verification-group-foot { padding-top: 15px; }
+.admin-verification-group-foot span { font-size: 12px; }
+.admin-reviewed-row { padding: 18px 0; }
+.admin-reviewed-row h3 { font-size: 18px; }
+.admin-reviewed-row p { font-size: 12px; }
+
+.admin-handoff-toolbar { margin: 28px 0 20px; }
+.admin-handoff-live { font-size: 10px; }
+.admin-handoff-summary { margin-bottom: 20px; }
+.admin-handoff-summary button { min-height: 72px; padding: 17px 18px; }
+.admin-handoff-summary span { font-size: 10px; }
+.admin-handoff-summary strong { font-size: 26px; }
+.admin-handoff-controls { margin-bottom: 20px; }
+.admin-handoff-filters { gap: 7px; }
+.admin-handoff-filters button { min-height: 42px; padding: 10px 13px; font-size: 10px; }
+.admin-handoff-queue { gap: 15px; }
+.admin-handoff-card { grid-template-columns: minmax(0, 1fr) 230px; gap: 26px; padding: 21px; }
+.admin-handoff-card.issue { border-left-width: 5px; }
+.admin-handoff-card-main { grid-template-columns: 126px minmax(0, 1fr); gap: 19px; }
+.admin-handoff-card-main > img { width: 126px; min-height: 132px; }
+.admin-handoff-card-meta { font-size: 10px; }
+.admin-handoff-card h2 { font-size: 23px; margin: 10px 0 6px; }
+.admin-handoff-card-copy > p { font-size: 13px; }
+.admin-handoff-card-facts { gap: 10px 16px; margin-top: 17px; font-size: 12px; }
+.admin-handoff-issue-note { padding: 11px 12px; font-size: 12px; }
+.admin-handoff-card-side { gap: 11px; padding-left: 24px; }
+.admin-handoff-value small,
+.admin-handoff-assign > span { font-size: 10px; }
+.admin-handoff-value strong { font-size: 25px; }
+.admin-handoff-assign select { min-height: 42px; padding: 10px; font-size: 12px; }
+.admin-handoff-blocker-count { padding: 9px 10px; font-size: 11px; font-weight: 700; }
+.admin-handoff-empty,
+.admin-handoff-state { padding: 62px 24px; }
+.admin-handoff-empty h2 { font-size: 26px; }
+.admin-handoff-empty p,
+.admin-handoff-alert { font-size: 13px; }
+
+.admin-handoff-detail-nav { margin: 26px 0 20px; font-size: 12px; }
+.admin-handoff-detail-nav > span { font-size: 11px; }
+.admin-handoff-hero { grid-template-columns: 146px minmax(240px, 1fr) minmax(380px, 1.2fr); gap: 24px; padding: 22px; margin-bottom: 18px; }
+.admin-handoff-hero > img { width: 146px; height: 118px; }
+.admin-handoff-ref { font-size: 10px; }
+.admin-handoff-hero h2 { font-size: 28px; }
+.admin-handoff-hero p { font-size: 13px; line-height: 1.55; }
+.admin-handoff-hero dl > div,
+.admin-handoff-facts > div { padding: 13px 14px; }
+.admin-handoff-hero dt,
+.admin-handoff-facts dt { font-size: 10px; }
+.admin-handoff-hero dd,
+.admin-handoff-facts dd { font-size: 12px; line-height: 1.45; }
+.admin-handoff-custody,
+.admin-handoff-panel { padding: 24px; }
+.admin-handoff-custody { margin-bottom: 18px; }
+.admin-handoff-section-head { margin-bottom: 20px; }
+.admin-handoff-section-head h2 { font-size: 24px; }
+.admin-handoff-section-head p { font-size: 12px; line-height: 1.55; }
+.admin-handoff-custody li { font-size: 10px; line-height: 1.4; }
+.admin-handoff-detail-grid { gap: 18px; }
+.admin-handoff-detail-primary,
+.admin-handoff-detail-side { gap: 18px; }
+.admin-handoff-proof-warning p,
+.admin-handoff-review-note,
+.admin-handoff-inline-state p,
+.admin-handoff-signatures p,
+.admin-handoff-upload > span,
+.admin-handoff-confirmation p,
+.admin-handoff-blockers li,
+.admin-handoff-clear,
+.admin-handoff-panel-intro,
+.admin-handoff-transition p,
+.admin-hub-settings-actions p { font-size: 12px; line-height: 1.55; }
+.admin-handoff-proof-actions > span { font-size: 11px; }
+.admin-handoff-review-form > label,
+.admin-handoff-hold-field > span,
+.admin-handoff-inspection > label > span,
+.admin-handoff-inspection legend,
+.admin-handoff-existing-photos > span,
+.admin-handoff-confirmations h3,
+.admin-hub-settings-fields label > span { font-size: 10px; }
+.admin-handoff-review-form textarea,
+.admin-handoff-hold-field textarea,
+.admin-handoff-inspection input[type="text"],
+.admin-handoff-inspection > label > input:not([type="file"]),
+.admin-handoff-inspection textarea,
+.admin-hub-settings-fields input,
+.admin-hub-settings-fields textarea { min-height: 44px; padding: 12px; font-size: 13px; line-height: 1.5; }
+.admin-handoff-check span { min-height: 44px; padding: 11px 12px; font-size: 12px !important; }
+.admin-handoff-confirmation { padding: 11px; }
+.admin-handoff-confirmation b { font-size: 12px; }
+.admin-handoff-timeline b { font-size: 15px; }
+.admin-handoff-timeline p { font-size: 11px; line-height: 1.5; }
+.admin-handoff-timeline small { font-size: 10px; }
+.admin-hub-deposit-lock small,
+.admin-hub-deposit-lock span { font-size: 11px; }
+
+.admin-incident-filters { gap: 10px; margin-bottom: 20px; }
+.admin-incident-filters button { min-height: 42px; padding: 8px 16px; font-size: 12px; }
+.admin-incident-list { gap: 18px; }
+.admin-incident-card { padding: 21px; gap: 14px; }
+.admin-incident-icon { width: 38px; height: 38px; }
+.admin-incident-head { gap: 13px; }
+.admin-incident-head b { font-size: 18px; line-height: 1.35; }
+.admin-incident-head small { margin-top: 4px; font-size: 12px; line-height: 1.5; }
+.admin-incident-description { font-size: 14px; line-height: 1.65; }
+.admin-incident-actions { gap: 14px; }
+.admin-incident-link { font-size: 13px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.admin-incident-review { padding-top: 16px; gap: 13px; }
+.admin-incident-review label span { font-size: 11px; }
+.admin-incident-review textarea { min-height: 116px; padding: 12px; font-size: 13px; line-height: 1.55; }
+.admin-incident-hint { font-size: 12px; line-height: 1.5; }
+
+.admin-doc-modal { padding: 28px; }
+.admin-doc-modal-head { padding: 18px 22px; }
+.admin-doc-modal-head h3 { font-size: 21px; }
+.admin-doc-modal-head p { font-size: 12px; line-height: 1.5; }
+.admin-doc-modal-actions { gap: 10px; }
+.admin-doc-modal-body { padding: 16px; }
+.admin-review-modal-body { padding: 20px 22px; }
+.admin-review-modal-body p { font-size: 14px; line-height: 1.6; }
+.admin-review-note-label { font-size: 10px; }
+.admin-review-note { min-height: 110px; padding: 11px 12px; font-size: 14px; }
+.admin-review-modal-foot { padding: 17px 22px; }
+
+.admin-page button:focus-visible,
+.admin-page a:focus-visible,
+.admin-page input:focus-visible,
+.admin-page select:focus-visible,
+.admin-page textarea:focus-visible { outline: 2px solid #3f7467; outline-offset: 3px; }
+
+@media (max-width: 1200px) {
+  .admin-grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-handoff-card { grid-template-columns: minmax(0, 1fr) 210px; }
+}
+
+@media (max-width: 800px) {
+  .admin-sidebar { width: 260px; height: 100dvh; z-index: 60; box-shadow: 14px 0 34px rgba(7, 16, 14, .18); }
+  .admin-menu { display: grid; }
+  .admin-content { padding: 30px 22px 70px; }
+  .admin-topbar { padding: 0 20px; }
+  .admin-row { align-items: flex-start; flex-wrap: wrap; }
+  .admin-row-main { flex: 1 1 260px; }
+  .admin-chips { justify-content: flex-start; }
+  .admin-handoff-card { grid-template-columns: 1fr; }
+  .admin-handoff-card-side { padding-top: 18px; }
+}
+
+@media (max-width: 600px) {
+  .admin-topbar { min-height: 62px; height: 62px; padding: 0 14px; }
+  .admin-tag { display: none; }
+  .admin-content { padding: 25px 15px 60px; }
+  .admin-heading { margin-bottom: 24px; }
+  .admin-heading h1 { font-size: 34px; }
+  .admin-heading p { font-size: 13px; }
+  .admin-grid,
+  .admin-grid.four { grid-template-columns: 1fr; gap: 12px; }
+  .admin-card { padding: 20px; }
+  .admin-row { padding: 16px; }
+  .admin-chips { width: 100%; }
+  .admin-pass-card,
+  .admin-verification-group,
+  .admin-verification-user-head,
+  .admin-handoff-panel,
+  .admin-handoff-custody,
+  .admin-incident-card { padding: 17px; }
+  .admin-pass-actions > *,
+  .admin-doc-actions > *,
+  .admin-incident-review-actions > *,
+  .admin-doc-modal-actions > *,
+  .admin-review-modal-foot > * { width: 100%; }
+  .admin-handoff-summary button { min-height: 66px; padding: 13px; }
+  .admin-handoff-card-main { grid-template-columns: 82px minmax(0, 1fr); }
+  .admin-handoff-card-main > img { width: 82px; min-height: 92px; height: 92px; }
+  .admin-handoff-card h2 { font-size: 20px; }
+  .admin-handoff-card-side { display: flex; }
+  .admin-handoff-hero { grid-template-columns: 82px 1fr; padding: 16px; }
+  .admin-handoff-hero > img { width: 82px; height: 82px; }
+  .admin-handoff-hero dl { grid-column: 1 / -1; }
+  .admin-doc-modal { padding: 12px; }
+  .admin-doc-modal-head { flex-direction: column; padding: 16px; }
+  .admin-doc-modal-actions { width: 100%; flex-direction: column; }
+  .admin-review-modal-body { padding: 18px 16px; }
+  .admin-review-modal-foot { padding: 15px 16px; flex-direction: column-reverse; }
+}

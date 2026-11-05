@@ -21,3 +21,4 @@ supabase/seed.sql
 supabase/admin.sql
 *.sql
 *.md
+!SAMPLE_DATA.md

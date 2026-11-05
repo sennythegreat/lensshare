@@ -5,7 +5,8 @@ import { usePathname } from 'next/navigation'
 import { BadgeCheck, BadgePercent, Search, ShieldCheck, UserRound } from 'lucide-react'
 import { useProfile } from '@/lib/use-profile'
 import { useUnreadMessages } from '@/lib/use-unread-messages'
-import { initialsOf } from '@/lib/types'
+import { useUnseenBookings } from '@/lib/use-unseen-bookings'
+import { initialsOf, ownerVerificationLabel } from '@/lib/types'
 import { UserMenu } from '@/components/user-menu'
 import '@/app/browse/browse.css'
 import '@/app/dashboard/owner-pages.css'
@@ -24,6 +25,7 @@ export function SiteHeadbar({
   const pathname = usePathname()
   const { user, profile, loading } = useProfile()
   const unreadMessages = useUnreadMessages()
+  const unseenBookings = useUnseenBookings()
   const isRenter = profile?.role === 'renter'
   const isAdmin = profile?.role === 'admin'
   const isOwner = profile?.role === 'owner'
@@ -46,7 +48,7 @@ export function SiteHeadbar({
               ? 'Verification pending'
               : 'Unverified renter'
           : isOwner
-            ? 'Verified owner'
+            ? ownerVerificationLabel(profile)
             : 'Signed in'
 
   // Guests and renters use the renter routes (guests get bounced to login).
@@ -63,7 +65,10 @@ export function SiteHeadbar({
             { href: '/renter/verification', label: 'Verification', icon: BadgeCheck },
             { href: '/renter/saver-pass', label: 'Saver Pass', icon: BadgePercent },
           ]
-        : [{ href: '/dashboard/settings', label: 'My Profile', icon: UserRound }]
+        : [
+            { href: '/dashboard/settings', label: 'My Profile', icon: UserRound },
+            { href: '/dashboard/verification', label: 'Verification', icon: BadgeCheck },
+          ]
 
   const showSubnav = Boolean(breadcrumb || subnavRight)
 
@@ -74,7 +79,7 @@ export function SiteHeadbar({
         <Link className={pathname === '/browse' ? 'active' : ''} href="/browse">Browse Equipment</Link>
         <Link className={pathname === '/packages' ? 'active' : ''} href="/packages">Creator Guides</Link>
         {isRenter && <Link className={pathname === '/renter/saver-pass' ? 'active' : ''} href="/renter/saver-pass">Saver Pass</Link>}
-        {showRenterLinks && <Link className={pathname === '/renter/bookings' ? 'active' : ''} href="/renter/bookings">My Bookings</Link>}
+        {showRenterLinks && <Link className={pathname === '/renter/bookings' ? 'active' : ''} href="/renter/bookings">My Bookings{unseenBookings > 0 && <span className="nav-badge">{unseenBookings > 9 ? '9+' : unseenBookings}</span>}</Link>}
         {showRenterLinks && <Link className={pathname === '/renter/messages' ? 'active' : ''} href="/renter/messages">Messages{unreadMessages > 0 && <span className="nav-badge">{unreadMessages > 9 ? '9+' : unreadMessages}</span>}</Link>}
       </nav>
       {onSearchChange && <div className="browse-search"><Search size={14} /><input value={searchValue ?? ''} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search equipment or brand..." /></div>}

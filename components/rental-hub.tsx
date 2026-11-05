@@ -22,6 +22,8 @@ import {
   UserCheck,
 } from 'lucide-react'
 import { ErrorState, SectionSkeleton } from '@/components/states'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { useToast } from '@/components/toast'
 import { RentalAgreementSheet } from '@/components/rental-agreement-sheet'
 import {
   confirmRentalStep,
@@ -71,11 +73,13 @@ type RentalHubProps = {
 
 export function RentalHub({ bookingId, party }: RentalHubProps) {
   const { data: hubData, loading, error: loadError, refresh } = useRentalHub(bookingId, party)
+  const toast = useToast()
   const [actionError, setActionError] = useState('')
   const [busyAction, setBusyAction] = useState('')
   const [depositReference, setDepositReference] = useState('')
   const [depositFile, setDepositFile] = useState<File | null>(null)
   const [notice, setNotice] = useState('')
+  const [confirmAction, setConfirmAction] = useState<'decline' | 'sign' | null>(null)
 
   async function perform(action: string, operation: () => Promise<unknown>, success: string) {
     setBusyAction(action)
@@ -84,9 +88,12 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
     try {
       await operation()
       setNotice(success)
+      toast.success(success)
       await refresh(true)
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : 'That action could not be completed.')
+      const message = cause instanceof Error ? cause.message : 'That action could not be completed.'
+      setActionError(message)
+      toast.error(message)
     } finally {
       setBusyAction('')
     }
@@ -142,7 +149,7 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
 
     {isPending && party === 'owner' && <section className="hub-decision-panel">
       <div><p className="hub-kicker">OWNER DECISION</p><h2>Review this rental request</h2><p>Approval creates the immutable version-2 equipment, hub, pricing, deposit, and agreement snapshot. Hub safeguards then control every physical hand-off.</p></div>
-      <div><button type="button" className="hub-button primary" disabled={Boolean(busyAction)} onClick={() => perform('approve', () => decideRentalRequest(booking.id, 'approved'), 'Request approved. The hub workflow is ready.')}>{busyAction === 'approve' ? 'Approving…' : 'Approve request'}</button><button type="button" className="hub-button danger" disabled={Boolean(busyAction)} onClick={() => perform('decline', () => decideRentalRequest(booking.id, 'declined'), 'Request declined.')}>{busyAction === 'decline' ? 'Declining…' : 'Decline request'}</button></div>
+      <div><button type="button" className="hub-button primary" disabled={Boolean(busyAction)} onClick={() => perform('approve', () => decideRentalRequest(booking.id, 'approved'), 'Request approved. The hub workflow is ready.')}>{busyAction === 'approve' ? 'Approving…' : 'Approve request'}</button><button type="button" className="hub-button danger" disabled={Boolean(busyAction)} onClick={() => setConfirmAction('decline')}>{busyAction === 'decline' ? 'Declining…' : 'Decline request'}</button></div>
     </section>}
 
     {isPending && party === 'renter' && <section className="hub-waiting"><Clock3 size={17} /><div><strong>Waiting for owner approval</strong><span>Your price request is recorded. Hub operations, the deposit receipt, and agreement signatures open only after approval creates an immutable booking snapshot.</span></div></section>}
@@ -159,7 +166,7 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
         <HubSection eyebrow="PRICING & DEPOSIT" title="Two separate booking amounts" icon={<Banknote size={17} />}>
           <PriceAndDeposit data={hubData} />
           {canSubmitDeposit && <div className="hub-deposit-form">
-            <div><p className="hub-kicker">MANUAL GCASH VERIFICATION</p><h3>Submit the ₱2,000 security-deposit receipt</h3><p>Send the deposit only to the configured recipient below. Uploading a receipt does not verify payment; the assigned hub operator reviews it manually.</p></div>
+            <div><p className="hub-kicker">MANUAL GCASH VERIFICATION</p><h3>Submit the {pesos(depositAmount(hubData))} security-deposit receipt</h3><p>Send the deposit only to the configured recipient below. Uploading a receipt does not verify payment; the assigned hub operator reviews it manually.</p></div>
             <dl className="hub-payment-recipient"><div><dt>Recipient</dt><dd>{hubData.hub?.gcash_recipient_name || 'Ask the hub operator'}</dd></div><div><dt>GCash number</dt><dd>{hubData.hub?.gcash_recipient_number || 'Not configured'}</dd></div></dl>
             <label>GCash reference<input value={depositReference} onChange={(event) => setDepositReference(event.target.value)} maxLength={80} placeholder="Enter the receipt reference" /></label>
             <label>Receipt image or PDF<input type="file" accept={DEPOSIT_ACCEPT} onChange={(event) => setDepositFile(event.target.files?.[0] ?? null)} /></label>
@@ -177,7 +184,7 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
             <SignatureStatus label="Owner" name={booking.owner?.full_name} signedAt={hubData.agreement?.owner_signed_at} />
             <SignatureStatus label="Renter" name={booking.renter?.full_name} signedAt={hubData.agreement?.renter_signed_at} />
           </div>
-          {canSign && <div className="hub-action-callout"><div><strong>Your signature is required</strong><p>Signing accepts this booking’s immutable equipment, Naga Hub, rental-price, and security-deposit snapshot. It cannot be edited or withdrawn.</p></div><button type="button" className="hub-button primary" disabled={Boolean(busyAction)} onClick={() => perform('sign', () => signRentalAgreement(booking.id), 'Your immutable agreement signature was recorded.')}>{busyAction === 'sign' ? 'Signing…' : 'Sign agreement'}</button></div>}
+          {canSign && <div className="hub-action-callout"><div><strong>Your signature is required</strong><p>Signing accepts this booking’s immutable equipment, Naga Hub, rental-price, and security-deposit snapshot. It cannot be edited or withdrawn.</p></div><button type="button" className="hub-button primary" disabled={Boolean(busyAction)} onClick={() => setConfirmAction('sign')}>{busyAction === 'sign' ? 'Signing…' : 'Sign agreement'}</button></div>}
         </HubSection>
 
         <HubSection eyebrow="PRIVATE INSPECTIONS" title="Finalized condition evidence" icon={<Camera size={17} />}>
@@ -218,6 +225,26 @@ export function RentalHub({ bookingId, party }: RentalHubProps) {
         </HubSection>
       </aside>
     </div>
+
+    <ConfirmDialog
+      open={confirmAction === 'decline'}
+      busy={busyAction === 'decline'}
+      tone="danger"
+      title="Decline this rental request?"
+      description="The request will be turned down permanently and the hub record becomes read-only history. The other party would need to book again."
+      confirmLabel="Decline request"
+      onConfirm={() => { setConfirmAction(null); void perform('decline', () => decideRentalRequest(booking.id, 'declined'), 'Request declined.') }}
+      onClose={() => setConfirmAction(null)}
+    />
+    <ConfirmDialog
+      open={confirmAction === 'sign'}
+      busy={busyAction === 'sign'}
+      title="Sign the immutable agreement?"
+      description="Your signature accepts this booking’s equipment, Naga Hub, rental-price, and security-deposit snapshot. It cannot be edited or withdrawn afterwards."
+      confirmLabel="Sign agreement"
+      onConfirm={() => { setConfirmAction(null); void perform('sign', () => signRentalAgreement(booking.id), 'Your immutable agreement signature was recorded.') }}
+      onClose={() => setConfirmAction(null)}
+    />
   </div>
 }
 
@@ -255,6 +282,11 @@ function CustodyTimeline({ data }: { data: RentalHubData }) {
   </>
 }
 
+/** The booking's recorded deposit amount, falling back to the hub default. */
+function depositAmount(data: RentalHubData): number {
+  return data.deposit?.amount ?? data.agreement?.snapshot?.deposit?.amount ?? data.hub?.deposit_amount ?? 2000
+}
+
 function PriceAndDeposit({ data }: { data: RentalHubData }) {
   const booking = data.booking
   const deposit = data.deposit
@@ -262,12 +294,12 @@ function PriceAndDeposit({ data }: { data: RentalHubData }) {
   const subtotal = snapshot?.pricing?.subtotal ?? Number(booking.subtotal)
   const discount = snapshot?.pricing?.discount_amount ?? Number(booking.discount_amount)
   const total = snapshot?.pricing?.total ?? Number(booking.total)
-  const depositAmount = deposit?.amount ?? snapshot?.deposit?.amount ?? 2000
+  const amount = depositAmount(data)
   const waived = deposit?.status === 'waived' || snapshot?.deposit?.waived
 
   return <div className="hub-money-grid">
     <article className="hub-money-card rental"><p className="hub-kicker">RENTAL PRICE</p><dl><div><dt>Rental subtotal</dt><dd>{pesos(subtotal)}</dd></div>{discount > 0 && <div className="saving"><dt>Saver Pass saving</dt><dd>− {pesos(discount)}</dd></div>}<div className="total"><dt>Renter total</dt><dd>{pesos(total)}</dd></div></dl><p>Saver Pass changes only the rental price. It never changes or pays the security deposit.</p></article>
-    <article className={`hub-money-card deposit ${waived ? 'waived' : ''}`}><p className="hub-kicker">SECURITY DEPOSIT</p><strong>{waived ? 'Waived' : pesos(depositAmount)}</strong><HubBadge value={deposit?.status || (waived ? 'waived' : 'created after approval')} />{waived ? <p>Booking-level verified-student waiver{deposit?.waiver_reason || snapshot?.deposit?.waiver_reason ? ` · ${deposit?.waiver_reason || snapshot?.deposit?.waiver_reason}` : ''}. This is separate from Saver Pass.</p> : <p>Manually verified GCash security deposit. It is separate from and not included in the rental total.</p>}{deposit?.gcash_reference && <small>Receipt reference · {deposit.gcash_reference}</small>}{deposit?.review_note && <small className="hub-review-note">Review note · {deposit.review_note}</small>}{deposit?.refund_reference && <small>Refund reference · {deposit.refund_reference}</small>}</article>
+    <article className={`hub-money-card deposit ${waived ? 'waived' : ''}`}><p className="hub-kicker">SECURITY DEPOSIT</p><strong>{waived ? 'Waived' : pesos(amount)}</strong><HubBadge value={deposit?.status || (waived ? 'waived' : 'created after approval')} />{waived ? <p>Booking-level verified-student waiver{deposit?.waiver_reason || snapshot?.deposit?.waiver_reason ? ` · ${deposit?.waiver_reason || snapshot?.deposit?.waiver_reason}` : ''}. This is separate from Saver Pass.</p> : <p>Manually verified GCash security deposit. It is separate from and not included in the rental total.</p>}{deposit?.gcash_reference && <small>Receipt reference · {deposit.gcash_reference}</small>}{deposit?.review_note && <small className="hub-review-note">Review note · {deposit.review_note}</small>}{deposit?.refund_reference && <small>Refund reference · {deposit.refund_reference}</small>}</article>
   </div>
 }
 

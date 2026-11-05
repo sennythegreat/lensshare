@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
 import { EmptyState, SectionSkeleton } from '@/components/states'
+import { useToast } from '@/components/toast'
 import { fetchAdminListings, setListingStatus } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import { pesos, type ListingWithOwner } from '@/lib/types'
 
 export default function AdminEquipmentPage() {
   const { profile } = useProfile()
+  const toast = useToast()
   const [listings, setListings] = useState<ListingWithOwner[]>([])
   const [query, setQuery] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -33,10 +35,13 @@ export default function AdminEquipmentPage() {
     setListings((current) => current.map((item) => item.id === listing.id ? { ...item, status: next } : item))
     try {
       await setListingStatus(listing.id, next)
+      toast.success(`${listing.name} is now ${next === 'paused' ? 'paused' : 'live'}.`)
       setBusyId(null)
     } catch (e) {
       setListings((current) => current.map((item) => item.id === listing.id ? { ...item, status: listing.status } : item))
-      setError(e instanceof Error ? e.message : 'Moderation action failed.')
+      const message = e instanceof Error ? e.message : 'Moderation action failed.'
+      setError(message)
+      toast.error(message)
       setBusyId(null)
     }
   }

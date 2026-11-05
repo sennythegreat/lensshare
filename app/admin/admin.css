@@ -3,7 +3,7 @@
    Light sidebar, same editorial type system.
    ============================================================ */
 .admin-page{min-height:100vh;background:#f3f3f0;color:#17201d;display:flex;font:13px Arial,sans-serif}
-.admin-sidebar{width:236px;flex:none;background:#fbfbf9;border-right:1px solid #e7e8e5;padding:26px 18px 20px;display:flex;flex-direction:column;min-height:100vh}
+.admin-sidebar{width:236px;flex:none;background:#fbfbf9;border-right:1px solid #e7e8e5;padding:26px 18px 20px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;align-self:flex-start}
 .admin-logo{display:flex;gap:9px;align-items:center;margin:0 3px 28px}
 .admin-logo-mark{display:grid;place-items:center;width:28px;height:30px;flex:none}
 .admin-logo b{font:700 16px Georgia,serif;display:block;color:#17201d}
@@ -12,11 +12,6 @@
 .admin-sidebar nav a{display:flex;align-items:center;gap:11px;padding:11px 10px;color:#4c5854;text-decoration:none;border-radius:4px;font-size:12px}
 .admin-sidebar nav a:hover{background:#eef2ef;color:#17201d}
 .admin-sidebar nav a.active{background:#dcebe7;color:#0b241f;font-weight:bold}
-.admin-profile{margin-top:auto;display:flex;align-items:center;gap:9px;border-top:1px solid #e7e8e5;padding-top:16px}
-.admin-profile .admin-initials{background:#07100e;color:#fff;border-radius:50%;display:grid;place-items:center;width:27px;height:27px;font-size:9px;flex:none}
-.admin-profile div{display:flex;flex-direction:column}
-.admin-profile b{font-size:11px;color:#17201d}
-.admin-profile small{font-size:9px;color:#7d8a84}
 .admin-main{flex:1;min-width:0}
 .admin-topbar{position:sticky;top:0;z-index:40;height:60px;border-bottom:1px solid #e3e6e2;display:flex;align-items:center;gap:16px;padding:0 28px;background:#fff}
 .admin-tag{font:9px 'DM Mono',monospace;letter-spacing:.14em;color:#53605b;background:#e9efe9;border-radius:14px;padding:7px 10px;margin-left:auto}
@@ -58,25 +53,23 @@
   .admin-grid,.admin-grid.four{grid-template-columns:1fr 1fr}
 }
 .admin-pill.admin{background:#f7e3e0;color:#8c3d31}
-/* Account dropdown (admin topbar) */
-.user-menu{position:relative;display:flex}
-.user-menu > button{border:0;padding:0;cursor:pointer}
-.user-menu-panel{position:absolute;right:0;top:calc(100% + 10px);background:#fff;border:1px solid #e7e8e5;box-shadow:0 8px 24px rgba(23,32,29,.12);border-radius:6px;min-width:190px;padding:6px;z-index:60;text-align:left}
-.user-menu-head{padding:10px 12px;border-bottom:1px solid #eef0ed;margin-bottom:6px}
-.user-menu-head b{display:block;font:14px Georgia,serif;color:#17201d}
-.user-menu-head small{font-size:10px;color:#69716e}
-.user-menu-panel a,.user-menu-panel button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:9px 12px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#3c4744;cursor:pointer;text-decoration:none;text-align:left}
-.user-menu-panel a:hover,.user-menu-panel button:hover{background:#f2f4f1;color:#17201d}
-.admin-topbar .user-menu{margin-left:auto}
+/* Account dropdown (admin topbar) — scoped to .admin-topbar so the white-name
+   rules never leak globally into owner/renter/browse headers */
+.admin-topbar .user-menu{position:relative;display:flex;margin-left:auto}
+.admin-topbar .user-menu > button{border:0;padding:0;cursor:pointer}
+.admin-topbar .user-menu-panel{position:absolute;right:0;top:calc(100% + 10px);background:#fff;border:1px solid #e7e8e5;box-shadow:0 8px 24px rgba(23,32,29,.12);border-radius:6px;min-width:190px;padding:6px;z-index:60;text-align:left}
+.admin-topbar .user-menu-head{padding:10px 12px;border-bottom:1px solid #eef0ed;margin-bottom:6px}
+.admin-topbar .user-menu-head b{display:block;font:14px Georgia,serif;color:#17201d}
+.admin-topbar .user-menu-head small{font-size:10px;color:#69716e}
+.admin-topbar .user-menu-panel a,.admin-topbar .user-menu-panel button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:9px 12px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#3c4744;cursor:pointer;text-decoration:none;text-align:left}
+.admin-topbar .user-menu-panel a:hover,.admin-topbar .user-menu-panel button:hover{background:#f2f4f1;color:#17201d}
 /* Identity beside the avatar */
-.user-menu-trigger{display:flex;align-items:center;gap:9px;background:none}
-.user-menu-name{display:flex;flex-direction:column;align-items:flex-end;line-height:1.3;white-space:nowrap}
-.user-menu-name b{font-size:12px;color:#fff}
-.user-menu-name small{font-size:9px;color:#7d8a84;text-transform:uppercase;letter-spacing:.06em}
+.admin-topbar .user-menu-trigger{display:flex;align-items:center;gap:9px;background:none}
+.admin-topbar .user-menu-name{display:flex;flex-direction:column;align-items:flex-end;line-height:1.3;white-space:nowrap}
+.admin-topbar .user-menu-name b{font-size:12px;color:#17201d}
+.admin-topbar .user-menu-name small{font-size:9px;color:#69716c;text-transform:uppercase;letter-spacing:.06em}
 .admin-topbar .user-menu{margin-left:14px}
-.admin-topbar .user-menu-name b{color:#17201d}
-.admin-topbar .user-menu-name small{color:#69716c}
-@media(max-width:800px){.user-menu-name{display:none}}
+@media(max-width:800px){.admin-topbar .user-menu-name{display:none}}
 .admin-logo-mark img{width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}
 
 /* Equipment grid view + dashboard row thumb spacing (appended) */

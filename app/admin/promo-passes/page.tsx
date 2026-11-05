@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ExternalLink, ReceiptText, ShieldAlert } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { OwnerHeading, PageCard, Status } from '@/components/owner-shell'
 import { EmptyState, SectionSkeleton } from '@/components/states'
+import { useToast } from '@/components/toast'
 import { fetchPromoPassQueue, fetchSignedPromoProofUrl, reviewPromoPass } from '@/lib/data'
 import { pesos, type PromoPassWithRenter } from '@/lib/types'
 
@@ -33,11 +35,13 @@ function statusLabel(status: PromoPassWithRenter['status']) {
 }
 
 export default function PromoPassesPage() {
+  const toast = useToast()
   const [passes, setPasses] = useState<PromoPassWithRenter[]>([])
   const [viewed, setViewed] = useState<Record<string, boolean>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
+  const [confirmTarget, setConfirmTarget] = useState<{ pass: PromoPassWithRenter; decision: 'approved' | 'rejected' } | null>(null)
 
   function load() {
     setError('')
@@ -68,32 +72,31 @@ export default function PromoPassesPage() {
     }
   }
 
-  async function review(pass: PromoPassWithRenter, decision: 'approved' | 'rejected') {
+  function review(pass: PromoPassWithRenter, decision: 'approved' | 'rejected') {
+    setError('')
     if (decision === 'approved' && !viewed[pass.id]) {
       setError('Open the receipt and confirm the account match before approving this payment.')
       return
     }
+    setConfirmTarget({ pass, decision })
+  }
 
-    let note: string | null = null
-    if (decision === 'rejected') {
-      const response = window.prompt('Reason for rejection (shown to the renter):')
-      if (response === null) return
-      note = response.trim()
-      if (!note) {
-        setError('Enter a clear rejection reason for the renter.')
-        return
-      }
-    } else if (!window.confirm(`Approve Saver Pass payment from ${pass.renter?.full_name || 'this renter'}? Confirm the receipt shows ${pesos(Number(pass.fee_amount))} received by the actual LensShare GCash account.`)) {
-      return
-    }
-
+  async function confirmReview(note: string) {
+    if (!confirmTarget) return
+    const { pass, decision } = confirmTarget
     setBusyId(pass.id)
     setError('')
     try {
-      await reviewPromoPass(pass.id, decision, note)
+      await reviewPromoPass(pass.id, decision, decision === 'rejected' ? note : null)
       await fetchPromoPassQueue().then(setPasses)
+      toast.success(decision === 'approved'
+        ? `Saver Pass payment from ${pass.renter?.full_name || 'the renter'} approved.`
+        : `Saver Pass payment rejected — the renter will see the reason.`)
+      setConfirmTarget(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save the review decision.')
+      const message = e instanceof Error ? e.message : 'Could not save the review decision.'
+      setError(message)
+      toast.error(message)
     } finally {
       setBusyId(null)
     }
@@ -127,5 +130,23 @@ export default function PromoPassesPage() {
         <button className="owner-button" type="button" onClick={() => viewReceipt(pass)}>View receipt</button>
       </div>)}</div> : loaded ? <EmptyState title="No decisions yet" hint="Approved and rejected payments will appear here." /> : <SectionSkeleton rows={2} />}
     </PageCard>
+
+    <ConfirmDialog
+      open={Boolean(confirmTarget)}
+      busy={busyId !== null}
+      tone={confirmTarget?.decision === 'approved' ? 'default' : 'danger'}
+      title={confirmTarget?.decision === 'approved'
+        ? `Approve Saver Pass payment?`
+        : 'Reject Saver Pass payment?'}
+      description={confirmTarget?.decision === 'approved'
+        ? <>Confirm the receipt shows {pesos(Number(confirmTarget.pass.fee_amount))} received by the actual LensShare GCash account. Approving activates the renter’s 30-day discount window.</>
+        : <>The payment from {confirmTarget?.pass.renter?.full_name || 'this renter'} stays inactive and the reason is shown to the renter.</>}
+      confirmLabel={confirmTarget?.decision === 'approved' ? 'Approve payment' : 'Reject payment'}
+      requireReason={confirmTarget?.decision === 'rejected'}
+      reasonLabel="Reason for rejection (shown to the renter)"
+      reasonPlaceholder="e.g. The reference number could not be found in the GCash account history."
+      onConfirm={(note) => void confirmReview(note)}
+      onClose={() => setConfirmTarget(null)}
+    />
   </AdminShell>
 }

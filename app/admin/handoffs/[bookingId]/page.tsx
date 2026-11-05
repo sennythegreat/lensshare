@@ -21,7 +21,9 @@ import {
   X,
 } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ErrorState } from '@/components/states'
+import { useToast } from '@/components/toast'
 import {
   fetchAdminHubHandoffDetail,
   fetchSignedAdminHubFileUrl,
@@ -109,8 +111,14 @@ function dateLabel(value: string) {
   return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+type ConfirmAction =
+  | { type: 'deposit'; decision: 'accepted' | 'rejected' }
+  | { type: 'clear-hold' }
+  | { type: 'transition'; action: HubPhysicalAction }
+
 export default function AdminHubHandoffDetailPage() {
   const params = useParams<{ bookingId: string }>()
+  const toast = useToast()
   const bookingId = params.bookingId
   const [detail, setDetail] = useState<HubHandoffDetail | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -120,6 +128,7 @@ export default function AdminHubHandoffDetailPage() {
   const [proofViewed, setProofViewed] = useState(false)
   const [proofNote, setProofNote] = useState('')
   const [holdReason, setHoldReason] = useState('')
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
 
   const load = useCallback(async (quiet = false) => {
     if (!bookingId) return
@@ -161,7 +170,7 @@ export default function AdminHubHandoffDetailPage() {
     }
   }
 
-  async function reviewDeposit(decision: 'accepted' | 'rejected') {
+  function reviewDeposit(decision: 'accepted' | 'rejected') {
     if (!detail) return
     if (!detail.deposit?.proof_path) {
       setError('No deposit proof is attached to this booking.')
@@ -175,18 +184,25 @@ export default function AdminHubHandoffDetailPage() {
       setError('Enter a rejection reason that staff can use to resolve the proof issue.')
       return
     }
-    if (decision === 'accepted' && !window.confirm('Record that this receipt image passed the manual visual check? This does not confirm the GCash provider transaction and is not escrow.')) return
+    setConfirmAction({ type: 'deposit', decision })
+  }
 
+  async function confirmDepositReview(decision: 'accepted' | 'rejected') {
+    if (!detail) return
     setBusy(`deposit-${decision}`)
     setError('')
     setNotice('')
     try {
       await reviewAdminHubDepositProof(detail.booking_id, decision, proofNote.trim() || null)
       setNotice(decision === 'accepted' ? 'Manual proof review recorded.' : 'Proof rejection and review note recorded.')
+      toast.success(decision === 'accepted' ? 'Deposit proof check accepted.' : 'Deposit proof rejected — the note was recorded.')
       setProofNote('')
+      setConfirmAction(null)
       await load(true)
     } catch (reviewError) {
-      setError(reviewError instanceof Error ? reviewError.message : 'Could not save the proof review.')
+      const message = reviewError instanceof Error ? reviewError.message : 'Could not save the proof review.'
+      setError(message)
+      toast.error(message)
     } finally {
       setBusy(null)
     }
@@ -205,16 +221,24 @@ export default function AdminHubHandoffDetailPage() {
     try {
       await setAdminHubIssueHold(detail.booking_id, reason)
       setNotice('Issue hold placed. Physical transitions remain blocked until it is cleared.')
+      toast.success('Issue hold placed — physical transitions are blocked until it is cleared.')
       await load(true)
     } catch (holdError) {
-      setError(holdError instanceof Error ? holdError.message : 'Could not place the issue hold.')
+      const message = holdError instanceof Error ? holdError.message : 'Could not place the issue hold.'
+      setError(message)
+      toast.error(message)
     } finally {
       setBusy(null)
     }
   }
 
-  async function clearHold() {
-    if (!detail || !window.confirm('Clear this issue hold? Only continue if the recorded issue is resolved.')) return
+  function clearHold() {
+    if (!detail) return
+    setConfirmAction({ type: 'clear-hold' })
+  }
+
+  async function confirmClearHold() {
+    if (!detail) return
     setBusy('hold')
     setError('')
     setNotice('')
@@ -222,25 +246,38 @@ export default function AdminHubHandoffDetailPage() {
       await setAdminHubIssueHold(detail.booking_id, null)
       setHoldReason('')
       setNotice('Issue hold cleared.')
+      toast.success('Issue hold cleared — physical transitions are available again.')
+      setConfirmAction(null)
       await load(true)
     } catch (holdError) {
-      setError(holdError instanceof Error ? holdError.message : 'Could not clear the issue hold.')
+      const message = holdError instanceof Error ? holdError.message : 'Could not clear the issue hold.'
+      setError(message)
+      toast.error(message)
     } finally {
       setBusy(null)
     }
   }
 
-  async function transition(action: HubPhysicalAction) {
-    if (!detail || !window.confirm(ACTIONS[action].confirm)) return
+  function transition(action: HubPhysicalAction) {
+    if (!detail) return
+    setConfirmAction({ type: 'transition', action })
+  }
+
+  async function confirmTransition(action: HubPhysicalAction) {
+    if (!detail) return
     setBusy(action)
     setError('')
     setNotice('')
     try {
       await transitionAdminHubCustody(detail.booking_id, action)
       setNotice(`${ACTIONS[action].label} recorded in the custody timeline.`)
+      toast.success(`${ACTIONS[action].label} recorded in the custody timeline.`)
+      setConfirmAction(null)
       await load(true)
     } catch (transitionError) {
-      setError(transitionError instanceof Error ? transitionError.message : 'Could not record the physical custody transition.')
+      const message = transitionError instanceof Error ? transitionError.message : 'Could not record the physical custody transition.'
+      setError(message)
+      toast.error(message)
     } finally {
       setBusy(null)
     }
@@ -248,6 +285,7 @@ export default function AdminHubHandoffDetailPage() {
 
   async function inspectionSaved() {
     setNotice('Inspection saved to the hand-off record.')
+    toast.success('Inspection saved to the hand-off record.')
     await load(true)
   }
 
@@ -273,7 +311,7 @@ export default function AdminHubHandoffDetailPage() {
     <div className="admin-handoff-detail-grid">
       <div className="admin-handoff-detail-primary">
         <section className="admin-handoff-panel" aria-labelledby="deposit-heading">
-          <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">₱2,000 HUB DEPOSIT</span><h2 id="deposit-heading">Deposit proof review</h2></div><span className={`admin-handoff-badge deposit-${detail.deposit_status}`}>{DEPOSIT_LABELS[detail.deposit_status]}</span></div>
+          <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">SECURITY DEPOSIT</span><h2 id="deposit-heading">Deposit proof review</h2></div><span className={`admin-handoff-badge deposit-${detail.deposit_status}`}>{DEPOSIT_LABELS[detail.deposit_status]}</span></div>
           <div className="admin-handoff-proof-warning" role="note"><ShieldAlert size={18} /><p><strong>Manual visual review only.</strong> Accepting a receipt checks the submitted image against the configured LensShare GCash details. It does not confirm the GCash provider transaction, place funds in LensShare custody, or create escrow.</p></div>
           {detail.deposit_status === 'waived' ? <div className="admin-handoff-inline-state"><CheckCircle2 size={18} /><div><b>Deposit waived for this booking</b><p>No receipt review is required. Continue only when all other hand-off blockers are clear.</p></div></div>
             : detail.deposit ? <>
@@ -321,6 +359,40 @@ export default function AdminHubHandoffDetailPage() {
         </section>
       </aside>
     </div>
+
+    <ConfirmDialog
+      open={confirmAction?.type === 'deposit'}
+      busy={busy === 'deposit-accepted' || busy === 'deposit-rejected'}
+      tone={confirmAction?.type === 'deposit' && confirmAction.decision === 'rejected' ? 'danger' : 'default'}
+      title={confirmAction?.type === 'deposit' && confirmAction.decision === 'accepted'
+        ? 'Record this proof check as passed?'
+        : 'Reject this deposit proof?'}
+      description={confirmAction?.type === 'deposit' && confirmAction.decision === 'accepted'
+        ? 'This records that the receipt image passed the manual visual check. It does not confirm the GCash provider transaction and is not escrow.'
+        : 'The renter will be asked to submit a new proof, and your reviewer note is kept on the record.'}
+      confirmLabel={confirmAction?.type === 'deposit' && confirmAction.decision === 'accepted' ? 'Accept proof check' : 'Reject proof'}
+      onConfirm={() => { if (confirmAction?.type === 'deposit') void confirmDepositReview(confirmAction.decision) }}
+      onClose={() => setConfirmAction(null)}
+    />
+    <ConfirmDialog
+      open={confirmAction?.type === 'clear-hold'}
+      busy={busy === 'hold'}
+      tone="danger"
+      title="Clear this issue hold?"
+      description="Only continue if the recorded issue is resolved. Physical transitions become available again immediately."
+      confirmLabel="Clear hold"
+      onConfirm={() => void confirmClearHold()}
+      onClose={() => setConfirmAction(null)}
+    />
+    <ConfirmDialog
+      open={confirmAction?.type === 'transition'}
+      busy={confirmAction?.type === 'transition' ? busy === confirmAction.action : false}
+      title={confirmAction?.type === 'transition' ? ACTIONS[confirmAction.action].confirm : 'Confirm physical transition?'}
+      description={confirmAction?.type === 'transition' ? ACTIONS[confirmAction.action].detail : undefined}
+      confirmLabel={confirmAction?.type === 'transition' ? ACTIONS[confirmAction.action].label : 'Confirm'}
+      onConfirm={() => { if (confirmAction?.type === 'transition') void confirmTransition(confirmAction.action) }}
+      onClose={() => setConfirmAction(null)}
+    />
   </AdminShell>
 }
 
@@ -335,6 +407,7 @@ function InspectionForm({ bookingId, stage, inspection, onOpenPhoto, onSaved }: 
   onOpenPhoto: (path: string, label: string) => Promise<void>
   onSaved: () => Promise<void>
 }) {
+  const toast = useToast()
   const [serial, setSerial] = useState(inspection?.serial_number ?? '')
   const [notes, setNotes] = useState(inspection?.notes ?? '')
   const [checks, setChecks] = useState<Record<string, boolean>>(inspection?.checks ?? {})
@@ -364,7 +437,9 @@ function InspectionForm({ bookingId, stage, inspection, onOpenPhoto, onSaved }: 
       setFiles([])
       await onSaved()
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Could not save this inspection.')
+      const message = saveError instanceof Error ? saveError.message : 'Could not save this inspection.'
+      setError(message)
+      toast.error(message)
     } finally {
       setBusy(false)
     }

@@ -2,13 +2,14 @@
 
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Clock3, LockKeyhole, MapPin, ShieldAlert, Smartphone } from 'lucide-react'
+import { ArrowLeft, Clock3, Coins, MapPin, ShieldAlert, Smartphone } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
 import { ErrorState } from '@/components/states'
+import { useToast } from '@/components/toast'
 import { fetchAdminHubSettings, saveAdminHubSettings } from '@/lib/data'
-import { pesos, type HubSettings, type HubSettingsInput } from '@/lib/types'
+import { type HubSettings, type HubSettingsInput } from '@/lib/types'
 
-const FIXED_DEPOSIT_AMOUNT = 2000
+const DEFAULT_DEPOSIT_AMOUNT = 2000
 const NAGA_HUB_DEFAULTS = {
   latitude: 13.6218,
   longitude: 123.1948,
@@ -27,7 +28,7 @@ const EMPTY_SETTINGS: HubSettingsInput = {
   operating_hours: '',
   gcash_account_name: '',
   gcash_mobile_number: '',
-  deposit_amount: FIXED_DEPOSIT_AMOUNT,
+  deposit_amount: DEFAULT_DEPOSIT_AMOUNT,
   deposit_policy: '',
   hub_latitude: NAGA_HUB_DEFAULTS.latitude,
   hub_longitude: NAGA_HUB_DEFAULTS.longitude,
@@ -43,6 +44,7 @@ function geoFormFromSettings(settings: Pick<HubSettingsInput, 'hub_latitude' | '
 }
 
 export default function AdminHubSettingsPage() {
+  const toast = useToast()
   const [values, setValues] = useState<HubSettingsInput>(EMPTY_SETTINGS)
   const [geoForm, setGeoForm] = useState<HubGeoForm>(() => geoFormFromSettings(EMPTY_SETTINGS))
   const [savedSettings, setSavedSettings] = useState<HubSettings | null>(null)
@@ -63,7 +65,7 @@ export default function AdminHubSettingsPage() {
         operating_hours: settings.operating_hours ?? '',
         gcash_account_name: settings.gcash_account_name ?? '',
         gcash_mobile_number: settings.gcash_mobile_number ?? '',
-        deposit_amount: FIXED_DEPOSIT_AMOUNT,
+        deposit_amount: Number.isFinite(settings.deposit_amount) && settings.deposit_amount >= 0 ? settings.deposit_amount : DEFAULT_DEPOSIT_AMOUNT,
         deposit_policy: settings.deposit_policy ?? '',
         hub_latitude: settings.hub_latitude ?? null,
         hub_longitude: settings.hub_longitude ?? null,
@@ -120,6 +122,10 @@ export default function AdminHubSettingsPage() {
       setError('Complete the exact address, operating hours, GCash details, and deposit policy before saving.')
       return
     }
+    if (!Number.isFinite(Number(values.deposit_amount)) || Number(values.deposit_amount) < 0 || Number(values.deposit_amount) > 1000000) {
+      setError('The default hub deposit must be a number between ₱0 and ₱1,000,000.')
+      return
+    }
     const latitudeText = geoForm.latitude.trim()
     const longitudeText = geoForm.longitude.trim()
     const radiusText = geoForm.serviceRadiusKm.trim()
@@ -159,13 +165,16 @@ export default function AdminHubSettingsPage() {
         operating_hours: nextValues.operating_hours.trim(),
         gcash_account_name: nextValues.gcash_account_name.trim(),
         gcash_mobile_number: nextValues.gcash_mobile_number.trim(),
-        deposit_amount: FIXED_DEPOSIT_AMOUNT,
+        deposit_amount: Number(nextValues.deposit_amount),
         deposit_policy: nextValues.deposit_policy.trim(),
       })
       await load(false)
       setSaved(true)
+      toast.success('Naga Hub settings saved.')
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Could not save the Naga Hub settings.')
+      const message = saveError instanceof Error ? saveError.message : 'Could not save the Naga Hub settings.'
+      setError(message)
+      toast.error(message)
     } finally {
       setSaving(false)
     }
@@ -209,9 +218,12 @@ export default function AdminHubSettingsPage() {
           </section>
 
           <section className="admin-handoff-panel">
-            <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">FIXED HUB POLICY</span><h2>{pesos(FIXED_DEPOSIT_AMOUNT)} deposit</h2><p>The configured hand-off deposit is fixed at ₱2,000 for this approved hub flow.</p></div><LockKeyhole size={18} /></div>
-            <div className="admin-hub-deposit-lock"><div><small>Configured amount</small><strong>{pesos(FIXED_DEPOSIT_AMOUNT)}</strong><span>Locked for consistent queue and proof-review rules</span></div><input type="hidden" name="deposit_amount" value={FIXED_DEPOSIT_AMOUNT} /></div>
-            <div className="admin-hub-settings-fields"><label className="wide" htmlFor="hub-deposit-policy"><span>Deposit instructions and policy <b>Required</b></span><textarea id="hub-deposit-policy" required maxLength={1800} value={values.deposit_policy} onChange={(event) => change('deposit_policy', event.target.value)} placeholder="Explain when proof is due, waiver eligibility, manual review, release conditions, and the issue-resolution process. Do not describe the deposit as escrow." /></label></div>
+            <div className="admin-handoff-section-head"><div><span className="admin-eyebrow">DEPOSIT POLICY</span><h2>Default hub deposit</h2><p>Applied to bookings of listings that do not set their own security deposit. Owners set per-item deposits on each listing.</p></div><Coins size={18} /></div>
+            <div className="admin-hub-settings-fields">
+              <label htmlFor="hub-deposit-amount"><span>Default deposit amount (PHP) <b>Required</b></span><input id="hub-deposit-amount" name="deposit_amount" type="number" inputMode="decimal" min={0} max={1000000} step="0.01" required value={values.deposit_amount} onChange={(event) => change('deposit_amount', Number(event.target.value))} aria-describedby="hub-deposit-help" /></label>
+              <p id="hub-deposit-help" className="wide admin-hub-geo-note">Existing bookings keep the deposit amount recorded at booking time. Verified students are always fully waived.</p>
+              <label className="wide" htmlFor="hub-deposit-policy"><span>Deposit instructions and policy <b>Required</b></span><textarea id="hub-deposit-policy" required maxLength={1800} value={values.deposit_policy} onChange={(event) => change('deposit_policy', event.target.value)} placeholder="Explain when proof is due, waiver eligibility, manual review, release conditions, and the issue-resolution process. Do not describe the deposit as escrow." /></label>
+            </div>
           </section>
 
           <div className="admin-hub-settings-actions"><p>Saving updates the centralized hub configuration used by the hand-off workflow. It does not perform or verify a payment.</p><button className="owner-button dark" type="submit" disabled={saving}>{saving ? 'Saving settings…' : 'Save hub settings'}</button></div>

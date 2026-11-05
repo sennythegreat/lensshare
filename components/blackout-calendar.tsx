@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarOff, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { useToast } from '@/components/toast'
 import { fetchListingBlackouts, saveListingBlackouts } from '@/lib/data'
 
 const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -17,6 +18,7 @@ function firstDayOfMonthGrid(year: number, month: number): number {
 }
 
 export function BlackoutCalendar({ listingId }: { listingId: string }) {
+  const toast = useToast()
   const [blocked, setBlocked] = useState<Set<string>>(new Set())
   const [cursor, setCursor] = useState(() => new Date())
   const [loading, setLoading] = useState(true)
@@ -63,8 +65,11 @@ export function BlackoutCalendar({ listingId }: { listingId: string }) {
     try {
       await saveListingBlackouts(listingId, [...blocked].sort())
       setNote('Blocked dates saved. Renters cannot book this gear on them.')
+      toast.success('Blocked dates saved.')
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Could not save blocked dates.')
+      const message = saveError instanceof Error ? saveError.message : 'Could not save blocked dates.'
+      setError(message)
+      toast.error(message)
     } finally {
       setSaving(false)
     }

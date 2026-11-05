@@ -9,21 +9,33 @@ import { createClient } from '@/lib/supabase/client'
 import { fetchRole } from '@/lib/data'
 
 const CODE_LENGTH = 6
+// Supabase rate-limits resend to one email per minute; 90s (1:30) keeps the
+// request safely inside that window and paces re-sends.
+const RESEND_COOLDOWN_SECONDS = 90
 const emptyCode = () => Array<string>(CODE_LENGTH).fill('')
+const formatCountdown = (seconds: number) =>
+  `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 
 function VerifyForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const email = searchParams.get('email') || ''
-  const [digits, setDigits] = useState<string[]>(emptyCode)
+  const [digits, setDigits] = useState<string[]>(emptyCode())
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [resendIn, setResendIn] = useState(RESEND_COOLDOWN_SECONDS)
   const inputsRef = useRef<Array<HTMLInputElement | null>>([])
 
   useEffect(() => {
     inputsRef.current[0]?.focus()
   }, [])
+
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const timer = setInterval(() => setResendIn((seconds) => (seconds <= 1 ? 0 : seconds - 1)), 1000)
+    return () => clearInterval(timer)
+  }, [resendIn > 0])
 
   async function verify(code: string) {
     if (busy || code.length !== CODE_LENGTH) return
@@ -72,6 +84,7 @@ function VerifyForm() {
   }
 
   async function resend() {
+    if (resendIn > 0) return
     setError('')
     setNotice('')
     setBusy(true)
@@ -79,7 +92,10 @@ function VerifyForm() {
     const { error } = await supabase.auth.resend({ type: 'signup', email })
     setBusy(false)
     if (error) setError(error.message)
-    else setNotice('New code sent — check your inbox again in a few seconds.')
+    else {
+      setResendIn(RESEND_COOLDOWN_SECONDS)
+      setNotice('New code sent — check your inbox again in a few seconds.')
+    }
   }
 
   return (
@@ -129,7 +145,13 @@ function VerifyForm() {
               </button>
               <p className="auth-resend">
                 Didn&apos;t get it?
-                <button type="button" onClick={() => void resend()} disabled={busy}>Send a new code</button>
+                <button
+                  type="button"
+                  onClick={() => void resend()}
+                  disabled={busy || resendIn > 0}
+                >
+                  {resendIn > 0 ? `Send a new code in ${formatCountdown(resendIn)}` : 'Send a new code'}
+                </button>
               </p>
               {error && <p className="auth-error">{error}</p>}
               {notice && <p className="auth-success">{notice}</p>}

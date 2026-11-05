@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check, CircleAlert, ImagePlus, LocateFixed, MapP
 import { OwnerShell, GearCard, PageCard, OwnerHeading } from '@/components/owner-shell'
 import { EmptyState, SectionSkeleton } from '@/components/states'
 import { BlackoutCalendar } from '@/components/blackout-calendar'
+import { useToast } from '@/components/toast'
 import {
   checkListingServiceArea,
   deleteUnreferencedGearPhotos,
@@ -40,6 +41,7 @@ function photoDraftsOf(listing: Listing): PhotoDraft[] {
 }
 
 export default function ListingsPage() {
+  const toast = useToast()
   const { user, loading } = useProfile()
   const [listings, setListings] = useState<Listing[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -50,6 +52,7 @@ export default function ListingsPage() {
   const [category, setCategory] = useState<ListingCategory>('Cameras')
   const [status, setStatus] = useState<ListingStatus>('available')
   const [rate, setRate] = useState('')
+  const [deposit, setDeposit] = useState('')
   const [description, setDescription] = useState('')
   const [specs, setSpecs] = useState('')
   const [included, setIncluded] = useState('')
@@ -157,7 +160,7 @@ export default function ListingsPage() {
     setShowForm(false)
     setEditing(null)
     setPhotos([])
-    setName(''); setBrandModel(''); setCategory('Cameras'); setStatus('available'); setRate('')
+    setName(''); setBrandModel(''); setCategory('Cameras'); setStatus('available'); setRate(''); setDeposit('')
     setDescription(''); setSpecs(''); setIncluded(''); setSerialNumber('')
     setSerialLoading(false); setSerialLoadError('')
     setPickupAddress(''); setPickupPoint(null); setLocationCandidate(null)
@@ -176,6 +179,7 @@ export default function ListingsPage() {
       setCategory(listing.category)
       setStatus(listing.status)
       setRate(String(listing.daily_rate))
+      setDeposit(listing.security_deposit === null || listing.security_deposit === undefined ? '' : String(listing.security_deposit))
       setDescription(listing.description ?? '')
       setSpecs(listing.specs ?? '')
       setIncluded(listing.included ?? '')
@@ -247,6 +251,11 @@ export default function ListingsPage() {
       setError('Fill in the equipment name, brand and model, and a daily rate above zero.')
       return
     }
+    const depositAmount = deposit.trim() === '' ? null : Number(deposit)
+    if (depositAmount !== null && (!Number.isFinite(depositAmount) || depositAmount < 0)) {
+      setError('Enter a security deposit of zero or more, or leave it blank to use the hub default.')
+      return
+    }
     if (serialLoading) {
       setError('Wait for the private serial record to finish loading before saving.')
       return
@@ -304,6 +313,7 @@ export default function ListingsPage() {
         category,
         status,
         daily_rate: dailyRate,
+        security_deposit: depositAmount,
         description: description.trim() || null,
         specs: specs.trim() || null,
         included: included.trim() || null,
@@ -363,6 +373,7 @@ export default function ListingsPage() {
       setListings((current) => editing ? current.map((item) => item.id === saved.id ? saved : item) : [...current, saved])
       resetForm()
       setSavedNote(`${editing ? `“${saved.name}” has been updated.` : `“${saved.name}” is live on the marketplace.`}${cleanupWarning}`)
+      toast.success(editing ? `“${saved.name}” has been updated.` : `“${saved.name}” is live on the marketplace.`)
     } catch (saveError) {
       let cleanupFailed = false
       if (uploadedPhotos.length) {
@@ -370,6 +381,7 @@ export default function ListingsPage() {
       }
       const message = saveError instanceof Error ? saveError.message : 'Saving the listing failed.'
       setError(`${message}${cleanupFailed ? ' Newly uploaded photos could not be cleaned up automatically.' : ''}`)
+      toast.error(message)
     } finally {
       setBusy(false)
     }
@@ -381,9 +393,12 @@ export default function ListingsPage() {
     setError('')
     try {
       await setListingStatus(listing.id, next)
+      toast.success(next === 'paused' ? `“${listing.name}” is paused and hidden from browse.` : `“${listing.name}” is live on the marketplace again.`)
     } catch (toggleError) {
       setListings((current) => current.map((item) => item.id === listing.id ? { ...item, status: listing.status } : item))
-      setError(toggleError instanceof Error ? toggleError.message : 'Could not update listing availability.')
+      const message = toggleError instanceof Error ? toggleError.message : 'Could not update listing availability.'
+      setError(message)
+      toast.error(message)
     }
   }
 
@@ -400,7 +415,7 @@ export default function ListingsPage() {
           <input ref={photoInput} type="file" accept="image/*" multiple hidden onChange={handlePhotos}/>
           {photos.length ? <div className="gear-photo-grid">{photos.map((photo, index) => <article className="gear-photo-item" key={photo.id}><img src={photo.url} alt={`Listing photo ${index + 1}`}/>{index === 0 && <span className="gear-photo-cover">Cover</span>}<div className="gear-photo-actions"><button type="button" disabled={index === 0} onClick={() => movePhoto(index, -1)} aria-label={`Move photo ${index + 1} left`}><ArrowLeft size={14}/></button><button type="button" disabled={index === photos.length - 1} onClick={() => movePhoto(index, 1)} aria-label={`Move photo ${index + 1} right`}><ArrowRight size={14}/></button><button type="button" onClick={() => removePhoto(index)} aria-label={`Remove photo ${index + 1}`}><Trash2 size={14}/></button></div></article>)}</div> : <button className="gear-photo-empty" type="button" onClick={() => photoInput.current?.click()}><ImagePlus size={22}/><span>Add up to five clear photos</span><small>JPG, PNG or another browser-supported image · 8 MB each</small></button>}
         </div>
-        <div className="form-grid"><label>Equipment name<input value={name} required autoFocus onChange={(event) => setName(event.target.value)} placeholder="Sony FX30 Cinema Body"/></label><label>Brand &amp; model<input value={brandModel} required onChange={(event) => setBrandModel(event.target.value)} placeholder="Sony · FX30"/></label><label>Category<select value={category} onChange={(event) => setCategory(event.target.value as ListingCategory)}>{CATEGORIES.map((item) => <option key={item}>{item}</option>)}</select></label><label>Listing status<select value={status} onChange={(event) => setStatus(event.target.value as ListingStatus)}><option value="available">Available</option><option value="paused">Paused</option></select></label><label>Daily rate PHP<input value={rate} required onChange={(event) => setRate(event.target.value)} placeholder="750" inputMode="decimal"/></label><div className="owner-serial-field"><label htmlFor="gear-serial-number">Equipment serial number</label><input id="gear-serial-number" value={serialNumber} required maxLength={160} autoComplete="off" spellCheck={false} disabled={serialLoading || Boolean(serialLoadError)} onChange={(event) => { setSerialNumber(event.target.value); setError('') }} placeholder={serialLoading ? 'Loading private serial…' : 'Enter the manufacturer serial'}/><p>This inventory identifier is stored in a private owner/admin record. It is never shown on the public listing.</p>{editing && !serialLoading && !serialLoadError && !serialNumber.trim() && <p className="owner-serial-warning" role="status"><CircleAlert size={14}/> Legacy listing: add a serial number before you can save changes.</p>}{serialLoadError && <p className="owner-serial-warning" role="alert"><CircleAlert size={14}/> {serialLoadError}</p>}</div><label className="wide">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the condition and anything renters should know."/></label><label className="wide">Specifications<textarea value={specs} onChange={(event) => setSpecs(event.target.value)} placeholder="Sensor, mount, resolution, dimensions, or other key specifications."/></label><label className="wide">Included accessories<textarea value={included} onChange={(event) => setIncluded(event.target.value)} placeholder="Batteries, charger, case, cables, stands, or other included items."/></label>
+        <div className="form-grid"><label>Equipment name<input value={name} required autoFocus onChange={(event) => setName(event.target.value)} placeholder="Sony FX30 Cinema Body"/></label><label>Brand &amp; model<input value={brandModel} required onChange={(event) => setBrandModel(event.target.value)} placeholder="Sony · FX30"/></label><label>Category<select value={category} onChange={(event) => setCategory(event.target.value as ListingCategory)}>{CATEGORIES.map((item) => <option key={item}>{item}</option>)}</select></label><label>Listing status<select value={status} onChange={(event) => setStatus(event.target.value as ListingStatus)}><option value="available">Available</option><option value="paused">Paused</option></select></label><label>Daily rate PHP<input value={rate} required onChange={(event) => setRate(event.target.value)} placeholder="750" inputMode="decimal"/></label><label>Security deposit PHP (optional)<input value={deposit} onChange={(event) => setDeposit(event.target.value)} placeholder="Hub default" inputMode="decimal"/><small>Leave blank to use the hub default. Refundable after return.</small></label><div className="owner-serial-field"><label htmlFor="gear-serial-number">Equipment serial number</label><input id="gear-serial-number" value={serialNumber} required maxLength={160} autoComplete="off" spellCheck={false} disabled={serialLoading || Boolean(serialLoadError)} onChange={(event) => { setSerialNumber(event.target.value); setError('') }} placeholder={serialLoading ? 'Loading private serial…' : 'Enter the manufacturer serial'}/><p>This inventory identifier is stored in a private owner/admin record. It is never shown on the public listing.</p>{editing && !serialLoading && !serialLoadError && !serialNumber.trim() && <p className="owner-serial-warning" role="status"><CircleAlert size={14}/> Legacy listing: add a serial number before you can save changes.</p>}{serialLoadError && <p className="owner-serial-warning" role="alert"><CircleAlert size={14}/> {serialLoadError}</p>}</div><label className="wide">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the condition and anything renters should know."/></label><label className="wide">Specifications<textarea value={specs} onChange={(event) => setSpecs(event.target.value)} placeholder="Sensor, mount, resolution, dimensions, or other key specifications."/></label><label className="wide">Included accessories<textarea value={included} onChange={(event) => setIncluded(event.target.value)} placeholder="Batteries, charger, case, cables, stands, or other included items."/></label>
           <div className="wide owner-location-field"><label htmlFor="gear-pickup-address">Availability area <span>Optional</span></label><input id="gear-pickup-address" value={pickupAddress} onChange={(event) => changePickupAddress(event.target.value)} placeholder="City or municipality, e.g. Naga City" maxLength={120} aria-describedby="gear-pickup-privacy"/><p id="gear-pickup-privacy">Share only the broad city or municipality where this gear is available. Arrange the exact handoff place privately with the renter in Messages.</p></div>
         </div>
         <div className="owner-pickup-location"><div className="owner-pickup-heading"><MapPin size={18} aria-hidden="true"/><div><b>Help renters find nearby gear</b><p>Optional GPS is rounded to an approximate area before saving. Your raw coordinates are not displayed.</p></div></div>

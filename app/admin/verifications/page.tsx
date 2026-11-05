@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Eye, RotateCcw, XCircle } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { PageCard, OwnerHeading } from '@/components/owner-shell'
 import { EmptyState, SectionSkeleton } from '@/components/states'
+import { useToast } from '@/components/toast'
 import {
   fetchSignedDocUrl,
   fetchVerificationQueue,
@@ -39,6 +41,7 @@ type UserEntry = {
   userId: string
   name: string
   email: string
+  role: string
   verification: string
   isStudent: boolean
   latest: Map<VerificationDocType, VerificationSubmissionWithUser>
@@ -80,6 +83,7 @@ function buildEntries(rows: VerificationSubmissionWithUser[]): UserEntry[] {
       userId: row.user_id,
       name: row.user?.full_name || 'Unknown user',
       email: row.user?.email || 'No email on profile',
+      role: row.user?.role || '',
       verification: row.user?.verification_status || 'unverified',
       isStudent: row.user?.is_student ?? false,
       latest: new Map<VerificationDocType, VerificationSubmissionWithUser>(),
@@ -100,6 +104,7 @@ function ReviewBadge({ status }: { status: string }) {
 }
 
 export default function VerificationsPage() {
+  const toast = useToast()
   const [queue, setQueue] = useState<VerificationSubmissionWithUser[]>([])
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -107,6 +112,7 @@ export default function VerificationsPage() {
   const [loaded, setLoaded] = useState(false)
   const [viewing, setViewing] = useState<{ row: VerificationSubmissionWithUser; url: string } | null>(null)
   const [reviewModal, setReviewModal] = useState<{ row: VerificationSubmissionWithUser; decision: 'approved' | 'rejected'; note: string; noteError?: string } | null>(null)
+  const [revokeTarget, setRevokeTarget] = useState<{ entry: UserEntry; group: VerificationGroup } | null>(null)
 
   function load() {
     return fetchVerificationQueue()
@@ -143,7 +149,7 @@ export default function VerificationsPage() {
     const { row, decision, note } = reviewModal
     const trimmed = note.trim()
     if (decision === 'rejected' && !trimmed) {
-      setReviewModal({ ...reviewModal, noteError: 'Add a rejection reason so the renter knows what to replace.' })
+      setReviewModal({ ...reviewModal, noteError: 'Add a rejection reason so the user knows what to replace.' })
       return
     }
 
@@ -155,24 +161,25 @@ export default function VerificationsPage() {
       setReviewModal(null)
       await load()
       setNotice(`${DOC_LABELS[row.doc_type]} ${decision}. The aggregate status was recalculated from both required documents.`)
+      toast.success(`${DOC_LABELS[row.doc_type]} ${decision} for ${row.user?.full_name || 'the user'}.`)
     } catch (reviewError) {
-      setError(reviewError instanceof Error ? reviewError.message : 'Review action failed.')
+      const message = reviewError instanceof Error ? reviewError.message : 'Review action failed.'
+      setError(message)
+      toast.error(message)
     } finally {
       setBusyKey(null)
     }
   }
 
-  async function revoke(entry: UserEntry, group: VerificationGroup) {
-    const groupLabel = GROUPS[group].label.toLowerCase()
-    const response = window.prompt(`Reason for revoking ${groupLabel} (shown in the audit record):`)
-    if (response === null) return
-    const note = response.trim()
-    if (!note) {
-      setError('Add a revocation reason before continuing.')
-      return
-    }
-    if (!window.confirm(`Revoke ${groupLabel} for ${entry.name}? They will need both required documents approved again.`)) return
+  function revoke(entry: UserEntry, group: VerificationGroup) {
+    setError('')
+    setRevokeTarget({ entry, group })
+  }
 
+  async function confirmRevoke(note: string) {
+    if (!revokeTarget) return
+    const { entry, group } = revokeTarget
+    const groupLabel = GROUPS[group].label.toLowerCase()
     const key = `revoke:${entry.userId}:${group}`
     setBusyKey(key)
     setError('')
@@ -181,8 +188,12 @@ export default function VerificationsPage() {
       await revokeVerificationGroup(entry.userId, group, note)
       await load()
       setNotice(`${entry.name}’s ${groupLabel} was revoked.`)
+      toast.success(`${entry.name}’s ${groupLabel} was revoked.`)
+      setRevokeTarget(null)
     } catch (revokeError) {
-      setError(revokeError instanceof Error ? revokeError.message : 'Could not revoke verification.')
+      const message = revokeError instanceof Error ? revokeError.message : 'Could not revoke verification.'
+      setError(message)
+      toast.error(message)
     } finally {
       setBusyKey(null)
     }
@@ -249,7 +260,7 @@ export default function VerificationsPage() {
       <OwnerHeading eyebrow="LATEST DOCUMENT SETS" title={`${pendingCount} document${pendingCount === 1 ? '' : 's'} waiting`} detail="Only the newest upload for each document type is actionable. Approving one document never completes a two-document check." />
       {!loaded ? <SectionSkeleton rows={3} /> : entries.length ? <div className="admin-verification-users">{entries.map((entry) => <article className="admin-user-card admin-verification-user" key={entry.userId}>
         <header className="admin-verification-user-head">
-          <div><h2>{entry.name}</h2><p>{entry.email}</p></div>
+          <div><h2>{entry.name}{entry.role && <span className={`admin-pill ${entry.role}`}>{entry.role}</span>}</h2><p>{entry.email}</p></div>
           <div className="admin-verification-profile-flags"><span>Profile flags</span><ReviewBadge status={entry.verification} />{entry.isStudent && <span className="admin-pill student">student</span>}</div>
         </header>
         <div className="admin-verification-groups">{renderGroup(entry, 'identity')}{renderGroup(entry, 'student')}</div>
@@ -296,9 +307,9 @@ export default function VerificationsPage() {
         <div className="admin-review-modal-body">
           {reviewModal.decision === 'approved'
             ? <p>Approve this {DOC_LABELS[reviewModal.row.doc_type]} only? The related check is complete only when both required documents are approved.</p>
-            : <p>The renter will replace this document. Explain below what is wrong so they know what to upload.</p>}
+            : <p>The user will replace this document. Explain below what is wrong so they know what to upload.</p>}
           {reviewModal.decision === 'rejected' && <>
-            <label className="admin-review-note-label" htmlFor="review-note">Reason for rejection (shown to the renter)</label>
+            <label className="admin-review-note-label" htmlFor="review-note">Reason for rejection (shown to the user)</label>
             <textarea
               id="review-note"
               className="admin-review-note"
@@ -324,5 +335,18 @@ export default function VerificationsPage() {
         </footer>
       </div>
     </div>}
+    <ConfirmDialog
+      open={Boolean(revokeTarget)}
+      busy={busyKey?.startsWith('revoke:') ?? false}
+      tone="danger"
+      title={revokeTarget ? `Revoke ${GROUPS[revokeTarget.group].label.toLowerCase()} for ${revokeTarget.entry.name}?` : 'Revoke verification?'}
+      description="They will need both required documents approved again before the flag is restored."
+      confirmLabel="Revoke"
+      requireReason
+      reasonLabel="Reason for revocation (kept in the audit record)"
+      reasonPlaceholder="e.g. Reported duplicate ID — status rolled back pending re-upload."
+      onConfirm={(note) => void confirmRevoke(note)}
+      onClose={() => setRevokeTarget(null)}
+    />
   </AdminShell>
 }

@@ -12,6 +12,8 @@ export default function SignupPage() {
   const router = useRouter()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [mobile, setMobile] = useState('')
+  const [address, setAddress] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState<Role>('renter')
@@ -26,7 +28,14 @@ export default function SignupPage() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, role } },
+      options: {
+        data: {
+          full_name: fullName,
+          role,
+          phone: mobile.trim() || null,
+          address: address.trim() || null,
+        },
+      },
     })
     if (error) {
       setError(error.message)
@@ -41,7 +50,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="auth-page">
+    <main className="auth-page auth-signup">
       <div className="auth-panel auth-brand-panel">
         <Link href="/" className="brand auth-brand"><span className="brand-mark"><img src="/lensshare-logo.png" alt="" /></span> LensShare</Link>
         <div className="auth-brand-copy">
@@ -58,9 +67,15 @@ export default function SignupPage() {
           <h2>Set up your LensShare account</h2>
           <p className="auth-subtitle">You can add the other role later from your workspace settings.</p>
           <form onSubmit={handleSubmit} className="auth-form">
-            <label htmlFor="full-name">Full name<input id="full-name" type="text" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Juan Dela Cruz" required /></label>
-            <label htmlFor="email">Email address<input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required /></label>
-            <label htmlFor="password">Password<div className="password-field"><input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 6 characters" minLength={6} required /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>
+            <div className="auth-field-row">
+              <label htmlFor="full-name">Full name<input id="full-name" type="text" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Juan Dela Cruz" required /></label>
+              <label htmlFor="mobile">Mobile number<input id="mobile" type="tel" value={mobile} onChange={(event) => setMobile(event.target.value)} placeholder="+63 917 555 0148" required /></label>
+            </div>
+            <label htmlFor="address">Address<input id="address" type="text" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Street, barangay, Naga City" required /></label>
+            <div className="auth-field-row">
+              <label htmlFor="email">Email address<input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required /></label>
+              <label htmlFor="password">Password<div className="password-field"><input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 6 characters" minLength={6} required /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>
+            </div>
             <fieldset className="role-picker" style={{ border: 0, padding: 0, margin: '4px 0 0' }}>
               <legend className="sr-only" style={{ position: 'absolute', left: -9999 }}>Account role</legend>
               <label className={role === 'renter' ? 'selected' : ''}>

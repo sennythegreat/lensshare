@@ -11,6 +11,9 @@ storage) with two role workspaces: owner (`/dashboard/*`) and renter
 - `pnpm dev` — dev server
 - `pnpm build` — production build
 - `pnpm exec tsc --noEmit` — typecheck
+- `corepack pnpm sample:data` — fill the system with deterministic sample data
+  (users, listings, bookings, verifications, hub workflows, incidents); see
+  `SAMPLE_DATA.md`. Requires `SUPABASE_SERVICE_ROLE_KEY` in `.env`.
 
 pnpm is pinned in `packageManager` and may be missing from PATH on this
 machine — run it as `corepack pnpm <cmd>`. Never npm or yarn. There is no test
@@ -64,7 +67,10 @@ finishing any change.
   Booking and verification writes are RPC-only. Version-2 identity requires both
   approved government ID and selfie; student status/waiver requires both approved
   student ID and proof of enrollment. The student deposit waiver is independent
-  of Saver Pass. Identity documents live in the PRIVATE append-only
+  of Saver Pass. The security deposit is equipment-dependent:
+  `gear_listings.security_deposit` (owner-set, nullable) wins; when null the
+  booking falls back to `rental_hubs.standard_deposit` (the admin-editable hub
+  default). Identity documents live in the PRIVATE append-only
   `verification-docs` bucket (signed URLs; 10 MB JPEG/PNG/WebP/PDF) — never move
   them to public `gear-photos`. Deposit proofs use private `deposit-proofs`
   (`{renter_id}/{booking_id}/{filename}`); inspection evidence uses private

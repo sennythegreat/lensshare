@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { RenterHeadbar, Status } from '@/components/renter-headbar'
 import { EmptyState, SectionSkeleton } from '@/components/states'
 import { ReportIncidentModal } from '@/components/report-incident-modal'
+import { useToast } from '@/components/toast'
 import { createClient } from '@/lib/supabase/client'
-import { fetchBookingHandoffs, fetchBookingReviews, fetchRenterBookings, saveHandoff, submitReview } from '@/lib/data'
+import { fetchBookingHandoffs, fetchBookingReviews, fetchRenterBookings, markRenterBookingsSeen, saveHandoff, submitReview } from '@/lib/data'
 import { isHubWorkflow } from '@/lib/rental-workflow'
 import { useProfile } from '@/lib/use-profile'
 import { pesos, type BookingHandoff, type BookingWithRelations, type Review } from '@/lib/types'
@@ -29,6 +30,7 @@ function dateLabel(booking: BookingWithRelations) {
 }
 
 export default function BookingsPage() {
+  const toast = useToast()
   const { user, profile } = useProfile()
   const [bookings, setBookings] = useState<BookingWithRelations[]>([])
   const [filter, setFilter] = useState('All Bookings')
@@ -46,6 +48,13 @@ export default function BookingsPage() {
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [reporting, setReporting] = useState(false)
+
+  // Viewing the page is what "reads" the bookings — clear the nav badge.
+  // The resulting UPDATE event also refreshes the unseen-bookings hook.
+  useEffect(() => {
+    if (!user) return
+    markRenterBookingsSeen().catch(() => { /* badge clearing is best-effort */ })
+  }, [user])
 
   useEffect(() => {
     if (!user) return
@@ -96,8 +105,11 @@ export default function BookingsPage() {
     try {
       await saveHandoff(selected.id, user.id, 'renter', 'agreement', {})
       setAgreementSigned(true)
+      toast.success('Agreement signed — it is part of the shared booking record.')
     } catch (e) {
-      setModalNote(e instanceof Error ? e.message : 'Could not sign the agreement.')
+      const message = e instanceof Error ? e.message : 'Could not sign the agreement.'
+      setModalNote(message)
+      toast.error(message)
     } finally {
       setAgreementBusy(false)
     }
@@ -109,8 +121,11 @@ export default function BookingsPage() {
     try {
       await saveHandoff(selected.id, user.id, 'renter', 'return', checklistItems)
       setChecklistSaved(true)
+      toast.success('Return confirmed — the owner has been updated.')
     } catch (e) {
-      setModalNote(e instanceof Error ? e.message : 'Could not save the checklist.')
+      const message = e instanceof Error ? e.message : 'Could not save the checklist.'
+      setModalNote(message)
+      toast.error(message)
     }
   }
 
@@ -128,8 +143,11 @@ export default function BookingsPage() {
         comment: reviewComment || null,
       })
       setReviewed(true)
+      toast.success('Review submitted — thank you!')
     } catch (e) {
-      setModalNote(e instanceof Error ? e.message : 'Could not submit the review.')
+      const message = e instanceof Error ? e.message : 'Could not submit the review.'
+      setModalNote(message)
+      toast.error(message)
     } finally {
       setReviewBusy(false)
     }
@@ -161,5 +179,5 @@ export default function BookingsPage() {
       </div>)}
   {modalNote && <p className="auth-error">{modalNote}</p>}
   <p className="demo-note">Statuses update live: when the owner approves your request, this booking changes without a refresh.</p></section></div>}
-  {reporting && selected && <ReportIncidentModal bookingId={selected.id} onClose={() => setReporting(false)} onReported={() => setModalNote('Incident reported. LensShare admins will review it shortly.')} />}
+  {reporting && selected && <ReportIncidentModal bookingId={selected.id} onClose={() => setReporting(false)} onReported={() => { setModalNote('Incident reported. LensShare admins will review it shortly.'); toast.success('Incident reported — admins will review it shortly.') }} />}
   </RenterHeadbar> }

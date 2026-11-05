@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Clock3, RefreshCw, Search, Settings, UserRoundCheck } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
 import { ErrorState } from '@/components/states'
+import { useToast } from '@/components/toast'
 import {
   assignAdminHubHandoff,
   fetchAdminHubHandoffQueue,
@@ -61,6 +62,7 @@ function dueLabel(value: string | null | undefined) {
 
 export default function AdminHubHandoffsPage() {
   const { user, profile, loading: profileLoading } = useProfile()
+  const toast = useToast()
   const [rows, setRows] = useState<HubHandoffQueueItem[]>([])
   const [admins, setAdmins] = useState<AdminUserRow[]>([])
   const [filter, setFilter] = useState<QueueFilter>('mine')
@@ -123,12 +125,15 @@ export default function AdminHubHandoffsPage() {
       : item))
     try {
       await assignAdminHubHandoff(row.booking_id, adminId)
+      toast.success(assignee ? `Booking #${row.booking_id.slice(0, 8).toUpperCase()} assigned to ${assignee.full_name}.` : 'Hand-off set back to unassigned.')
       setLastUpdated(new Date())
     } catch (assignmentError) {
       setRows((current) => current.map((item) => item.booking_id === row.booking_id
         ? { ...item, assigned_admin_id: previousId, assigned_admin: row.assigned_admin }
         : item))
-      setError(assignmentError instanceof Error ? assignmentError.message : 'Could not update the hand-off assignment.')
+      const message = assignmentError instanceof Error ? assignmentError.message : 'Could not update the hand-off assignment.'
+      setError(message)
+      toast.error(message)
     } finally {
       setBusyId(null)
     }

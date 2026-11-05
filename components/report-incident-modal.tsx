@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ImagePlus, Siren } from 'lucide-react'
+import { useToast } from '@/components/toast'
 import { createIncident, validateIncidentPhotos } from '@/lib/data'
 import type { IncidentCategory } from '@/lib/types'
 
@@ -26,6 +27,7 @@ export function ReportIncidentModal({ bookingId, onClose, onReported }: {
   onClose: () => void
   onReported: () => void
 }) {
+  const toast = useToast()
   const [category, setCategory] = useState<IncidentCategory>('damage')
   const [description, setDescription] = useState('')
   const [incidentDate, setIncidentDate] = useState(isoDate())
@@ -77,10 +79,13 @@ export function ReportIncidentModal({ bookingId, onClose, onReported }: {
     setError('')
     try {
       await createIncident({ booking_id: bookingId, category, description: description.trim(), incident_date: incidentDate }, files.map((entry) => entry.file))
+      toast.success('Incident report filed — admins will review it shortly.')
       onReported()
       onClose()
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Could not file the incident report.')
+      const message = submitError instanceof Error ? submitError.message : 'Could not file the incident report.'
+      setError(message)
+      toast.error(message)
       setBusy(false)
     }
   }

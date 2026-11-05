@@ -132,3 +132,164 @@
 
 /* Per-slot upload error: calm callout instead of raw server text */
 .doc-validation-error{display:flex;align-items:flex-start;gap:8px;background:#f9efed;border:1px solid #e6cdc7;color:#8c3d31!important;font-weight:400!important;padding:9px 11px;margin:10px 0 12px;font-size:11px;line-height:1.5}
+
+/* === Readability refinement: renter workspace (final overrides) === */
+.renter-page{font-size:14px}
+.renter-page .owner-content{padding-bottom:96px}
+.renter-page .owner-heading{margin-bottom:34px}
+.renter-page .owner-heading>div>p:last-child{max-width:760px;color:#56635e;font-size:14px;line-height:1.6}
+.renter-page .eyebrow{font-size:10.5px;line-height:1.45;letter-spacing:.1em}
+.renter-toolbar{gap:22px;margin:14px 0 26px}
+.renter-search{min-height:46px;padding:11px 14px;border-color:#cfd8d3;color:#43534d}
+.renter-search input{font-size:14px;color:#26332f}
+.renter-tabs{gap:8px}
+.renter-tabs button{min-height:44px;padding:11px 15px;border-color:#cfd8d3;color:#45534e;font-size:11px;font-weight:700;letter-spacing:.02em}
+.renter-tabs button.active{border-color:#a9cbc1;background:#dcebe7;color:#1f4d43}
+.renter-list{gap:18px}
+.renter-booking,.renter-card{border-color:#d8dfdb;padding:25px;box-shadow:0 2px 10px rgba(23,32,29,.035)}
+.renter-booking{grid-template-columns:132px minmax(0,1fr) minmax(172px,auto);gap:24px}
+.renter-booking img{width:132px;height:104px;border:1px solid #e1e6e3}
+.renter-booking h2,.renter-card h2{margin:7px 0 10px;line-height:1.2}
+.renter-booking h2{font-size:26px}
+.renter-booking p,.renter-card p{color:#56635e;font-size:14px;line-height:1.62}
+.renter-booking strong{font-size:22px}
+.renter-booking-actions{min-width:172px;gap:10px}
+.renter-booking-actions button,.renter-message-link{width:100%;min-height:44px;justify-content:center;border-color:#cbd5d0;padding:10px 14px;color:#2f3e39;font-size:11px;font-weight:700;line-height:1.3;text-decoration:none}
+.renter-booking-actions .status{align-self:flex-end;margin-bottom:3px}
+.renter-hub-link{border-color:#07100e;color:#fff}
+.renter-booking-area{margin:2px 0 10px!important;padding:6px 9px;font-size:11px!important;line-height:1.45!important}
+.renter-pass-saving,.renter-price-discount{font-size:11.5px!important;line-height:1.55}
+.status{border:1px solid #bad2cb;background:#dcebe7;color:#244f46;padding:6px 10px;font-size:10.5px;line-height:1.2;font-weight:700;letter-spacing:.055em;white-space:nowrap}
+.status.pending{border-color:#ddce95;background:#f4edcf;color:#67521c}
+.status.rejected{border-color:#dfb6ae;background:#f8e7e3;color:#80382e}
+.renter-page .owner-button{min-height:44px;padding:11px 16px;font-size:11px;line-height:1.3}
+.profile-card{max-width:900px}
+.profile-avatar{width:76px;height:76px;margin-bottom:28px;font-size:22px}
+.form-grid{gap:18px;margin-bottom:24px}
+.form-grid label{gap:8px;color:#51615b;font-size:11px;line-height:1.4}
+.form-grid input,.form-grid select{min-height:46px;border-color:#cfd8d3;padding:12px 13px;font-size:14px}
+.profile-use-field>small{color:#62706b;font:12px/1.55 Arial,sans-serif;text-transform:none;letter-spacing:0}
+.profile-actions{gap:12px;margin-top:20px;flex-wrap:wrap}
+.renter-pass-summary{padding:26px 28px;border-left:3px solid #315f57}
+.renter-pass-summary>div{max-width:700px}
+.renter-reviews{gap:14px;margin-top:16px}
+.renter-review{padding:16px 18px;border-color:#d5ddd9}
+.renter-review-head{align-items:flex-start}
+.renter-review-head b{font-size:17px}
+.review-stars-inline{font-size:15px}
+.renter-review small{font-size:11.5px;line-height:1.45}
+.renter-review p{font-size:13.5px;line-height:1.6}
+.verification-overview{gap:34px;padding:30px 32px;margin-bottom:22px}
+.verification-overview-copy h2{font-size:30px;line-height:1.2;margin:11px 0}
+.verification-overview-copy>p:last-child{font-size:14px;line-height:1.65;color:#d0dad6}
+.verification-track-list{gap:15px}
+.verification-track{padding:15px 16px;border-color:rgba(255,255,255,.22)}
+.verification-track>div>span{font-size:10.5px;line-height:1.45}
+.verification-track progress{height:8px;margin:13px 0 9px}
+.verification-track small{font-size:11.5px;line-height:1.45;color:#c1ccc8}
+.verification-grid{gap:20px}
+.verification-card-head{margin-bottom:3px}
+.verification-feedback{gap:10px;margin-bottom:20px;padding:13px 15px;font-size:13px;line-height:1.55}
+.doc-slots{gap:15px;margin-top:18px}
+.doc-slot{padding:18px;border-color:#c9d4cf;background:#fcfcfa}
+.doc-slot-head{gap:14px}
+.doc-slot-head strong{font-size:17px;line-height:1.35}
+.doc-slot-head small{margin-top:5px;color:#66746e;font-size:11px;line-height:1.4}
+.doc-slot p{margin:8px 0 12px;color:#56635e;font-size:13px;line-height:1.6}
+.doc-note,.doc-replacement-note,.doc-pending-note{padding:10px 11px!important;font-size:12px!important;line-height:1.55!important}
+.doc-validation-error{padding:11px 12px;font-size:12px;line-height:1.55}
+.verification-footnotes{gap:11px;margin-top:26px}
+.verification-footnotes li{gap:10px;color:#5f6d67;font-size:12.5px;line-height:1.6}
+.saver-hero{gap:38px;padding:38px 40px;margin-bottom:22px}
+.saver-hero h2{font-size:36px;line-height:1.15;margin:12px 0}
+.saver-hero>div>p:last-child{font-size:14px;line-height:1.7;color:#d0d9d5}
+.saver-rate span{font-size:10.5px;line-height:1.4}
+.saver-state-card{gap:18px;padding:25px;margin-bottom:20px;border-color:#d6ded9}
+.saver-state-card h2{font-size:26px;line-height:1.22;margin:9px 0}
+.saver-state-card p{font-size:13.5px;line-height:1.65;color:#56635e}
+.saver-progress{height:11px;margin:20px 0 10px}
+.saver-progress-labels{font-size:10.5px;line-height:1.45}
+.saver-purchase-grid{gap:22px;margin-bottom:22px}
+.saver-gcash-details{margin:22px 0 16px}
+.saver-gcash-details div{padding:15px 0}
+.saver-gcash-details dt{font-size:10.5px;line-height:1.45;color:#5d6b65}
+.saver-gcash-details dd{font-size:14px;line-height:1.45}
+.saver-config-notice{padding:16px;font-size:13px;line-height:1.5}
+.saver-payment-form label{font-size:10.5px;line-height:1.45;margin:14px 0 8px}
+.saver-payment-form label span{font-size:11px;color:#67756f}
+.saver-payment-form input{min-height:46px;border-color:#cbd5d0;padding:12px 13px;font-size:14px}
+.saver-payment-form input[type=file]{padding:10px}
+.saver-file-note,.saver-fine-print{font-size:12px!important;line-height:1.6!important;color:#5f6d67!important}
+.saver-success{padding:12px 14px;font-size:13px;line-height:1.55}
+.saver-terms-grid{margin:22px 0}
+.saver-terms-grid div{padding:20px}
+.saver-terms-grid strong{font-size:25px}
+.saver-terms-grid span{font-size:12px;line-height:1.55}
+.saver-terms ul{font-size:13.5px;line-height:1.75;color:#46544f}
+.saver-terms li+li{margin-top:9px}
+.renter-page .owner-modal>p{font-size:13.5px;line-height:1.6}
+.renter-page .modal-grid{gap:12px}
+.renter-page .modal-grid div{padding:15px}
+.renter-page .modal-grid small{font-size:10.5px;line-height:1.45;color:#5e6d67}
+.renter-page .modal-grid strong{font-size:13.5px;line-height:1.5}
+.renter-agreement-row{gap:10px;margin-top:18px}
+.renter-return-box,.renter-review-box{padding:18px;margin-top:20px}
+.check-item{min-height:44px;font-size:13.5px;line-height:1.5}
+.check-item input{width:18px;height:18px;flex:none}
+.renter-review-box .review-comment{min-height:104px;padding:12px;font-size:14px;line-height:1.55}
+.demo-note{font-size:11.5px!important;line-height:1.55!important;color:#5f6d67!important}
+.renter-page button:focus-visible,.renter-page a:focus-visible,.renter-page input:focus-visible,.renter-page select:focus-visible,.renter-page textarea:focus-visible{outline:2px solid #4f7b70;outline-offset:3px}
+
+@media(max-width:980px){
+  .renter-booking{grid-template-columns:112px minmax(0,1fr)}
+  .renter-booking img{width:112px;height:92px}
+  .renter-booking-actions{grid-column:1/-1;min-width:0;align-items:center;flex-direction:row;flex-wrap:wrap;justify-content:flex-start;border-top:1px solid #e5e9e6;padding-top:16px}
+  .renter-booking-actions .status{align-self:center;margin:0 auto 0 0}
+  .renter-booking-actions button,.renter-message-link{width:auto;min-width:150px}
+  .verification-grid{grid-template-columns:1fr}
+  .verification-card{padding:24px}
+}
+@media(max-width:700px){
+  .renter-page .owner-content{padding:26px 16px 72px}
+  .renter-page .owner-heading{margin-bottom:26px}
+  .renter-toolbar{gap:16px;margin-bottom:22px}
+  .renter-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .renter-tabs button{width:100%}
+  .renter-booking,.renter-card{padding:20px}
+  .renter-booking{grid-template-columns:96px minmax(0,1fr);gap:17px}
+  .renter-booking img{width:96px;height:82px}
+  .renter-booking h2{font-size:22px}
+  .renter-booking-actions{align-items:stretch}
+  .renter-booking-actions .status{align-self:center}
+  .verification-overview{padding:24px}
+  .verification-overview-copy h2{font-size:26px}
+  .verification-card{padding:20px}
+  .doc-slot{padding:16px}
+  .saver-hero{padding:28px}
+  .saver-hero h2{font-size:30px}
+  .saver-state-card{padding:20px}
+  .saver-state-card h2{font-size:23px}
+  .renter-pass-summary{padding:22px}
+  .renter-page .owner-modal{padding:24px 20px}
+  .renter-agreement-row>*{flex:1 1 180px}
+}
+@media(max-width:560px){
+  .renter-booking{grid-template-columns:1fr}
+  .renter-booking img{width:100%;height:auto;max-height:210px;aspect-ratio:16/9}
+  .renter-booking-actions{grid-column:auto;flex-direction:column;align-items:stretch}
+  .renter-booking-actions .status{align-self:flex-start;margin:0 0 3px}
+  .renter-booking-actions button,.renter-message-link{width:100%;min-width:0}
+  .verification-track>div{flex-direction:column;align-items:flex-start;gap:8px}
+  .doc-slot-head{align-items:flex-start}
+  .doc-slot-head .status{white-space:normal}
+  .profile-actions{flex-direction:column}
+  .profile-actions .owner-button,.renter-pass-summary .owner-button{width:100%}
+  .saver-hero{padding:24px 21px}
+  .saver-rate strong{font-size:48px}
+  .saver-state-card{align-items:flex-start}
+  .saver-terms-grid div{padding:17px}
+  .saver-gcash-details div{align-items:flex-start;flex-direction:column;gap:5px}
+  .saver-gcash-details dd{text-align:left;overflow-wrap:anywhere}
+  .renter-review-head{flex-direction:column}
+  .renter-page .form-grid input,.renter-page .form-grid select,.renter-search input,.saver-payment-form input{font-size:16px}
+}

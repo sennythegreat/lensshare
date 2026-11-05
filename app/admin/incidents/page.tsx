@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, CheckCircle2, ImageIcon, Loader2, RefreshCw, Siren } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { EmptyState, SectionSkeleton } from '@/components/states'
+import { useToast } from '@/components/toast'
 import { fetchAdminIncidents, fetchIncidentPhotoUrl, updateIncidentStatus } from '@/lib/data'
 import { type Incident, type IncidentStatus } from '@/lib/types'
 import '../../admin/admin.css'
@@ -26,6 +28,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 export default function AdminIncidentsPage() {
+  const toast = useToast()
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [filter, setFilter] = useState<IncidentStatus | 'all'>('all')
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -34,6 +37,7 @@ export default function AdminIncidentsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [resolutionNote, setResolutionNote] = useState('')
+  const [resolveTarget, setResolveTarget] = useState<Incident | null>(null)
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
 
   const load = useCallback(async (showLoading = true) => {
@@ -75,15 +79,43 @@ export default function AdminIncidentsPage() {
       setError('Add resolution notes before resolving this incident.')
       return
     }
+    if (status === 'resolved') {
+      setResolveTarget(incident)
+      return
+    }
     setBusyId(incident.id)
     setError('')
     setNotice('')
     try {
-      await updateIncidentStatus(incident.id, status, status === 'resolved' ? resolutionNote : null)
-      setNotice(status === 'resolved' ? 'Incident resolved.' : 'Incident moved to review.')
+      await updateIncidentStatus(incident.id, status, null)
+      setNotice('Incident moved to review.')
+      toast.success('Incident moved to review.')
       await load(false)
     } catch (moveError) {
-      setError(moveError instanceof Error ? moveError.message : 'Could not update the incident.')
+      const message = moveError instanceof Error ? moveError.message : 'Could not update the incident.'
+      setError(message)
+      toast.error(message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function confirmResolve() {
+    if (!resolveTarget) return
+    const incident = resolveTarget
+    setBusyId(incident.id)
+    setError('')
+    setNotice('')
+    try {
+      await updateIncidentStatus(incident.id, 'resolved', resolutionNote)
+      setNotice('Incident resolved.')
+      toast.success(`Incident resolved for booking #${incident.booking_id.slice(0, 8).toUpperCase()}.`)
+      setResolveTarget(null)
+      await load(false)
+    } catch (moveError) {
+      const message = moveError instanceof Error ? moveError.message : 'Could not resolve the incident.'
+      setError(message)
+      toast.error(message)
     } finally {
       setBusyId(null)
     }
@@ -146,6 +178,17 @@ export default function AdminIncidentsPage() {
               </article>
             ))}
           </div>}
+
+    <ConfirmDialog
+      open={Boolean(resolveTarget)}
+      busy={busyId !== null}
+      tone="danger"
+      title="Resolve this incident?"
+      description={<>The resolution notes are recorded permanently and cannot be edited afterwards. The booking issue hold clears once no open incidents remain.</>}
+      confirmLabel="Resolve incident"
+      onConfirm={() => void confirmResolve()}
+      onClose={() => setResolveTarget(null)}
+    />
   </AdminShell>
 }
 

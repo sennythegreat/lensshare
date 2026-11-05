@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AdminShell } from '@/components/admin-shell'
 import { Status } from '@/components/owner-shell'
+import { useToast } from '@/components/toast'
 import { fetchAdminBookings, fetchAdminListings, fetchAdminUsers, fetchVerificationQueue, sendQueuedNotifications } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import { pesos, type BookingWithRelations, type ListingWithOwner, type AdminUserRow, type VerificationSubmissionWithUser } from '@/lib/types'
@@ -14,6 +15,7 @@ function dateLabel(value: string) {
 
 export default function AdminDashboardPage() {
   const { profile, loading } = useProfile()
+  const toast = useToast()
   const [users, setUsers] = useState<AdminUserRow[]>([])
   const [listings, setListings] = useState<ListingWithOwner[]>([])
   const [bookings, setBookings] = useState<BookingWithRelations[]>([])
@@ -45,8 +47,11 @@ export default function AdminDashboardPage() {
       const result = await sendQueuedNotifications()
       const failed = result.failures?.length ?? 0
       setMailNote(failed ? `${result.sent} email${result.sent === 1 ? '' : 's'} sent; ${failed} stayed queued for retry.` : `${result.sent} queued email${result.sent === 1 ? '' : 's'} sent.`)
+      toast.success(failed ? `${result.sent} sent, ${failed} stayed queued for retry.` : `${result.sent} queued email${result.sent === 1 ? '' : 's'} sent.`)
     } catch (e) {
-      setMailNote(e instanceof Error ? e.message : 'Could not invoke the email function. Check its deployment and secrets.')
+      const message = e instanceof Error ? e.message : 'Could not invoke the email function. Check its deployment and secrets.'
+      setMailNote(message)
+      toast.error(message)
     } finally {
       setMailState('idle')
     }

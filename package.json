@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "upload:images": "node scripts/upload-seed-images.mjs"
+    "upload:images": "node scripts/upload-seed-images.mjs",
+    "sample:data": "node scripts/sample-data.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

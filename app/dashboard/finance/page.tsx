@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { OwnerShell, PageCard, OwnerHeading, Status } from '@/components/owner-shell'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { SectionSkeleton, EmptyState } from '@/components/states'
+import { useToast } from '@/components/toast'
 import { fetchOwnerBookings, fetchOwnerPayouts, markPayoutPaid } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import { pesos, type BookingWithRelations, type Payout } from '@/lib/types'
@@ -12,10 +14,12 @@ type PayoutRow = Payout & { booking: BookingWithRelations }
 
 export default function FinancePage() {
   const { user } = useProfile()
+  const toast = useToast()
   const [payouts, setPayouts] = useState<PayoutRow[]>([])
   const [bookings, setBookings] = useState<BookingWithRelations[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [confirmPayout, setConfirmPayout] = useState<PayoutRow | null>(null)
 
   function load() {
     if (!user) return
@@ -27,15 +31,21 @@ export default function FinancePage() {
   }
   useEffect(load, [user])
 
-  async function handleMarkPaid(payoutId: string) {
+  async function confirmMarkPaid() {
+    if (!confirmPayout) return
+    const payoutId = confirmPayout.id
     setBusyId(payoutId)
-    // Optimistic update, rollback on error (same pattern as rentals decide()).
+    // Optimistic update, rollback + visible error on failure.
     const previous = payouts
     setPayouts((rows) => rows.map((row) => row.id === payoutId ? { ...row, status: 'paid' as const, paid_at: new Date().toISOString() } : row))
     try {
       await markPayoutPaid(payoutId)
-    } catch {
+      toast.success(`Payout for booking #${payoutId.slice(0, 8).toUpperCase()} marked as paid — ${pesos(Number(confirmPayout.net))} net.`)
+      setConfirmPayout(null)
+    } catch (e) {
       setPayouts(previous)
+      const message = e instanceof Error ? e.message : 'Could not mark the payout as paid.'
+      toast.error(message)
     } finally {
       setBusyId(null)
     }
@@ -68,7 +78,7 @@ export default function FinancePage() {
         <span>Commission <b>− {pesos(Number(row.commission))}</b><br/>Net <b>{pesos(Number(row.net))}</b></span>
         {row.status === 'paid'
           ? <Status>PAID</Status>
-          : <button className="owner-button dark" disabled={busyId === row.id} onClick={() => handleMarkPaid(row.id)}>{busyId === row.id ? 'Saving…' : 'Mark as paid'}</button>}
+          : <button className="owner-button dark" disabled={busyId === row.id} onClick={() => setConfirmPayout(row)}>{busyId === row.id ? 'Saving…' : 'Mark as paid'}</button>}
       </div>)}</div> : <EmptyState title="No payouts yet" hint="Complete a rental from Manage Rentals and its payout will appear here." />}
     </PageCard>
     <PageCard><OwnerHeading eyebrow="SETTLEMENT FORMULA" title="15% co-op commission" detail="Gross uses the undiscounted rental subtotal. Saver Pass discounts are funded by LensShare and do not reduce your 85% share."/>
@@ -78,5 +88,15 @@ export default function FinancePage() {
         <span>Owner share <b>{pesos(totalPaid + pendingNet)}</b></span>
       </div>
     </PageCard>
+    <ConfirmDialog
+      open={Boolean(confirmPayout)}
+      busy={busyId !== null}
+      tone="danger"
+      title="Mark this payout as paid?"
+      description={confirmPayout && <>Confirm you have actually sent {pesos(Number(confirmPayout.net))} to your own account for booking #{confirmPayout.booking_id.slice(0, 8).toUpperCase()}. The ledger status cannot go back to pending afterwards.</>}
+      confirmLabel="Mark as paid"
+      onConfirm={() => void confirmMarkPaid()}
+      onClose={() => setConfirmPayout(null)}
+    />
   </OwnerShell>
 }

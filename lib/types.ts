@@ -17,6 +17,7 @@ export type Profile = {
   full_name: string
   email: string | null
   phone: string | null
+  address: string | null
   role: Role
   primary_rental_use: PrimaryRentalUse | null
   is_student: boolean
@@ -41,7 +42,7 @@ export type VerificationSubmission = {
 }
 
 export type VerificationSubmissionWithUser = VerificationSubmission & {
-  user: Pick<Profile, 'id' | 'full_name' | 'email' | 'verification_status' | 'is_student'> | null
+  user: Pick<Profile, 'id' | 'full_name' | 'email' | 'role' | 'verification_status' | 'is_student'> | null
 }
 
 export type AdminUserRow = Profile & {
@@ -63,6 +64,7 @@ export type Listing = {
   included: string | null
   description: string | null
   daily_rate: number
+  security_deposit: number | null
   image_url: string | null
   image_urls: string[] | null
   pickup_address: string | null
@@ -142,13 +144,22 @@ export type BookingQuote = {
 }
 
 export type ListingWithOwner = Listing & {
-  owner: Pick<Profile, 'id' | 'full_name'> | null
+  owner: Pick<Profile, 'id' | 'full_name' | 'verification_status'> | null
 }
 
 export type BookingWithRelations = Booking & {
   listing: Listing | null
   renter: (Pick<Profile, 'id' | 'full_name' | 'verification_status' | 'is_student' | 'phone'> & Partial<Pick<Profile, 'primary_rental_use'>>) | null
-  owner: Pick<Profile, 'id' | 'full_name'> | null
+  owner: Pick<Profile, 'id' | 'full_name' | 'verification_status' | 'phone'> | null
+}
+
+// Counterparty identity-document proof rows shown in the booking conversation.
+export type CounterpartyVerificationProof = {
+  doc_type: VerificationDocType
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+  review_note: string | null
+  file_path: string
 }
 
 // ---------- Versioned Naga Hub rental workflow ----------
@@ -683,6 +694,12 @@ export function renterVerificationLabel(renter: Pick<Profile, 'verification_stat
   if (!renter) return ''
   const label = renter.verification_status === 'verified' ? '✓ Verified renter' : renter.verification_status === 'pending' ? 'Verification pending' : 'Unverified renter'
   return renter.is_student ? `${label} · Student` : label
+}
+
+// Shown to renters on listings and to the owner themselves so they can gauge the owner's trust standing.
+export function ownerVerificationLabel(owner: Pick<Profile, 'verification_status'> | null | undefined): string {
+  if (!owner) return ''
+  return owner.verification_status === 'verified' ? '✓ Verified owner' : owner.verification_status === 'pending' ? 'Verification pending' : 'Unverified owner'
 }
 
 export function pesos(amount: number): string {

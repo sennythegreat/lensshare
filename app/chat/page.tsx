@@ -4,15 +4,18 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Download, FileText, MessageCircle, Paperclip, Send, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Download, FileText, MessageCircle, Paperclip, Send, X } from 'lucide-react'
 import { RentalAgreementSheet } from '@/components/rental-agreement-sheet'
 import { VerifyBanner } from '@/components/verify-banner'
 import { EmptyState, ErrorState, SectionSkeleton } from '@/components/states'
+import { useToast } from '@/components/toast'
 import {
   fetchBookingById,
   fetchBookingHandoffs,
   fetchBookingMessages,
+  fetchCounterpartyVerificationProofs,
   fetchMessageAttachmentUrl,
+  fetchSignedDocUrl,
   markMessagesRead,
   sendMessage,
   updateBookingStatus,
@@ -20,20 +23,22 @@ import {
 } from '@/lib/data'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/lib/use-profile'
-import { pesos, renterVerificationLabel } from '@/lib/types'
+import { ownerVerificationLabel, pesos, renterVerificationLabel } from '@/lib/types'
 import { isHubWorkflow } from '@/lib/rental-workflow'
-import type { BookingHandoff, BookingStatus, BookingWithRelations, Message, MessageAttachment } from '@/lib/types'
+import type { BookingHandoff, BookingStatus, BookingWithRelations, CounterpartyVerificationProof, Message, MessageAttachment } from '@/lib/types'
 import './chat.css'
 
 const ATTACHMENT_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv'
 
 export default function ChatPage() {
+  const toast = useToast()
   return <Suspense fallback={<main className="chat-page"><SectionSkeleton rows={5} /></main>}><ChatContent /></Suspense>
 }
 
 function ChatContent() {
   const bookingId = useSearchParams().get('id') ?? ''
   const router = useRouter()
+  const toast = useToast()
   const { user, profile, loading: profileLoading } = useProfile()
   const [booking, setBooking] = useState<BookingWithRelations | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -46,6 +51,9 @@ function ChatContent() {
   const [agreementOpen, setAgreementOpen] = useState(false)
   const [agreementState, setAgreementState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [handoffs, setHandoffs] = useState<BookingHandoff[]>([])
+  const [aboutOpen, setAboutOpen] = useState(false)
+  const [proofs, setProofs] = useState<CounterpartyVerificationProof[]>([])
+  const [proofsState, setProofsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [error, setError] = useState('')
   const endRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -143,8 +151,11 @@ function ChatContent() {
       const updated = await updateBookingStatus(booking.id, status)
       setBooking((current) => current ? { ...current, status: updated.status, updated_at: updated.updated_at } : current)
       setConfirmingDecline(false)
+      toast.success(status === 'approved' ? 'Request approved — the renter has been notified.' : 'Request declined.')
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Booking status could not be updated.')
+      const message = cause instanceof Error ? cause.message : 'Booking status could not be updated.'
+      setError(message)
+      toast.error(message)
       refreshBooking()
     } finally {
       setDecisionBusy(false)
@@ -167,12 +178,30 @@ function ChatContent() {
   const renterLocked = profile?.role === 'renter' && profile.verification_status !== 'verified'
   const backHref = profile?.role === 'owner' ? '/dashboard/messages' : '/renter/messages'
   const counterpart = profile?.role === 'owner' ? booking?.renter?.full_name : booking?.owner?.full_name
+  const counterpartInfo = profile?.role === 'owner' ? booking?.renter : booking?.owner
+  const counterpartRole = profile?.role === 'owner' ? 'renter' : 'owner'
+  const counterpartVerificationLabel = profile?.role === 'owner'
+    ? renterVerificationLabel(booking?.renter)
+    : ownerVerificationLabel(booking?.owner)
   const isOwner = Boolean(booking && user && profile?.role === 'owner' && booking.owner_id === user.id)
   const conversationClosed = booking?.status === 'declined'
   const bookingHref = booking && isHubWorkflow(booking)
     ? profile?.role === 'owner' ? `/dashboard/rentals/${booking.id}` : `/renter/bookings/${booking.id}`
     : profile?.role === 'owner' ? '/dashboard/rentals' : '/renter/bookings'
   const canSend = Boolean(body.trim() || files.length)
+
+  function toggleAbout() {
+    setAboutOpen((open) => {
+      const next = !open
+      if (next && proofsState === 'idle') {
+        setProofsState('loading')
+        fetchCounterpartyVerificationProofs(bookingId)
+          .then((rows) => { setProofs(rows); setProofsState('ready') })
+          .catch(() => setProofsState('error'))
+      }
+      return next
+    })
+  }
 
   if (!bookingId) return <main className="chat-page"><EmptyState icon={MessageCircle} title="Choose a booking conversation" hint="Open Messages from your workspace to choose a thread." /></main>
   if (profileLoading || loading) return <main className="chat-page"><SectionSkeleton rows={5} /></main>
@@ -189,6 +218,27 @@ function ChatContent() {
           <Link href={bookingHref}>{isHubWorkflow(booking) ? 'Open rental hub' : 'View booking'}</Link>
         </div>
       </header>
+      {counterpartInfo && <section className="chat-about" aria-label={`About ${counterpart || 'the other party'}`}>
+        <button type="button" className="chat-about-toggle" aria-expanded={aboutOpen} onClick={toggleAbout}>
+          <div>
+            <span>About your {counterpartRole}</span>
+            <strong>{counterpart} · {counterpartVerificationLabel}</strong>
+          </div>
+          <ChevronDown size={16} className={aboutOpen ? 'open' : ''} />
+        </button>
+        {aboutOpen && <div className="chat-about-details">
+          <div className="chat-about-cell"><small>Role</small><strong>{counterpartRole === 'renter' ? 'Renter' : 'Owner'}</strong></div>
+          <div className="chat-about-cell"><small>Contact</small><strong>{counterpartInfo.phone || 'No phone on file'}</strong><small className="chat-about-note">Coordinate the hand-off by phone or here in messages.</small></div>
+          <div className="chat-about-cell"><small>Verification</small><strong>{counterpartVerificationLabel}</strong><small className="chat-about-note">Reviewed by LensShare admins — not self-declared.</small></div>
+          <div className="chat-about-proofs">
+            <small>Identity documents</small>
+            {proofsState === 'loading' && <p>Loading documents…</p>}
+            {proofsState === 'error' && <p>Documents could not be loaded. Try expanding again.</p>}
+            {proofsState === 'ready' && !proofs.length && <p>No identity documents submitted yet.</p>}
+            {proofsState === 'ready' && !!proofs.length && <div className="chat-about-proof-list">{proofs.map((proof) => <ProofDocRow proof={proof} key={proof.doc_type} />)}</div>}
+          </div>
+        </div>}
+      </section>}
       <div className="chat-notices">
         {renterLocked && <div className="chat-banner"><VerifyBanner compact /></div>}
         {isOwner && booking.status === 'pending' && <section className="chat-decision" aria-label="Pending rental request">
@@ -229,6 +279,34 @@ function ChatContent() {
       </div>}
     </section>
   </main>
+}
+
+function ProofDocRow({ proof }: { proof: CounterpartyVerificationProof }) {
+  const [url, setUrl] = useState('')
+  const [failed, setFailed] = useState(false)
+  const approved = proof.status === 'approved'
+
+  useEffect(() => {
+    if (!approved) return
+    let active = true
+    setFailed(false)
+    fetchSignedDocUrl(proof.file_path)
+      .then((signedUrl) => { if (active) setUrl(signedUrl) })
+      .catch(() => { if (active) setFailed(true) })
+    return () => { active = false }
+  }, [approved, proof.file_path])
+
+  const title = proof.doc_type === 'government_id' ? 'Government ID' : 'Selfie'
+  return <div className="chat-about-proof">
+    <span><b>{title}</b><small>Uploaded {new Date(proof.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</small></span>
+    <div className="chat-about-proof-actions">
+      <em className={`chat-about-proof-status ${proof.status}`}>{approved ? 'Approved' : proof.status === 'pending' ? 'Pending review' : 'Rejected'}</em>
+      {approved && (url
+        ? <a href={url} target="_blank" rel="noreferrer">View document</a>
+        : <span className="chat-about-proof-view">{failed ? 'Preview unavailable' : '…'}</span>)}
+    </div>
+    {proof.status === 'rejected' && proof.review_note && <p>Reviewer note: “{proof.review_note}”</p>}
+  </div>
 }
 
 function ChatAttachment({ attachment }: { attachment: MessageAttachment }) {

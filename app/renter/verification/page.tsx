@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BadgeCheck, Camera, Check, CircleAlert, FileUp, GraduationCap, IdCard } from 'lucide-react'
 import { RenterHeadbar, Status } from '@/components/renter-headbar'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { useToast } from '@/components/toast'
 import { fetchMySubmissions, friendlyVerificationError, replaceVerificationSubmission, validateVerificationDocument } from '@/lib/data'
 import { useProfile } from '@/lib/use-profile'
 import type { VerificationDocType, VerificationSubmission } from '@/lib/types'
@@ -125,12 +127,14 @@ function DocSlot({
 
 export default function VerificationPage() {
   const { user } = useProfile()
+  const toast = useToast()
   const [submissions, setSubmissions] = useState<VerificationSubmission[]>([])
   const [uploading, setUploading] = useState<VerificationDocType | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<VerificationDocType, string>>>({})
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loaded, setLoaded] = useState(false)
+  const [pendingReplace, setPendingReplace] = useState<{ docType: VerificationDocType; file: File } | null>(null)
 
   function load() {
     if (!user) return Promise.resolve()
@@ -160,16 +164,26 @@ export default function VerificationPage() {
     setSuccess('')
     if (validationError) return
 
+    // Replacing an approved document resets the check to review — confirm first.
+    if (latest.get(docType)?.status === 'approved') {
+      setPendingReplace({ docType, file })
+      return
+    }
+    await uploadReplacement(docType, file)
+  }
+
+  async function uploadReplacement(docType: VerificationDocType, file: File) {
+    if (!user) return
     setUploading(docType)
     try {
       await replaceVerificationSubmission(user.id, docType, file)
       await load()
       setSuccess(`${DOC_LABELS[docType]} submitted. This latest file is now the version awaiting review.`)
+      toast.success(`${DOC_LABELS[docType]} submitted for review.`)
     } catch (uploadError) {
-      setFieldErrors((current) => ({
-        ...current,
-        [docType]: friendlyVerificationError(uploadError),
-      }))
+      const message = friendlyVerificationError(uploadError)
+      setFieldErrors((current) => ({ ...current, [docType]: message }))
+      toast.error(message)
     } finally {
       setUploading(null)
     }
@@ -231,5 +245,15 @@ export default function VerificationPage() {
       <li><BadgeCheck size={13} /> <span>Approval is manual and per document. A check becomes complete only after both of its required documents are approved.</span></li>
       {loaded && !submissions.length && <li><CircleAlert size={13} /> <span>No submissions yet — start with your government ID and selfie.</span></li>}
     </ul>
+    <ConfirmDialog
+      open={Boolean(pendingReplace)}
+      busy={uploading !== null}
+      tone="danger"
+      title={pendingReplace ? `Replace your approved ${DOC_LABELS[pendingReplace.docType]}?` : 'Replace approved document?'}
+      description="Your check goes back to review immediately, and the new file must be approved again before the flag is restored."
+      confirmLabel="Replace file"
+      onConfirm={() => { if (pendingReplace) { const { docType, file } = pendingReplace; setPendingReplace(null); void uploadReplacement(docType, file) } }}
+      onClose={() => setPendingReplace(null)}
+    />
   </RenterHeadbar>
 }
